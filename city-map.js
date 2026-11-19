@@ -58,35 +58,8 @@
         releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
         setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
-  const findResumableEncounterSession=async(characterId,placeKey)=>{
-    const uid=currentUser()?.uid;
-    if(!uid)return null;
-    const dateKey=value=>String(value||'').replaceAll('/','-');
-    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date());
-    const matches=item=>item?.encounterMode===true&&item.archived!==true&&item.characterId===characterId&&
-      item.encounterPlace===placeKey&&item.cloudOwned===true&&item.cloudOwnerUid===uid&&
-      dateKey(item.encounterDay||(item.startedAt?new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei'}).format(new Date(item.startedAt)):''))===today;
-    const local=Object.values(state.sessions).filter(matches)
-      .sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0];
-    if(local)return local;
-    const client=window.mySupabase;
-    if(!client)return null;
-    const {data:{user},error:authError}=await client.auth.getUser();
-    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)return null;
-    const {data:rows,error}=await client.from('chat_sessions')
-      .select('id,session_data,created_at,updated_at')
-      .eq('user_id',uid).eq('character_id',characterId).eq('chat_mode','encounter')
-      .is('deleted_at',null).order('updated_at',{ascending:false}).limit(20);
-    if(error)throw error;
-    const candidate=(rows||[]).find(row=>{
-      const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
-      return data.encounterMode===true&&data.archived!==true&&data.encounterPlace===placeKey&&dateKey(data.encounterDay)===today;
-    });
-    if(!candidate)return null;
-    await loadCloudChatSessions(user,{onlySessionId:candidate.id,force:true,listPage:false});
-    const hydrated=state.sessions[candidate.id];
-    return matches(hydrated)?hydrated:null;
-  };
+  const findResumableEncounterSession=(characterId,placeKey)=>
+    window.PoyozzEncounterSessionResume?.find({characterId,placeKey,state,currentUser,loadCloudChatSessions})||Promise.resolve(null);
 
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
