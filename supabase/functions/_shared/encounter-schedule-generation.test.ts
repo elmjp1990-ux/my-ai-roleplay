@@ -172,7 +172,15 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
   }
   if (normalizeEncounterSceneKey("酒吧") !== "night-bar" ||
       normalizeEncounterSceneKey("辦公大樓") !== "commercial" ||
-      normalizeEncounterSceneKey("咖啡廳") !== "cafe") throw new Error("canonical scene aliases regressed");
+      normalizeEncounterSceneKey("咖啡廳") !== "cafe" ||
+      normalizeEncounterSceneKey("展演廳") !== "live-house") throw new Error("canonical scene aliases regressed");
+
+  const tooLong = hourlyBlocks();
+  tooLong[8] = block(8, [option({ location: "音樂工作室" }), option({ weight: 40 })]);
+  const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
+  if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
+    throw new Error("location label longer than four characters accepted");
+  }
 });
 
 Deno.test("preserves modern schedules when the model reports no matching map location", () => {
