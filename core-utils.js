@@ -21,15 +21,17 @@
       if (sourceChanged(a, b)) ai.push({ key, label: key });
       else if (changed(a, b)) nonAi.push({ key: key + '_format_only', label: key });
     };
-    const prev = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
-    const next = normalizePersonalityProfile(character.personalityProfile || {});
+    // Compare persisted source values, not their UI-normalized display copies.
+    // Otherwise truncation/trim could hide a real DB source-hash change.
+    const prev = existingPrivateProfile?.personality_profile || {};
+    const next = character.personalityProfile || {};
     compare(nonAi, 'name', existingCharacter?.name, String(character.name || '').trim());
     compareSource('intro', existingCharacter?.intro || '', character.intro || '');
     compareSource('race', existingCharacter?.race || '', character.race || '');
     compareSource('style', existingCharacter?.style || '', character.style || '');
     compareSource('private_info', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
     const fields = ['coreTraits','values','speechStyle','behaviorRules','likes','dislikes','boundaries','relationshipPacing','occupation'];
-    for (const key of fields) compare(ai, 'personality_profile.' + key, prev[key], next[key]);
+    for (const key of fields) compare(ai, 'personality_profile.' + key, prev[key] ?? '', next[key] ?? '');
     compare(nonAi, 'personality_profile.primaryIllustrationName', prev.primaryIllustrationName, next.primaryIllustrationName);
     compare(runtime, 'phone_settings', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
     compare(nonAi, 'tags', existingCharacter?.tags || [], character.tags || []);
