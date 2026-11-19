@@ -26,13 +26,22 @@ function parseJsonObject(raw) {
 }
 
 export function parseEncounterTurnOutput(raw) {
-  const value = parseJsonObject(raw);
+  let value = parseJsonObject(raw);
+  if (!value && typeof raw === "string") {
+    const cleaned = raw.trim().replace(/^\x60{3}(?:json)?\\s*/i, "").replace(/\\s*\x60{3}$/, "");
+    // Some providers return a useful plain-text reply despite JSON mode. Recover
+    // only ordinary text; malformed object/array output remains rejected.
+    if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[") &&
+        Array.from(cleaned).length >= 60 && Array.from(cleaned).length <= 600) {
+      value = { reply: cleaned };
+    }
+  }
   if (!value) return null;
   const reply = typeof value.reply === "string" ? value.reply.trim() : "";
   const length = Array.from(reply).length;
-  // The prompt targets 150–300 characters. Accept a bounded margin so a
-  // slightly short/long valid character reply is not refunded as malformed.
-  if (length < 100 || length > 420) return null;
+  // Prompt target is 150–300 characters, but allow shorter/longer valid output
+  // so an otherwise coherent reply is not refunded for minor model drift.
+  if (length < 60 || length > 600) return null;
 
   const rawSuggestions = Array.isArray(value.suggested_replies ?? value.suggestedReplies)
     ? (value.suggested_replies ?? value.suggestedReplies) : [];
