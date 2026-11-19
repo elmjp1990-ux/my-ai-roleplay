@@ -119,8 +119,8 @@ assert.match(coreUtils, /shouldCallModel: false/,
 assert.match(frontend, /p_source_changed: aiOrganizationDecision\.requiresDerivedRefresh === true/, "Save flow must pass its deterministic source-change decision to the database");
 assert.match(profileVersionMigration, /p_source_changed boolean/, "Profile queue must accept the deterministic source-change decision");
 assert.match(profileVersionMigration, /character_private_info\.personality_profile\.occupation/, "The profile source payload must include the creator occupation field");
-assert.match(profileVersionMigration, /AS \\$queue_wrapper\\$[\\s\\S]*?RETURN public\\.enqueue_character_profile_organization\\(p_character_id, true\\);[\\s\\S]*?\\$queue_wrapper\\$;/, "Legacy one-argument queue RPC must retain valid dollar quoting");
-assert.match(profileVersionMigration, /AS \\$profile_source\\$[\\s\\S]*?RETURN v_payload;[\\s\\S]*?\\$profile_source\\$;/, "The source payload replacement must use valid dollar quoting");
+assert.match(profileVersionMigration, /AS \$queue_wrapper\$[\s\S]*?RETURN public\.enqueue_character_profile_organization\(p_character_id, true\);[\s\S]*?\$queue_wrapper\$;/, "Legacy one-argument queue RPC must retain valid dollar quoting");
+assert.match(profileVersionMigration, /AS \$profile_source\$[\s\S]*?RETURN v_payload;[\s\S]*?\$profile_source\$;/, "The source payload replacement must use valid dollar quoting");
 assert.match(profileVersionMigration, /p\.profile->>'schema_version' = '1\.1'/, "Legacy profile schemas must be refreshed once");
 assert.match(profileVersionMigration, /p\.profile \? 'life_context'/, "A profile is current only when structured life context exists");
 assert.match(frontend, /enqueue_character_profile_organization/,
