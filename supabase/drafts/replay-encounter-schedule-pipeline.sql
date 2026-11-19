@@ -267,6 +267,18 @@ BEGIN
     RAISE EXCEPTION 'synthetic fixture no longer selects the unavailable restaurant option: %', v_option_roll;
   END IF;
 
+  -- This character also has a legacy manual primary row from 12:00–14:00
+  -- for the separate weather-fallback smoke test. Manual schedules intentionally
+  -- outrank AI schedules, so temporarily deactivate that overlapping fixture row
+  -- to isolate the hourly weighted-option behavior under test.
+  UPDATE public.character_schedules
+  SET is_active = false
+  WHERE id = '00000000-0000-4000-8000-000000000013'::uuid
+    AND is_active IS TRUE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'hourly unavailable-scene smoke could not isolate its legacy manual fixture';
+  END IF;
+
   SELECT * INTO v_result
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
@@ -279,6 +291,10 @@ BEGIN
     RAISE EXCEPTION 'when the original weighted choice is unavailable, the character must not appear or be rerolled; got % / %',
       v_result.location_key, v_result.variant_key;
   END IF;
+
+  UPDATE public.character_schedules
+  SET is_active = true
+  WHERE id = '00000000-0000-4000-8000-000000000013'::uuid;
 END;
 $unavailable_hourly_scene_option_smoke$;
 
