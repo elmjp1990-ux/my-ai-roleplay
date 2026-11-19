@@ -89,6 +89,20 @@ Deno.test("accepts full weekday and holiday days with independent weighted optio
   }
 });
 
+
+Deno.test("accepts descriptive venue labels such as 歸途（酒吧）", () => {
+  const blocks = hourlyBlocks();
+  blocks[18] = block(18, [
+    option({ weight: 60, location: "歸途（酒吧）", activity: "在酒吧吧台調製雞尾酒並招呼熟客" }),
+    option({ weight: 40, location: "歸途（酒吧）", activity: "在酒館角落整理酒單並準備營業" }),
+  ]);
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  if (parsed.characters[0].variants.weekday[18].options[0].location_description !== "歸途（酒吧）") {
+    throw new Error("descriptive venue label was not preserved");
+  }
+});
+
 Deno.test("rejects missing hours, gaps, and non-hourly blocks", () => {
   const missing = hourlyBlocks().slice(0, 23);
   const missingResult = result([{ character_id: id1, placement: "modern_map", variants: variants(missing) }]);
