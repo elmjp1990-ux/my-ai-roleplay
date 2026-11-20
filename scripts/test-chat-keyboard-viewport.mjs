@@ -13,6 +13,7 @@ assert.doesNotThrow(() => new Function(source), "keyboard viewport controller mu
 
 assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
+assert.match(encounterScene, /top:var\(--poyozz-visual-viewport-top,0px\)!important/);
 assert.match(encounterScene, /height:var\(--poyozz-chat-viewport-height,100dvh\)!important/);
 assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
 assert.match(encounterScene, /bottom:0!important;max-height:calc/);
@@ -20,9 +21,10 @@ assert.match(encounterScene, /encounterTypingPulse/);
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
-assert.doesNotMatch(html.match(/<style[^>]*>[\s\S]*?<\/style>/g)?.join("\n")||"", /encounter-mode-active|encounter-scene/,
+const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\\s\\S]*?)<\\/style>/g)].map(item=>item[1]).join("\\n");
+assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
-assert.match(encounterScene, /Encounter-specific final refinements migrated out of index\.html/,
+assert.match(encounterScene, /\\.encounter-scene \\.messages\\{/);
   "Encounter-specific final visual refinements must be centralized in encounter-scene.js");
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
