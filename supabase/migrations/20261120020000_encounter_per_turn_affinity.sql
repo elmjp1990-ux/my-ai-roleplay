@@ -92,3 +92,68 @@ FOR EACH ROW WHEN (OLD.affinity IS DISTINCT FROM NEW.affinity OR OLD.relationshi
 EXECUTE FUNCTION public.sync_shared_affinity_to_story();
 REVOKE ALL ON FUNCTION public.sync_shared_affinity_from_story() FROM PUBLIC,anon,authenticated;
 REVOKE ALL ON FUNCTION public.sync_shared_affinity_to_story() FROM PUBLIC,anon,authenticated;
+
+-- New Encounter sessions inherit the user's canonical relationship with this character.
+CREATE OR REPLACE FUNCTION public.create_encounter_session_with_lifecycle(
+  p_session_id uuid,
+  p_user_id uuid,
+  p_character_id uuid,
+  p_character_name text,
+  p_character_snapshot jsonb,
+  p_schedule_snapshot jsonb,
+  p_location_key text,
+  p_scheduled_start_at timestamptz,
+  p_scheduled_end_at timestamptz
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE
+  v_session jsonb;
+  v_affinity integer := 0;
+  v_stage text := 'first_meeting';
+BEGIN
+  IF NOT public.is_service_role_request() THEN RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501'; END IF;
+  IF p_session_id IS NULL OR p_user_id IS NULL OR p_character_id IS NULL
+     OR p_location_key IS NULL OR char_length(p_location_key) NOT BETWEEN 1 AND 80
+     OR jsonb_typeof(COALESCE(p_character_snapshot, '{}'::jsonb)) <> 'object'
+     OR jsonb_typeof(COALESCE(p_schedule_snapshot, '{}'::jsonb)) <> 'object'
+     OR pg_column_size(COALESCE(p_schedule_snapshot, '{}'::jsonb)) > 8000
+     OR p_scheduled_start_at IS NULL OR p_scheduled_end_at IS NULL
+     OR p_scheduled_end_at <= p_scheduled_start_at THEN
+    RAISE EXCEPTION 'Invalid Encounter session lifecycle input' USING ERRCODE = '22023';
+  END IF;
+
+  SELECT state.affinity, state.relationship_stage INTO v_affinity, v_stage
+  FROM public.encounter_character_state state
+  WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+
+  v_affinity := COALESCE(v_affinity,0);
+  v_stage := COALESCE(v_stage,public.story_relationship_stage_for_affinity(v_affinity));
+
+  INSERT INTO public.chat_sessions (
+    id,user_id,character_id,character_name,status,character_snapshot,session_data,chat_mode
+  ) VALUES (
+    p_session_id,p_user_id,p_character_id,p_character_name,'active',
+    COALESCE(p_character_snapshot,'{}'::jsonb),
+    jsonb_build_object('encounter',jsonb_build_object('affinity',v_affinity,'relationshipStage',v_stage)),
+    'encounter'
+  );
+
+  INSERT INTO public.encounter_session_lifecycle (
+    session_id,user_id,character_id,location_key,schedule_snapshot,
+    scheduled_start_at,scheduled_end_at,timezone,status
+  ) VALUES (
+    p_session_id,p_user_id,p_character_id,p_location_key,p_schedule_snapshot,
+    p_scheduled_start_at,p_scheduled_end_at,'Asia/Taipei','active'
+  );
+
+  SELECT jsonb_build_object(
+    'id',s.id,'user_id',s.user_id,'character_id',s.character_id,
+    'character_name',s.character_name,'status',s.status,
+    'character_snapshot',s.character_snapshot,'session_data',s.session_data,
+    'chat_mode',s.chat_mode,'created_at',s.created_at,'updated_at',s.updated_at
+  ) INTO v_session FROM public.chat_sessions s WHERE s.id=p_session_id;
+  RETURN v_session;
+END; $$;
+REVOKE ALL ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz) TO service_role;
+
