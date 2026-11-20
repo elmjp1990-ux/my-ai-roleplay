@@ -105,9 +105,6 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     throw new Error("encounter_evaluation_lifecycle_not_due");
   }
   if (lifecycle.status === "settled") {
-    const { data: settledSession, error: settledSessionError } = await admin.from("chat_sessions")
-      .select("session_data").eq("id", job.session_id).maybeSingle();
-    if (settledSessionError || !settledSession) throw new Error("encounter_summary_session_unavailable");
     const result = asRow(lifecycle.settlement_result);
     const evaluation = asRow(result.evaluation);
     const summary = asText(evaluation.diary_summary);
