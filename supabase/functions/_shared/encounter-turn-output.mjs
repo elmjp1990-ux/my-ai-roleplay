@@ -50,12 +50,13 @@ export function parseEncounterTurnOutput(raw) {
       const size = Array.from(item).length;
       return size >= 30 && size <= 90;
     }).slice(0, 3);
+  if (suggestedReplies.length !== 3) return null;
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);
   const sceneBackgroundId = optionalUuid(value.scene_background_id ?? value.sceneBackgroundId);
 
   return {
     reply,
-    suggestedReplies: suggestedReplies.length === 3 ? suggestedReplies : [],
+    suggestedReplies,
     illustrationId,
     sceneBackgroundId,
   };
