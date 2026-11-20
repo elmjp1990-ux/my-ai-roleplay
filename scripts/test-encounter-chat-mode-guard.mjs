@@ -80,6 +80,16 @@ assert.match(encounterSession, /create_encounter_session_with_lifecycle/);
 assert.match(accessMigration, /private\.current_user_is_adult\(\)/);
 assert.doesNotMatch(encounterSession, /\.eq\(["']latest_eligible["'],\s*true\)/);
 
+const relationshipSeedMigration = fs.readFileSync(
+  "supabase/migrations/20261120030000_seed_encounter_relationship_state.sql",
+  "utf8",
+);
+assert.match(relationshipSeedMigration, /FROM public\.encounter_character_state AS state/);
+assert.match(relationshipSeedMigration, /FROM public\.story_relationship_states AS story/);
+assert.match(relationshipSeedMigration, /jsonb_build_object\('encounter',jsonb_build_object\('affinity',v_affinity,'relationshipStage',v_relationship_stage\)\)/);
+assert.match(relationshipSeedMigration, /ON CONFLICT\(user_id,character_id\) DO NOTHING/);
+assert.match(relationshipSeedMigration, /GRANT EXECUTE ON FUNCTION public\.create_encounter_session_with_lifecycle/);
+
 const encounterTurn = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 assert.match(encounterTurn, /auth\.getUser\(\)/);
 assert.match(encounterTurn, /session\.chat_mode !== ["']encounter["']/);
