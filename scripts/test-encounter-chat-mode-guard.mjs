@@ -471,7 +471,7 @@ assert.match(frontend, /background:transparent!important/);
 assert.match(frontend, /body\.encounter-mode-active \.chat-main\.encounter-scene \.encounter-dialogue-beat/);
 assert.match(frontend, /padding-bottom:0!important/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/);
-assert.match(cityMap, /ageValue=person\.age\?\?person\.characterAge\?\?person\.character_age/);
+assert.match(cityMap, /const liveAge=person\.age\?\?person\.characterAge\?\?person\.character_age/);
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/);
 assert.match(pauseResumeEndpoint, /encounter_session_evaluation_jobs/);
 assert.match(pauseResumeEndpoint, /EdgeRuntime/);
