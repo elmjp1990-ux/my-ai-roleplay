@@ -6,15 +6,17 @@ const text = "相遇內容。".repeat(30);
 const illustrationId = "11111111-1111-4111-8111-111111111111";
 const sceneBackgroundId = "22222222-2222-4222-8222-222222222222";
 assert.equal(Array.from(text).length, 150);
+const validSuggestions = ["我想了解你剛才為什麼會來這裡，以及你現在的想法。", "如果方便的話，我想陪你做點別的事，看看接下來會發生什麼。", "我先回應你剛剛的話，再問一個和眼前情況有關的小問題。"];
+
 assert.deepEqual(
-  parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
-  { reply: text, suggestedReplies: [], illustrationId, sceneBackgroundId },
+  parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
+  { reply: text, suggestedReplies: validSuggestions, illustrationId, sceneBackgroundId },
 );
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
 const shortValid = "相遇內容。".repeat(15);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid })).reply, shortValid);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid, suggested_replies: validSuggestions })).reply, shortValid);
 const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(3);
-assert.equal(parseEncounterTurnOutput(plainTextReply).reply, plainTextReply);
+assert.equal(parseEncounterTurnOutput(plainTextReply), null, "Plain text without three suggestions must be rejected to avoid a missing-options turn");
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(151) })), null);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
@@ -24,12 +26,12 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration
 
 const max = "相遇內容".repeat(150);
 assert.equal(Array.from(max).length, 600);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max })).reply, max);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max, suggested_replies: validSuggestions })).reply, max);
 const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的狀況，這裡還有其他地方需要一起檢查嗎？", "你膝蓋上沾了不少灰塵，需要我幫你拿毛巾，還是先讓你把手邊工作收尾？", "浴室的濾網換好之後，有沒有什麼日常清潔方式可以避免排水管再次堵塞？"];
 const fence = String.fromCharCode(96).repeat(3);
 const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, illustration_id: illustrationId }) + "\n" + fence);
 assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"] })).suggestedReplies.length, 0);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"] })), null, "Invalid suggestions must reject the response");
 
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
