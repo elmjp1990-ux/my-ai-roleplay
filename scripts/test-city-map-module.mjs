@@ -15,6 +15,8 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
 
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
+assert.match(cityMap, /map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)/,
+  'Blank live age must be treated as missing so the consistent snapshot fallback is used');
 assert.match(cityMap, /snapshotAges\.every\(value=>value===snapshotAges\[0\]\)/,
   'When live age is missing, only a consistent age across loaded chat snapshots may be used as fallback');
 assert.match(cityMap, /requestedSleepScene=person\.name==='陸沈宵'&&rawTimeRange==='08:00–09:00'/);
