@@ -65,7 +65,7 @@ BEGIN
   IF pg_trigger_depth()>1 THEN RETURN NEW; END IF;
   SELECT COALESCE(s.session_data->>'affinityMode','shared') INTO v_mode FROM public.chat_sessions s WHERE s.id=NEW.session_id;
   IF v_mode<>'shared' OR NEW.character_id IS NULL THEN RETURN NEW; END IF;
-  v_stage := CASE WHEN NEW.affinity=-100 THEN 'hostile' WHEN NEW.affinity<0 THEN 'dislike' ELSE NEW.relationship_stage END;
+  v_stage := public.story_relationship_stage_for_affinity(NEW.affinity);
   INSERT INTO public.encounter_character_state(user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at,updated_at)
   VALUES(NEW.user_id,NEW.character_id,NEW.affinity,v_stage,now(),now(),now())
   ON CONFLICT(user_id,character_id) DO UPDATE SET affinity=EXCLUDED.affinity,relationship_stage=EXCLUDED.relationship_stage,last_interaction_at=now(),updated_at=now();
