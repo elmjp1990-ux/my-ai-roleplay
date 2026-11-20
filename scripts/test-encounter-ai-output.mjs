@@ -38,6 +38,14 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_re
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
+const affinityMigration = fs.readFileSync("supabase/migrations/20261120020000_encounter_per_turn_affinity.sql", "utf8");
+assert.match(affinityMigration, /apply_encounter_turn_affinity/);
+assert.match(affinityMigration, /affinity_delta BETWEEN -3 AND 3/);
+assert.match(affinityMigration, /status='settled'/);
+assert.match(affinityMigration, /story_relationship_states/);
+assert.match(endpoint, /apply_encounter_turn_affinity/);
+assert.match(endpoint, /affinity_delta/);
+assert.match(endpoint, /不要輸出總好感度或關係階段/);
 const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
