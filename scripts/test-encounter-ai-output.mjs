@@ -40,7 +40,7 @@ const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(encounterScene, /const processEncounterSpriteBackdrop=/);
 assert.match(encounterScene, /brightness>=140&&Math\.max\(r,g,b\)-Math\.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\)/);
-assert.doesNotMatch(encounterScene, /const neutralBackdrop=\(i\)=>/);
+assert.equal((encounterScene.match(/const neutralBackdrop=i=>/g)||[]).length,1,\n  'Portrait background-removal algorithm must exist only once');
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
 const affinityMigration = fs.readFileSync("supabase/migrations/20261120020000_encounter_per_turn_affinity.sql", "utf8");
