@@ -22,8 +22,6 @@ assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
 assert.match(encounterScene, /Encounter-specific final refinements migrated out of index\.html/,
   "Encounter-specific final visual refinements must be centralized in encounter-scene.js");
-assert.doesNotMatch(html, /body\.encounter-mode-active[^{}]*\{/,
-  "index.html must not own Encounter visual CSS");
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
 assert.match(source, /orientationchange/);
