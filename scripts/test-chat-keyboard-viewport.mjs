@@ -26,7 +26,7 @@ assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
 const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(item=>item[1]).join("\n");
 assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
-assert.match(encounterScene, /brightness>=140&&Math\.max\(r,g,b\)-Math\.min\(r,g,b\)<=42/);
+assert.match(encounterScene, /\(r\+g\+b\)\/3>=140&&Math.max\(r,g,b\)-Math.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /background:transparent!important/);
 assert.match(html, /data-action="encounter-temporary-leave"/);
 assert.match(html, /data-action="encounter-end-prompt"/);
