@@ -102,6 +102,7 @@ assert.match(sessionStateEdge, /encounter_session_evaluation_jobs/);
 assert.match(sessionStateEdge, /EdgeRuntime/);
 assert.match(sessionStateEdge, /sessionId: lifecycle\.session_id/);
 assert.match(sessionStateEdge, /encounter-evaluation-worker/);
+assert.match(sessionStateEdge, /session_data: \{ \.\.\.currentSessionData, archived: true, encounterEndedAt: Date\.now\(\) \}/,\n  "Manual end must mark the session finished immediately, even if AI summary evaluation fails");
 assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
   "A manual end must not enqueue or drain unrelated users' due sessions");
 
