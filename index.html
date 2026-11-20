@@ -11334,10 +11334,8 @@ document.addEventListener('click',async event => {
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
       case 'encounter-end-prompt': {
-        const session=state.sessions[key]||currentSession();
-        if(!session?.encounterMode)break;
-        showDialog('結束這次相遇','<p>確定要結束這次相遇嗎？結束後將整理好感度與相遇日記，今天這個地標不再提供續談。</p><div class="row" style="justify-content:flex-end;margin-top:16px"><button type="button" data-action="encounter-dialog-dismiss">取消</button><button type="button" class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">結束相遇</button></div>');
-        break;
+        const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
+        showDialog('結束相遇','<p>結束後將整理好感度與相遇日記，今天無法續談。</p><div class="row" style="justify-content:flex-end"><button data-action="encounter-dialog-dismiss">取消</button><button class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">確定結束</button></div>');break;
       }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
