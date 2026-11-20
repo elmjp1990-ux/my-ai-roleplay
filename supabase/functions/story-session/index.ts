@@ -245,8 +245,13 @@ Deno.serve(async (request: Request) => {
     console.error("Story session creation failed:", createError?.message || "invalid_rpc_result");
     return json({ error: "story_session_create_failed" }, 503);
   }
+  const { data: createdSessionMetadata, error: metadataReadError } = await admin.from("chat_sessions")
+    .select("session_data").eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "story").maybeSingle();
+  if (metadataReadError || !createdSessionMetadata) return json({ error: "story_affinity_mode_metadata_unavailable" }, 503);
+  const existingSessionData = createdSessionMetadata.session_data && typeof createdSessionMetadata.session_data === "object" && !Array.isArray(createdSessionMetadata.session_data)
+    ? createdSessionMetadata.session_data as Record<string, unknown> : {};
   const { error: affinityModeError } = await admin.from("chat_sessions").update({
-    session_data: { affinityMode, affinitySyncVersion: 1 },
+    session_data: { ...existingSessionData, affinityMode, affinitySyncVersion: 1 },
   }).eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "story");
   if (affinityModeError) return json({ error: "story_affinity_mode_persistence_failed" }, 503);
 
