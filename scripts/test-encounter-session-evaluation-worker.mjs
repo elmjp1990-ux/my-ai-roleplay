@@ -110,8 +110,15 @@ assert.match(specificClaimMigration, /encounter_session_turns/);
 assert.match(specificClaimMigration, /GRANT EXECUTE ON FUNCTION public\.claim_encounter_evaluation_job\(uuid\) TO service_role/);
 assert.match(sessionStateEdge, /encounter_session_evaluation_jobs/);
 assert.match(sessionStateEdge, /action === "pause" \|\| action === "resume"/);
-assert.match(sessionStateEdge, /encounterTemporarilyLeftAt: Date\.now\(\)/);
-assert.match(sessionStateEdge, /encounterTemporarilyLeftAt: null/);
+assert.match(sessionStateEdge, /persist_encounter_session_pause_resume_metadata/);
+assert.doesNotMatch(sessionStateEdge, /\.from\("chat_sessions"\)[\s\S]{0,400}\.update\(\{\s*session_data:/,
+  "Pause/resume must not read-modify-write the full session_data JSON in the Edge Function");
+const pauseResumeMetadataMigration=fs.readFileSync('supabase/migrations/20261120151000_atomic_encounter_pause_resume_metadata.sql','utf8');
+assert.match(pauseResumeMetadataMigration,/persist_encounter_session_pause_resume_metadata/);
+assert.match(pauseResumeMetadataMigration,/COALESCE\(session_data,'\{\}'::jsonb\)\|\|/);
+assert.match(pauseResumeMetadataMigration,/encounterTemporarilyLeftAt/);
+assert.match(pauseResumeMetadataMigration,/is_service_role_request/);
+assert.match(pauseResumeMetadataMigration,/GRANT EXECUTE[\s\S]*TO service_role/);
 assert.match(sessionStateEdge, /encounter_state_metadata_persistence_failed/);
 assert.match(sessionStateEdge, /EdgeRuntime/);
 assert.match(sessionStateEdge, /sessionId: lifecycle\.session_id/);
