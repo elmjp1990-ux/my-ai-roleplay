@@ -3,6 +3,7 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const html = fs.readFileSync("index.html", "utf8");
+const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
 const match = html.match(/<script id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/script>/);
 assert.ok(style, "keyboard viewport CSS must be present");
@@ -12,14 +13,17 @@ assert.doesNotThrow(() => new Function(source), "keyboard viewport controller mu
 
 assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
-const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(encounterScene, /height:var\(--poyozz-chat-viewport-height,100dvh\)!important/);
 assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
 assert.match(encounterScene, /bottom:0!important;max-height:calc/);
 assert.match(encounterScene, /encounterTypingPulse/);
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
-assert.doesNotMatch(style, /encounter-mode-active|encounter-character-sprite|encounter-dialogue-beat/,
-  "Encounter styles must not be duplicated in the shared index keyboard CSS");
+assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
+  "Encounter visual overrides must not remain in index.html");
+assert.match(encounterScene, /Encounter-specific final refinements migrated out of index\.html/,
+  "Encounter-specific final visual refinements must be centralized in encounter-scene.js");
+assert.doesNotMatch(html, /body\.encounter-mode-active[^{}]*\{/,
+  "index.html must not own Encounter visual CSS");
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
 assert.match(source, /orientationchange/);
