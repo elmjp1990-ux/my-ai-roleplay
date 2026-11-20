@@ -52,7 +52,7 @@
         $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
         persist, hydratePublicCharacterIllustrations, characterVideoObserver,
         releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
-        setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
+        setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
   const findResumableEncounterSession=(characterId,placeKey)=>
     window.PoyozzEncounterSessionResume?.find({characterId,placeKey,state,currentUser,loadCloudChatSessions})||Promise.resolve(null);
