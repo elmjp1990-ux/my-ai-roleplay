@@ -376,10 +376,6 @@
     const clock=getTaipeiClock();
     const aliases=cityPlaceAliases[place]||[place];
     return (Array.isArray(sourceCharacters)?sourceCharacters:[]).filter(character=>{
-      // Author access to a private character is for management only. It must
-      // never make that character a participant in the public city encounter.
-      // Do not use accessible() here: it intentionally permits the owner to
-      // view private characters elsewhere in the product.
       if(character?.visibility!=='public'||character.deletedAt||!accessible(character)) return false;
       const raw=String(character.encounterSchedules||'').trim();
       if(!raw) return false;
