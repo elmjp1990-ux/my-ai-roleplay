@@ -169,7 +169,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
  // Discarded Explore and city portrait nodes must release their detached media resources.
  assert.ok(html.includes("existingVideosByCharacter.forEach(video=>{\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
- assert.ok(cityMap.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
+ assert.match(cityMap, /else if\(previousCharacterVideo\)\{\s*characterVideoObserver\?\.unobserve\(previousCharacterVideo\);\s*releaseCharacterVideo\(previousCharacterVideo\);/);
  assert.ok(html.includes("video.dataset.videoObservePending='false';"));
  assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
  assert.ok(html.includes("void hydrateCharacterVideo(video);"));
