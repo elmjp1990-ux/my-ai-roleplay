@@ -41,6 +41,9 @@ assert.match(worker, /玩家選擇留空，讓角色主動發現自己/);
 assert.match(worker, /玩家留空發送，請角色自然延續目前互動/);
 assert.match(worker, /Authorization.*Bearer.*serviceRoleKey/);
 assert.match(worker, /claim_encounter_evaluation_jobs/);
+assert.match(worker, /requestedSessionId/);
+assert.match(worker, /claim_encounter_evaluation_job/);
+assert.match(worker, /UUID_PATTERN/);
 assert.match(worker, /settle_encounter_session/);
 assert.match(worker, /fail_encounter_evaluation_job/);
 assert.match(worker, /encounter_session_turns/);
@@ -91,5 +94,24 @@ assert.match(manualEndDraft, /schedule_snapshot/);
 assert.match(sessionStateEdge, /\["pause", "resume", "end"\]/);
 assert.match(frontend, /setEncounterLifecycleState\(session\.id,'end'\)/,
   "The explicit end action must request server-side settlement rather than only archiving the local chat");
+
+const specificClaimMigration = fs.readFileSync(
+  "supabase/migrations/20261120010100_claim_encounter_evaluation_job_by_session.sql",
+  "utf8",
+);
+assert.match(specificClaimMigration, /FUNCTION public\.claim_encounter_evaluation_job\(p_session_id uuid\)/);
+assert.match(specificClaimMigration, /WHERE job\.session_id=p_session_id/);
+assert.match(specificClaimMigration, /FOR UPDATE OF job,lifecycle SKIP LOCKED/);
+assert.match(specificClaimMigration, /job\.attempt_count < 5/);
+assert.match(specificClaimMigration, /lifecycle\.status='ready_to_settle'/);
+assert.match(specificClaimMigration, /chat_turn_charges/);
+assert.match(specificClaimMigration, /encounter_session_turns/);
+assert.match(specificClaimMigration, /GRANT EXECUTE ON FUNCTION public\.claim_encounter_evaluation_job\(uuid\) TO service_role/);
+assert.match(sessionStateEdge, /encounter_session_evaluation_jobs/);
+assert.match(sessionStateEdge, /EdgeRuntime/);
+assert.match(sessionStateEdge, /sessionId: lifecycle\.session_id/);
+assert.match(sessionStateEdge, /encounter-evaluation-worker/);
+assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
+  "A manual end must not enqueue or drain unrelated users' due sessions");
 
 console.log("Encounter session evaluator parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
