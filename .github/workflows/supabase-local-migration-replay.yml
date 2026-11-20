@@ -167,6 +167,15 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
 
+      - name: Replay and behavior-test per-turn Encounter affinity migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Applies the formal migration and verifies settled-turn idempotency,
+          # canonical session seeding, shared Story synchronization and isolation.
+          # The dedicated SQL harness wraps all DDL and fixtures in ROLLBACK.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-per-turn-affinity.sql
+
       - name: Replay failed AI usage migration against synthetic ledger
         shell: bash
         run: |
