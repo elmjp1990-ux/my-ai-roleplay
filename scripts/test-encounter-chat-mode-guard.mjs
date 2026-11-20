@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 
 const chatTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const modeMigration = fs.readFileSync("supabase/migrations/20261028170000_trusted_chat_mode_marker.sql", "utf8");
@@ -465,3 +466,44 @@ assert.match(pauseResumeEndpoint, /encounter_session_evaluation_jobs/);
 assert.match(pauseResumeEndpoint, /EdgeRuntime/);
 assert.match(pauseResumeEndpoint, /encounter-evaluation-worker/);
 assert.match(pauseResumeEndpoint, /if \(action === "end"\)/);
+
+// Functional regression: all pages of encounter history are loaded, and ended
+// blank-send sessions render their saved summary rather than "故事仍待續".
+const historyWindow = {};
+vm.runInNewContext(encounterHistory, { window: historyWindow, Set, Date, Error, String, Array, Number, Object });
+const historyApi = historyWindow.PoyozzEncounterHistory;
+const historyRows = Array.from({ length: 51 }, (_, index) => ({
+  id: "session-" + index,
+  chat_mode: "encounter",
+  created_at: "2026-11-20T00:00:00.000Z",
+  updated_at: "2026-11-20T00:00:00.000Z",
+  session_data: index === 0
+    ? { archived: true, encounterEndedAt: 1795134702137, encounterSummary: '你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。顧言回應：門沒有鎖。' }
+    : { archived: false, lastMessagePreview: "相遇片段 " + index },
+}));
+const rangeCalls = [];
+let orFilter = "";
+const query = {
+  select() { return this; },
+  eq() { return this; },
+  or(value) { orFilter = value; return this; },
+  is() { return this; },
+  order() { return this; },
+  range(start, end) {
+    rangeCalls.push([start, end]);
+    return Promise.resolve({ data: start === 0 ? historyRows.slice(0, 50) : historyRows.slice(50), error: null });
+  },
+};
+const historyPerson = { id: "character-1" };
+await historyApi.loadCloudHistory(
+  historyPerson,
+  () => ({ uid: "user-1" }),
+  { auth: { getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }) }, from: () => query },
+);
+assert.deepEqual(rangeCalls, [[0, 49], [50, 99]], "history must continue paging after the first 50 records");
+assert.equal(historyPerson.encounterHistoryCloud.length, 51, "older encounter records must not be silently dropped");
+assert.match(orFilter, /session_data->>encounterMode/, "legacy sessions marked in session_data must remain discoverable");
+const historyHtml = historyApi.renderHistory(historyPerson, historyPerson.encounterHistoryCloud, value => value, {});
+assert.match(historyHtml, /已結束/, "ended sessions must have an explicit ended status");
+assert.match(historyHtml, /你選擇讓角色主動發現你/, "blank-send system events must be rendered as a human-readable summary");
+assert.doesNotMatch(historyHtml, /POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
