@@ -106,4 +106,5 @@ assert.match(sessionStateEdge, /session_data: \{ \.\.\.currentSessionData, archi
 assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
   "A manual end must not enqueue or drain unrelated users' due sessions");
 
-assert.doesNotMatch(worker, /affinity_delta.*整場相遇|relationship_stage.*八種階段/);\nconsole.log("Encounter session evaluator summary/memory parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
+assert.doesNotMatch(worker, /affinity_delta.*整場相遇|relationship_stage.*八種階段/);
+console.log("Encounter session evaluator summary/memory parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
