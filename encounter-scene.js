@@ -260,6 +260,7 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
           existingSprite.dataset.encounterProcessed='';
           existingSprite.classList.remove('encounter-auto-bg-fallback');
           processEncounterSpriteBackdrop(existingSprite,halfBodyImage);
+        }
       }else{
         if(existingSprite)existingSprite.remove();
         let artNote=missingArt;
