@@ -14268,10 +14268,7 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
     root.style.setProperty('--poyozz-visual-viewport-top', top + 'px');
     updateEncounterComposerHeight();
     const keyboardOpen=syncKeyboardState();
-    if(document.body.classList.contains('encounter-mode-active')){
-      const offset=keyboardOpen?Math.max(0,baselineViewportHeight-(height+top)):0;
-      root.style.setProperty('--encounter-keyboard-offset',offset+'px');
-    }else root.style.removeProperty('--encounter-keyboard-offset');
+    root.style.removeProperty('--encounter-keyboard-offset');
   };
   const scheduleViewportUpdate = () => {
     if (framePending) return;
