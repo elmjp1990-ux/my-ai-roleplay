@@ -100,7 +100,7 @@ Deno.serve(async (request: Request) => {
             Authorization: "Bearer " + serviceRoleKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ limit: 1 }),
+          body: JSON.stringify({ limit: 1, sessionId: lifecycle.session_id }),
         });
         if (!workerResponse.ok) {
           throw new Error("encounter_evaluation_worker_http_" + workerResponse.status);
