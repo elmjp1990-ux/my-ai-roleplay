@@ -98,7 +98,8 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
 {
   const h = createHarness();
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "720px");
-  assert.equal(h.variables["--encounter-keyboard-offset"], "0px");
+  assert.equal(h.variables["--encounter-keyboard-offset"], undefined,
+    "The shared controller must not set an Encounter keyboard offset; the viewport height is the sole layout source.");
   h.viewport.height = 410;
   h.viewportListeners.resize();
   h.flush();
