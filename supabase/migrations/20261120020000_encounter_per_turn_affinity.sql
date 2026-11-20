@@ -49,6 +49,8 @@ BEGIN
   UPDATE public.encounter_character_state SET affinity=v_after,relationship_stage=v_stage,last_interaction_at=now(),updated_at=now()
     WHERE user_id=p_user_id AND character_id=p_character_id;
   UPDATE public.encounter_turn_affinity_receipts SET affinity_after=v_after,relationship_stage=v_stage WHERE turn_id=p_turn_id;
+  UPDATE public.chat_sessions SET session_data=jsonb_set(COALESCE(session_data,'{}'::jsonb),'{encounter}',COALESCE(session_data->'encounter','{}'::jsonb)||jsonb_build_object('affinity',v_after,'relationshipStage',v_stage),true),updated_at=now()
+    WHERE id=v_session_id AND user_id=p_user_id AND chat_mode='encounter';
   RETURN jsonb_build_object('affinity',v_after,'relationship_stage',v_stage,'idempotent',false);
 END; $$;
 REVOKE ALL ON FUNCTION public.apply_encounter_turn_affinity(uuid,uuid,uuid,integer) FROM PUBLIC,anon,authenticated;
