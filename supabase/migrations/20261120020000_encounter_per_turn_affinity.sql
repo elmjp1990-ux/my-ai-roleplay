@@ -53,3 +53,5 @@ BEGIN
 END; $$;
 REVOKE ALL ON FUNCTION public.apply_encounter_turn_affinity(uuid,uuid,uuid,integer) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.apply_encounter_turn_affinity(uuid,uuid,uuid,integer) TO service_role;
+
+ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS affinity_delta smallint CHECK (affinity_delta IS NULL OR affinity_delta BETWEEN -3 AND 3);
