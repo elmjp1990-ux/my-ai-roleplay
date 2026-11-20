@@ -174,10 +174,11 @@ assert.match(html, /正式環境不提供此工具/);
 
 
 assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
-assert.match(cityMap, /mergeCityCharacterProfile\(live,person\)/,
-  'Opening a city character card must merge resolved schedule data without overwriting non-empty profile fields.');
-assert.match(cityMap, /if\(!hasProfileValue\(presence\?\.\[key\]\)&&hasProfileValue\(live\?\.\[key\]\)\)merged\[key\]=live\[key\]/,
+assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/,
+  'Opening a city character card must merge resolved schedule data with the base profile.');
+assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/,
   'Null or empty schedule profile fields must fall back to the cached character profile.');
+assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(cityMap, /ageValue=person\.age\?\?person\.characterAge\?\?person\.character_age/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 assert.match(cityMap, /const isSleepingSchedule=/);
