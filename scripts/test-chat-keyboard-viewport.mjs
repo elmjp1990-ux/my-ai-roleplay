@@ -20,13 +20,13 @@ assert.match(encounterScene, /bottom:var\(--encounter-keyboard-offset,0px\)!impo
 assert.match(encounterScene, /encounterTypingPulse/);
 assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\);\s*\}\s*\}else\{/,
   "The sprite source-change conditional must close before the no-art fallback branch");
-assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
+assert.doesNotMatch(encounterScene, /trackEncounterKeyboard/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
 const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(item=>item[1]).join("\n");
 assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
-assert.match(encounterScene, /brightness>=140&&spread<=42/);
+assert.match(encounterScene, /brightness>=140&&Math\.max\(r,g,b\)-Math\.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /background:transparent!important/);
 assert.match(html, /data-action="encounter-temporary-leave"/);
 assert.match(html, /data-action="encounter-end-prompt"/);
