@@ -259,69 +259,7 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
           existingSprite.dataset.encounterSource=halfBodyImage;
           existingSprite.dataset.encounterProcessed='';
           existingSprite.classList.remove('encounter-auto-bg-fallback');
-          if(existingSprite.dataset.encounterCharacterImage==='true'){
-            existingSprite.crossOrigin='anonymous';
-            existingSprite.onload=()=>{
-              const activeSource=existingSprite.dataset.encounterSource||'';
-              if(!activeSource||existingSprite.dataset.encounterProcessed===activeSource)return;
-              try{
-                const sourceImage=existingSprite;
-                const canvas=document.createElement('canvas');
-                canvas.width=sourceImage.naturalWidth;
-                canvas.height=sourceImage.naturalHeight;
-                const ctx=canvas.getContext('2d',{willReadFrequently:true});
-                ctx.drawImage(sourceImage,0,0);
-                const frame=ctx.getImageData(0,0,canvas.width,canvas.height);
-                const pixels=frame.data,w=canvas.width,h=canvas.height,total=w*h;
-                const visited=new Uint8Array(total);
-                const stack=new Int32Array(total);
-                let top=0;
-                const neutralBackdrop=(i)=>{
-                  const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
-                  const spread=Math.max(red,green,blue)-Math.min(red,green,blue);
-                  const brightness=(red+green+blue)/3;
-                  return brightness>=140&&spread<=42;
-                };
-                const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&neutralBackdrop(i)){visited[i]=1;stack[top++]=i;}};
-                for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
-                for(let y=0;y<h;y++){push(y*w);push(y*w+w-1);}
-                while(top){
-                  const i=stack[--top];
-                  const p=i*4;
-                  pixels[p+3]=0;
-                  const x=i%w,y=(i/w)|0;
-                  if(x>0)push(i-1);
-                  if(x<w-1)push(i+1);
-                  if(y>0)push(i-w);
-                  if(y<h-1)push(i+w);
-                }
-                ctx.putImageData(frame,0,0);
-                const transparentImage=canvas.toDataURL('image/png');
-                existingSprite.dataset.encounterProcessed=activeSource;
-                existingSprite.onload=null;
-                existingSprite.src=transparentImage;
-              }catch(error){
-                // If the image host disallows canvas access, use a visual blend fallback.
-                existingSprite.dataset.encounterProcessed=activeSource;
-                existingSprite.classList.add('encounter-auto-bg-fallback');
-              }
-            };
-          }
-          existingSprite.src=halfBodyImage;
-        }
-      if(selectedIllustrationId&&character?.id&&typeof hydrateEncounterGalleryIllustration==='function'){
-        const encounterSessionId=session.id;
-        void hydrateEncounterGalleryIllustration(character.id,selectedIllustrationId).then(asset=>{
-          if(!asset?.src||!panel.isConnected||currentSession()?.id!==encounterSessionId)return;
-          const sprite=panel.querySelector('.encounter-character-sprite');
-          if(!sprite||sprite.dataset.encounterSource===asset.src)return;
-          sprite.dataset.encounterCharacterImage='true';
-          sprite.dataset.encounterSource=asset.src;
-          sprite.dataset.encounterProcessed='';
-          sprite.classList.remove('encounter-auto-bg-fallback');
-          processEncounterSpriteBackdrop(sprite,asset.src);
-        }).catch(error=>console.warn('AI 選定立繪載入失敗：',error?.message||error));
-      }
+          processEncounterSpriteBackdrop(existingSprite,halfBodyImage);
       }else{
         if(existingSprite)existingSprite.remove();
         let artNote=missingArt;
