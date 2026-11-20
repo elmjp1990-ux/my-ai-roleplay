@@ -14,9 +14,9 @@ assert.doesNotThrow(() => new Function(source), "keyboard viewport controller mu
 assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
 assert.match(encounterScene, /top:0!important;bottom:auto!important/);
-assert.match(encounterScene, /height:100lvh!important/);
-assert.match(encounterScene, /bottom:calc\(var\(--poyozz-encounter-composer-height,190px\) \+ var\(--encounter-keyboard-offset,0px\)\)!important/);
-assert.match(encounterScene, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
+assert.match(encounterScene, /height:78lvh!important/);
+assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
+assert.match(encounterScene, /bottom:0!important;max-height:calc\(var\(--poyozz-chat-viewport-height,100dvh\) - 72px\)!important/);
 assert.match(encounterScene, /encounterTypingPulse/);
 assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\);\s*\}\s*\}else\{/,
   "The sprite source-change conditional must close before the no-art fallback branch");
@@ -38,7 +38,7 @@ assert.match(html, /latestAssistantSuggestions/);
 assert.match(encounterScene, /\.encounter-scene \.messages\{/);
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
-assert.match(source, /--encounter-keyboard-offset/);
+assert.match(source, /removeProperty\('--encounter-keyboard-offset'\)/);
 assert.match(source, /orientationchange/);
 assert.match(source, /window\.visualViewport/);
 assert.match(source, /addEventListener\('resize'/);
@@ -138,8 +138,8 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
   h.listeners.focusin({ target: input });
   h.flush();
   assert.ok(h.classes.has("chat-keyboard-open"));
-  assert.equal(h.variables["--encounter-keyboard-offset"], "398px",
-    "Encounter composer offset must be calculated by the single shared viewport controller");
+  assert.equal(h.variables["--encounter-keyboard-offset"], undefined,
+    "Encounter layout must not use a second keyboard offset after the shared viewport shrinks");
   assert.ok(input.scrolled, "encounter input should be scrolled into the visible area on focus");
   h.viewport.height = 720;
   h.viewport.offsetTop = 0;
