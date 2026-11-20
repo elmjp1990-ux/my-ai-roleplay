@@ -462,12 +462,13 @@
         if(!affinityChip){
           affinityChip=document.createElement('span');
           affinityChip.className='encounter-affinity-chip';
-          affinityChip.textContent='♡ 好感度';
-          affinityChip.setAttribute('role','status');
-          affinityChip.setAttribute('aria-label','好感度會在本次相遇結束後更新');
-          affinityChip.title='好感度會在本次相遇結束後更新';
           if(tag?.isConnected)tag.after(affinityChip);else if(identityRow)identityRow.appendChild(affinityChip);
         }
+        const relationshipLabel=({hostile:'敵意',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'逐漸熟悉',close:'親近信任',intimate:'深厚親密',special:'特殊關係'}[session.encounterRelationshipStage||'first_meeting']||'初次見面');
+        affinityChip.textContent='♡ '+relationshipLabel;
+        affinityChip.setAttribute('role','status');
+        affinityChip.setAttribute('aria-label','目前關係：'+relationshipLabel+'；好感度 '+(Number.isInteger(session.encounterAffinity)?session.encounterAffinity:0));
+        affinityChip.title='本回合互動更新；目前好感度 '+(Number.isInteger(session.encounterAffinity)?session.encounterAffinity:0)+' / 100';
       }
       const input=panel.querySelector('.composer #messageInput');
       if(input)input.setAttribute('aria-label','相遇模式對話');
