@@ -174,7 +174,28 @@
     body.encounter-mode-active .app,
     body.encounter-mode-active #view,
     body.encounter-mode-active .chat-layout,
-    body.encounter-mode-active .chat-main.encounter-scene{height:100lvh!important;min-height:100lvh!important}
+    body.encounter-mode-active .chat-main.encounter-scene{
+      top:0!important;bottom:auto!important;inset-inline:0!important;
+      height:100lvh!important;min-height:100lvh!important;max-height:100lvh!important
+    }
+    body.encounter-mode-active .chat-main.encounter-scene .messages{
+      bottom:calc(var(--poyozz-encounter-composer-height,190px) + var(--encounter-keyboard-offset,0px))!important;
+      max-height:calc(100lvh - var(--poyozz-encounter-composer-height,190px) - var(--encounter-keyboard-offset,0px) - 110px)!important
+    }
+    body.encounter-mode-active .chat-main.encounter-scene .composer{
+      max-height:calc(100lvh - 72px)!important
+    }
+    body.encounter-mode-active .chat-main.encounter-scene .assistant-typing .message-content{
+      display:flex!important;align-items:center;gap:8px;padding:10px 14px!important;
+      border-radius:13px!important;background:rgba(35,30,43,.52)!important;
+      border:1px solid rgba(255,255,255,.18)!important;color:#fff!important
+    }
+    body.encounter-mode-active .chat-main.encounter-scene .typing-dots i{
+      animation:encounterTypingPulse 1.15s infinite ease-in-out
+    }
+    body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(2){animation-delay:.16s}
+    body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3){animation-delay:.32s}
+    @keyframes encounterTypingPulse{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
     body.encounter-mode-active .chat-main.encounter-scene>.chat-heading{
       position:absolute!important;top:0!important;left:0!important;right:0!important;width:100vw!important;
       max-width:100vw!important;margin:0!important;transform:none!important;box-sizing:border-box!important;
@@ -291,7 +312,8 @@
         encounterViewportPanel=null;
         return;
       }
-      const offset=viewport?Math.max(0,panel.clientHeight-(viewport.height+viewport.offsetTop)):0;
+      const layoutHeight=Math.max(window.innerHeight,document.documentElement.clientHeight);
+      const offset=viewport?Math.max(0,layoutHeight-(viewport.height+viewport.offsetTop)):0;
       panel.style.setProperty('--encounter-keyboard-offset',offset+'px');
     };
     viewport?.addEventListener('resize',update,{passive:true});
