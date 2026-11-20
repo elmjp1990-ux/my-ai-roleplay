@@ -54,8 +54,33 @@
         releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
         setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
       } = dependencies;
-  const findResumableEncounterSession=(characterId,placeKey)=>
-    window.PoyozzEncounterSessionResume?.find({characterId,placeKey,state,currentUser,loadCloudChatSessions})||Promise.resolve(null);
+  const findResumableEncounterSession=async(characterId,placeKey)=>{
+    const client=window.mySupabase,user=currentUser?.();
+    if(!client||!user?.uid)return null;
+    const {data:authData,error:authError}=await client.auth.getUser();
+    if(authError||authData?.user?.id!==user.uid||currentUser()?.uid!==user.uid)return null;
+    const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const {data:rows,error}=await client.from('chat_sessions')
+      .select('id,character_id,chat_mode,session_data,updated_at')
+      .eq('user_id',user.uid).eq('character_id',characterId).eq('chat_mode','encounter')
+      .is('deleted_at',null).order('updated_at',{ascending:false}).limit(8);
+    if(error)throw new Error('讀取暫離相遇紀錄失敗：'+error.message);
+    const candidate=(rows||[]).find(row=>{
+      const data=row.session_data&&typeof row.session_data==='object'?row.session_data:{};
+      const day=String(data.encounterDay||data.startedAt&&new Date(data.startedAt).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'})||'');
+      return row.character_id===characterId&&data.encounterPlace===placeKey&&day===today&&
+        Number(data.encounterTemporarilyLeftAt)>0&&data.archived!==true&&
+        !(Number(data.encounterEndedAt)>0);
+    });
+    if(!candidate)return null;
+    await loadCloudChatSessions(user,{onlySessionId:candidate.id,listPage:false});
+    if(currentUser()?.uid!==user.uid)return null;
+    const hydrated=state.sessions?.[candidate.id];
+    return hydrated?.cloudOwned===true&&hydrated?.cloudOwnerUid===user.uid&&
+      hydrated?.encounterMode===true&&hydrated?.encounterPlace===placeKey&&
+      Number(hydrated?.encounterTemporarilyLeftAt)>0&&!hydrated?.archived&&
+      !(Number(hydrated?.encounterEndedAt)>0)?hydrated:null;
+  };
 
   document.querySelectorAll('#cityMapPeople').forEach(modal=>modal.remove());
   document.body.classList.remove('city-location-active');
