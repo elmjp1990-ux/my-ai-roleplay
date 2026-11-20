@@ -83,16 +83,38 @@ function buildTranscript(
   };
 }
 
+async function persistEncounterSummary(admin: any, sessionId: string, summary: string, endedAt: string) {
+  const { data: session, error: readError } = await admin.from("chat_sessions")
+    .select("session_data").eq("id", sessionId).maybeSingle();
+  if (readError || !session) throw new Error("encounter_summary_session_unavailable");
+  const existing = asRow(session.session_data);
+  const { error: updateError } = await admin.from("chat_sessions").update({
+    session_data: { ...existing, encounterSummary: summary.slice(0, 1200), encounterEndedAt: Date.parse(endedAt) || Date.now(), archived: true },
+  }).eq("id", sessionId);
+  if (updateError) throw new Error("encounter_summary_persistence_failed");
+}
+
 async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
   const { data: lifecycle, error: lifecycleError } = await admin
     .from("encounter_session_lifecycle")
-    .select("session_id,user_id,character_id,status,turn_count,scheduled_end_at,location_key,schedule_snapshot")
+    .select("session_id,user_id,character_id,status,turn_count,scheduled_end_at,location_key,schedule_snapshot,settlement_result,settled_at")
     .eq("session_id", job.session_id)
     .maybeSingle();
   if (lifecycleError || !lifecycle) throw new Error("encounter_evaluation_lifecycle_unavailable");
-  if (lifecycle.user_id !== job.user_id || lifecycle.character_id !== job.character_id ||
-      lifecycle.status !== "ready_to_settle" ||
-      new Date(lifecycle.scheduled_end_at).getTime() > Date.now()) {
+  if (lifecycle.user_id !== job.user_id || lifecycle.character_id !== job.character_id) {
+    throw new Error("encounter_evaluation_lifecycle_not_due");
+  }
+  if (lifecycle.status === "settled") {
+    const { data: settledSession, error: settledSessionError } = await admin.from("chat_sessions")
+      .select("session_data").eq("id", job.session_id).maybeSingle();
+    if (settledSessionError || !settledSession) throw new Error("encounter_summary_session_unavailable");
+    const result = asRow(lifecycle.settlement_result);
+    const evaluation = asRow(result.evaluation);
+    const summary = asText(evaluation.diary_summary);
+    if (summary) await persistEncounterSummary(admin, job.session_id, summary, asText(lifecycle.settled_at) || new Date().toISOString());
+    return { sessionId: job.session_id, settled: true, idempotent: true, summarySynced: !!summary };
+  }
+  if (lifecycle.status !== "ready_to_settle" || new Date(lifecycle.scheduled_end_at).getTime() > Date.now()) {
     throw new Error("encounter_evaluation_lifecycle_not_due");
   }
   if (Number(lifecycle.turn_count) !== Number(job.turn_count)) {
@@ -134,7 +156,8 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
       },
     });
     if (error || !data?.settled) throw new Error("encounter_empty_session_settlement_failed");
-    return { sessionId: job.session_id, settled: true, noTurns: true, result: data.result };
+    await persistEncounterSummary(admin, job.session_id, "本次相遇沒有進行對話。", new Date().toISOString());
+    return { sessionId: job.session_id, settled: true, noTurns: true, summarySynced: true, result: data.result };
   }
 
   if (!apiKey) throw new Error("encounter_evaluation_provider_not_configured");
@@ -226,7 +249,8 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
   if (settlementError || !settled?.settled) {
     throw new Error("encounter_evaluation_settlement_failed");
   }
-  return { sessionId: job.session_id, settled: true, idempotent: settled.idempotent === true, result: settled.result };
+  await persistEncounterSummary(admin, job.session_id, evaluation.diarySummary, new Date().toISOString());
+  return { sessionId: job.session_id, settled: true, idempotent: settled.idempotent === true, summarySynced: true, result: settled.result };
 }
 
 Deno.serve(async (request: Request) => {
