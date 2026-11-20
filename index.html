@@ -14095,6 +14095,8 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;margin:12px 0}
 .city-character-portrait{width:118px;height:164px;object-fit:cover;object-position:center top;border-radius:12px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);box-shadow:none;display:block}
 .city-character-portrait-fallback{display:grid;place-items:center;color:#eee;font-size:30px}
+/* Portraits and transparent cutout art must not inherit a gray placeholder backing. */
+.city-character-portrait,.city-character-portrait-video{background:transparent!important;}
 .city-character-copy{min-width:0;color:#f4f2fa;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .city-character-copy h3{margin:0 0 9px;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
 .city-character-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
