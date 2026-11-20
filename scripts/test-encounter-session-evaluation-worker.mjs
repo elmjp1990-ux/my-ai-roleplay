@@ -45,6 +45,11 @@ assert.match(worker, /requestedSessionId/);
 assert.match(worker, /claim_encounter_evaluation_job/);
 assert.match(worker, /UUID_PATTERN/);
 assert.match(worker, /settle_encounter_session/);
+assert.match(worker, /persistEncounterSummary/);
+assert.match(worker, /encounterSummary: summary\.slice\(0, 1200\)/);
+assert.match(worker, /encounterEndedAt: Date\.parse\(endedAt\)/);
+assert.match(worker, /lifecycle\.status === "settled"[\s\S]*?summarySynced/,
+  "A retry after affinity settlement must sync the saved summary without re-running evaluation");
 assert.match(worker, /fail_encounter_evaluation_job/);
 assert.match(worker, /encounter_session_turns/);
 assert.match(worker, /POYOZZ_DEFAULT_CHAT_MODEL/);
