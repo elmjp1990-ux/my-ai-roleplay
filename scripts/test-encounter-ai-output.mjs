@@ -232,7 +232,7 @@ assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
 assert.match(endpoint, /illustration_id/);
 assert.match(endpoint, /scene_background_id/);
 assert.match(scene, /session\?\.encounterVisuals/);
-assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\)/);
+assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\|\|null\)/,\n  "Encounter gallery fallback must hydrate the selected illustration lazily when the dedicated sprite is unavailable");
 assert.doesNotMatch(frontend, /poyozz-encounter-opening-choice/);
 assert.match(compactScheduleMigration, /ALTER COLUMN encounter_greeting DROP NOT NULL/);
 assert.match(compactScheduleMigration, /DELETE FROM public\.encounter_character_greeting_pools/);
