@@ -260,6 +260,7 @@ jobs:
       - name: Test Character AI Profile evidence, privacy and OOC validation
         run: deno test supabase/functions/_shared/character-profile-organization.test.ts
       - name: Verify Story phone RPC and suggested reply persistence regressions
+        run: node scripts/test-story-phone-and-suggestions-regression.mjs
       - name: Test structured Story turn evaluation parsing
         run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests
