@@ -460,7 +460,7 @@ assert.match(encounterPresentation, /data-kind="search"/);
 assert.match(encounterPresentation, /data-action="phone-open"/);
 assert.match(encounterPresentation, /data-kind="album"/);
 assert.match(encounterPresentation, /height:78lvh!important/);
-assert.match(encounterPresentation, /window\.visualViewport/);
+assert.match(encounterPresentation, /--poyozz-chat-viewport-height/);
 assert.match(encounterPresentation, /height:100lvh!important/);
 assert.match(encounterPresentation, /neutralBackdrop/);
 assert.match(encounterPresentation, /brightness>=158&&spread<=36/);
