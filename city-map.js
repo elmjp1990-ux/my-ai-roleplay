@@ -756,9 +756,11 @@
           try{
             await setEncounterLifecycleState(resumedSession.id,'resume');
             resumedSession.encounterTemporarilyLeftAt=null;
+            resumedSession.archived=false;
+            resumedSession.archivedAt=null;
             encounterSession=resumedSession;
-            const saved=await saveChatSessionSafely(encounterSession);
-            if(saved!==true)throw new Error('接續相遇狀態尚未同步保存。');
+            // Resume metadata is committed by encounter-session-state on the server.
+            // Do not require a separate chat snapshot save to reopen the scene.
           }catch(error){
             if(error?.code!=='encounter_scene_expired_or_closed')throw error;
             resumedSession.archived=true;
