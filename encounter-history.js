@@ -42,7 +42,7 @@
         const {data:page,error}=await client.from('chat_sessions')
           .select('id,chat_mode,session_data,created_at,updated_at')
           .eq('user_id',uid).eq('character_id',person.id)
-          .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true,session_data->>chatMode.eq.encounter,session_data->>chat_mode.eq.encounter,session_data->encounter->>mode.eq.encounter')
+          .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
           .is('deleted_at',null).order('updated_at',{ascending:false}).order('id',{ascending:false})
           .range(offset,offset+PAGE_SIZE-1);
         if(error)throw error;
