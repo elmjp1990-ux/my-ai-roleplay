@@ -65,23 +65,9 @@ Deno.serve(async (request: Request) => {
   }
 
   if (action === "pause" || action === "resume") {
-    const { data: sessionRow, error: sessionReadError } = await admin.from("chat_sessions")
-      .select("session_data").eq("id", sessionId).eq("user_id", user.id)
-      .eq("chat_mode", "encounter").is("deleted_at", null).maybeSingle();
-    if (sessionReadError || !sessionRow) {
-      try { await admin.rpc("set_encounter_session_lifecycle_state", {
-        p_session_id: sessionId, p_user_id: user.id, p_action: action === "pause" ? "resume" : "pause",
-      }); } catch (_) {}
-      return json({ error: "encounter_state_metadata_unavailable" }, 503);
-    }
-    const sessionData = (sessionRow as any).session_data && typeof (sessionRow as any).session_data === "object"
-      ? (sessionRow as any).session_data as Record<string, unknown> : {};
-    const updatedData = action === "pause"
-      ? { ...sessionData, archived: false, archivedAt: null, encounterTemporarilyLeftAt: Date.now() }
-      : { ...sessionData, archived: false, archivedAt: null, encounterTemporarilyLeftAt: null };
-    const { error: metadataError } = await admin.from("chat_sessions").update({
-      session_data: updatedData, updated_at: new Date().toISOString(),
-    }).eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "encounter").is("deleted_at", null);
+    const { error: metadataError } = await admin.rpc("persist_encounter_session_pause_resume_metadata", {
+      p_session_id: sessionId, p_user_id: user.id, p_action: action,
+    });
     if (metadataError) {
       try { await admin.rpc("set_encounter_session_lifecycle_state", {
         p_session_id: sessionId, p_user_id: user.id, p_action: action === "pause" ? "resume" : "pause",
