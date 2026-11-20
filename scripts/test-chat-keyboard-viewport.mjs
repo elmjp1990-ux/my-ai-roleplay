@@ -17,6 +17,12 @@ assert.match(style, /--poyozz-chat-viewport-height/);
 assert.match(style, /--poyozz-visual-viewport-top/);
 assert.match(style, /--poyozz-encounter-composer-height/);
 assert.match(style, /chat-keyboard-open/);
+assert.match(style, /height:78lvh!important/);
+assert.match(style, /bottom:calc\(var\(--poyozz-encounter-composer-height/);
+assert.match(style, /padding-bottom:0!important/);
+assert.match(source, /baselineViewportHeight/);
+assert.match(source, /syncKeyboardState/);
+assert.match(source, /orientationchange/);
 assert.match(source, /window\.visualViewport/);
 assert.match(source, /addEventListener\('resize'/);
 assert.match(source, /addEventListener\('scroll'/);
@@ -81,8 +87,15 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "410px",
     "visualViewport resize must shrink single/group chat above the keyboard");
   const input = { matches: selector => selector.includes("#messageInput") };
+  h.document.activeElement = input;
   h.listeners.focusin({ target: input });
-  assert.ok(h.classes.has("chat-keyboard-open"), "focusing a chat composer must mark keyboard state");
+  assert.ok(h.classes.has("chat-keyboard-open"), "focusing a chat composer with a shrunken viewport must mark keyboard state");
+  h.viewport.height = 720;
+  h.viewportListeners.resize();
+  h.flush();
+  assert.ok(!h.classes.has("chat-keyboard-open"),
+    "Android back-button keyboard dismissal must clear keyboard state even while the textarea remains focused");
+  assert.equal(h.document.activeElement, input, "keyboard dismissal must not require the textarea to blur");
   h.document.activeElement = { matches: () => false };
   h.listeners.focusout();
   h.flush();
@@ -103,10 +116,18 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
     matches: selector => selector.includes("#messageInput"),
     scrollIntoView: () => { input.scrolled = true; }
   };
+  h.document.activeElement = input;
   h.listeners.focusin({ target: input });
   h.flush();
   assert.ok(h.classes.has("chat-keyboard-open"));
   assert.ok(input.scrolled, "encounter input should be scrolled into the visible area on focus");
+  h.viewport.height = 720;
+  h.viewport.offsetTop = 0;
+  h.viewportListeners.resize();
+  h.flush();
+  assert.ok(!h.classes.has("chat-keyboard-open"),
+    "Encounter keyboard dismissal must restore the full-height character state without requiring blur");
+  assert.equal(h.variables["--poyozz-chat-viewport-height"], "720px");
 }
 
 {
