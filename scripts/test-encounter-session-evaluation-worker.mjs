@@ -65,7 +65,7 @@ assert.doesNotMatch(worker, /reserve_chat_turn|settle_chat_turn|refund_chat_turn
 const config = fs.readFileSync("supabase/config.toml", "utf8");
 assert.match(config, /\[functions\.encounter-evaluation-worker\][\s\S]*?verify_jwt = false/);
 
-const scheduleDraft = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
+const scheduleDraft = fs.readFileSync("supabase/migrations/20261120152000_opt_in_encounter_evaluation_worker_scheduler.sql", "utf8");
 const manualEndDraft = fs.readFileSync("supabase/drafts/encounter-session-manual-end.sql", "utf8");
 const evidenceGates = fs.readFileSync("supabase/drafts/encounter-evaluation-evidence-gates.sql", "utf8");
 const sessionStateEdge = fs.readFileSync("supabase/functions/encounter-session-state/index.ts", "utf8");
