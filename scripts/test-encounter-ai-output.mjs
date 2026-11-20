@@ -43,7 +43,7 @@ assert.match(affinityMigration, /apply_encounter_turn_affinity/);
 assert.match(affinityMigration, /affinity_delta BETWEEN -3 AND 3/);
 assert.match(affinityMigration, /status='settled'/);
 assert.match(affinityMigration, /story_relationship_states/);
-assert.match(endpoint, /apply_encounter_turn_affinity/);
+assert.match(endpoint, /apply_encounter_turn_affinity/);\nassert.match(frontend, /encounterAffinity=affinityResult\.affinity/);\nassert.match(scene, /目前關係：/);\nassert.match(scene, /affinityChip\.textContent='♡ '\+relationshipLabel/);
 assert.match(endpoint, /affinity_delta/);
 assert.match(endpoint, /不得輸出總好感度或關係階段/);
 const frontend = fs.readFileSync("index.html", "utf8");
