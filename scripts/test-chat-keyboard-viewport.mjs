@@ -23,7 +23,7 @@ assert.match(encounterScene, /top:0!important;bottom:auto!important;inset-inline
 assert.match(encounterScene, /height:100lvh!important;min-height:100lvh!important;max-height:100lvh!important/);
 assert.match(encounterScene, /layoutHeight-\(viewport\.height\+viewport\.offsetTop\)/);
 assert.match(encounterScene, /encounterTypingPulse/);
-assert.match(encounterScene, /composer-height,190px\)\+var\(--encounter-keyboard-offset/);
+assert.match(encounterScene, /composer-height,190px\)\s*\+\s*var\(--encounter-keyboard-offset/);
 assert.match(style, /bottom:calc\(var\(--poyozz-encounter-composer-height/);
 assert.match(style, /padding-bottom:0!important/);
 assert.match(source, /baselineViewportHeight/);
