@@ -49,13 +49,16 @@ export function parseEncounterTurnOutput(raw) {
     .filter((item) => {
       const size = Array.from(item).length;
       return size >= 30 && size <= 90;
-    }).slice(0, 3);
+    });
+  // Encounter UI depends on three actionable choices. Reject incomplete model output
+  // instead of silently converting one or two suggestions into an empty array.
+  if (suggestedReplies.length !== 3) return null;
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);
   const sceneBackgroundId = optionalUuid(value.scene_background_id ?? value.sceneBackgroundId);
 
   return {
     reply,
-    suggestedReplies: suggestedReplies.length === 3 ? suggestedReplies : [],
+    suggestedReplies,
     illustrationId,
     sceneBackgroundId,
   };
