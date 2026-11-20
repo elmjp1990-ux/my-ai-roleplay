@@ -15,6 +15,7 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
 
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
+assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/,\n  'Blank live age fields must fall back to a consistent cloud character snapshot');
 assert.match(cityMap, /map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)/,
   'Blank live age must be treated as missing so the consistent snapshot fallback is used');
 assert.match(cityMap, /snapshotAges\.every\(value=>value===snapshotAges\[0\]\)/,
