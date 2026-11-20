@@ -175,46 +175,46 @@ const saveStart = html.indexOf('async function saveSupabaseCharacter');
 const saveEnd = html.indexOf('const stablePersonaJson', saveStart);
 assert.ok(saveStart >= 0 && saveEnd > saveStart, 'Character cloud-save flow must remain identifiable');
 const saveFlow = html.slice(saveStart, saveEnd);
-assert.match(saveFlow, /select\('name, intro, race, style, tags, phone_settings, visibility/,
-  'Save must load the previous AI source fields before writing');
-assert.match(saveFlow, /existingPrivateProfileError/,
-  'Save must read the previous author-only personality profile before diffing');
-assert.match(saveFlow, /characterValueChanged/,
-  'Save must compare normalized old/new values rather than triggering on every save');
-assert.match(saveFlow, /aiRelevantChanges/,
-  'Save must maintain a separate list of AI-impacting field changes');
-assert.match(saveFlow, /nonAiChanges/,
-  'Save must distinguish display/configuration changes from AI source changes');
-assert.match(saveFlow, /new_character_source_fields_available/,
-  'New characters with no meaningful AI source fields must not trigger model organization');
-assert.match(saveFlow, /new_character_ai_source_present/,
-  'New characters with populated AI source fields may require derived organization');
-assert.match(saveFlow, /model: 'deepseek\/deepseek-v4-flash-20260423'/,
-  'Character data organization must use the confirmed conversation model');
-assert.match(saveFlow, /shouldCallModel: false/,
-  'This change must classify only; it must not call the model during this phase');
-assert.match(saveFlow, /aiOrganizationDecision/ ,
+const coreUtils = fs.readFileSync('core-utils.js', 'utf8');
+assert.match(saveFlow, /classifyCharacterProfileChanges/,
+  'Character save must delegate deterministic AI-impact classification to the shared pure helper');
+assert.match(saveFlow, /aiOrganizationDecision/,
   'The save result must expose the deterministic AI organization decision');
+assert.match(saveFlow, /aiOrganizationDecision\.requiresDerivedRefresh === true/,
+  'The save flow must queue derived refresh only when the shared classifier says source content changed');
+assert.match(saveFlow, /enqueue_character_profile_organization/,
+  'Character save must enqueue the idempotent profile refresh instead of calling the model inline');
+assert.match(saveFlow, /existingPrivateProfileError/,
+  'Save must read the previous author-only personality profile before classifying changes');
+assert.match(saveFlow, /verifiedPrivateInfo/,
+  'Private personality and private-info fields must be read back after save');
 assert.doesNotMatch(saveFlow, /chat\.completions|fetch\(.*openrouter/i,
   'Character save classification must not call the AI provider directly');
 
-
-assert.match(saveFlow, /runtimeAiChanges/,
+assert.match(coreUtils, /function classifyCharacterProfileChanges/,
+  'Shared core utilities must own the field-level AI-impact classifier');
+assert.match(coreUtils, /const changed = \(a, b\) => JSON\.stringify\(stable\(a\)\) !== JSON\.stringify\(stable\(b\)\)/,
+  'Field comparison must normalize object key order before detecting changes');
+assert.match(coreUtils, /const compareSource = \(key, a, b\)/,
+  'Source fields must distinguish content changes from format-only changes');
+assert.match(coreUtils, /const fields = \['coreTraits','values','speechStyle','behaviorRules','likes','dislikes','boundaries','relationshipPacing','occupation'\]/,
+  'Personality source fields must be diffed individually');
+assert.match(coreUtils, /compare\(runtime, 'phone_settings'/,
   'Phone notice instructions must be classified as runtime AI configuration changes');
-assert.match(saveFlow, /runtimeAiChangedFields/,
-  'Save result must expose runtime AI configuration changes separately');
-assert.match(saveFlow, /const requiresDerivedRefresh = aiRelevantChanges\.length > 0/,
-  'Derived refresh must be triggered only by meaningful AI source/personality fields');
-assert.match(saveFlow, /compareCharacterField\(nonAiChanges, 'name'/,
-  'Character renaming must be treated as metadata and must not trigger model organization');
-assert.match(saveFlow, /primaryIllustrationName/,
-  'Primary illustration naming must be treated as display metadata, not personality content');
-assert.match(saveFlow, /aiProfileFields/,
-  'Personality profile fields must be diffed individually instead of as one opaque object');
-assert.doesNotMatch(saveFlow, /compareCharacterField\('phone_settings'.*false/,
-  'Phone instructions must not be mislabeled as non-AI changes');
+assert.match(coreUtils, /compare\(nonAi, 'personality_profile\.primaryIllustrationName'/,
+  'Illustration naming must remain display metadata, not a personality refresh trigger');
+assert.match(coreUtils, /requiresDerivedRefresh: refresh, shouldCallModel: false/,
+  'The classifier must queue only when meaningful AI source changes and never call the model during save');
+assert.match(coreUtils, /model: 'deepseek\/deepseek-v4-flash-20260423'/,
+  'Character data organization must retain the confirmed conversation model');
+assert.match(coreUtils, /new_character_source_fields_available/);
+assert.match(coreUtils, /new_character_ai_source_present/);
+assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/,
+  'Opening message edits must remain runtime-only and not rebuild the derived profile');
+assert.match(coreUtils, /runtimeAiChangedFields: runtime\.map/);
+assert.match(coreUtils, /nonAiChangedFields: nonAi\.map/);
+assert.match(coreUtils, /changedFields: ai\.map/);
 
-console.log('Character save performs deterministic AI-impact diffing without invoking the model.');
 
 
 assert.match(phoneBlock, /get_story_world_state/, 'Story phone must read the persisted contextual time and location');
