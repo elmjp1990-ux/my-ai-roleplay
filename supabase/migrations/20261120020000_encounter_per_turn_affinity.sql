@@ -157,3 +157,26 @@ END; $$;
 REVOKE ALL ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz) TO service_role;
 
+
+-- When a Story session is explicitly switched to shared mode, seed the canonical
+-- Encounter state from its already-created relationship row immediately.
+CREATE OR REPLACE FUNCTION public.seed_encounter_affinity_from_shared_story()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF pg_trigger_depth()>1 OR NEW.chat_mode<>'story'
+     OR COALESCE(NEW.session_data->>'affinityMode','independent')<>'shared'
+     OR OLD.session_data->>'affinityMode' IS NOT DISTINCT FROM NEW.session_data->>'affinityMode' THEN
+    RETURN NEW;
+  END IF;
+  INSERT INTO public.encounter_character_state(user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at,updated_at)
+  SELECT NEW.user_id,NEW.character_id,r.affinity,public.story_relationship_stage_for_affinity(r.affinity),now(),now(),now()
+  FROM public.story_relationship_states r WHERE r.session_id=NEW.id AND r.user_id=NEW.user_id AND r.character_id=NEW.character_id
+  ON CONFLICT(user_id,character_id) DO UPDATE SET affinity=EXCLUDED.affinity,relationship_stage=EXCLUDED.relationship_stage,last_interaction_at=now(),updated_at=now();
+  RETURN NEW;
+END; $$;
+DROP TRIGGER IF EXISTS story_session_seed_shared_encounter_affinity ON public.chat_sessions;
+CREATE TRIGGER story_session_seed_shared_encounter_affinity
+AFTER UPDATE OF session_data ON public.chat_sessions
+FOR EACH ROW WHEN (OLD.session_data->>'affinityMode' IS DISTINCT FROM NEW.session_data->>'affinityMode')
+EXECUTE FUNCTION public.seed_encounter_affinity_from_shared_story();
+REVOKE ALL ON FUNCTION public.seed_encounter_affinity_from_shared_story() FROM PUBLIC,anon,authenticated;
