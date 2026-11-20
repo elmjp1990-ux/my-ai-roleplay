@@ -617,7 +617,11 @@
           : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
     const name=escapeHTML(person.name||'未命名角色');
     const gender=escapeHTML(person.gender||'未設定');
-    const ageValue=person.age??person.characterAge??person.character_age,ageText=ageValue==null?'':String(ageValue).trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
+    const liveAge=person.age??person.characterAge??person.character_age;
+    const snapshotAges=Object.values(state.sessions||{}).filter(session=>session?.characterId===person.id&&session?.cloudCharacterSnapshot?.age!=null)
+      .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=20);
+    const consistentSnapshotAge=snapshotAges.length&&snapshotAges.every(value=>value===snapshotAges[0])?snapshotAges[0]:'';
+    const ageValue=liveAge??consistentSnapshotAge,ageText=ageValue==null?'':String(ageValue).trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
     const statusDescription=escapeHTML(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
