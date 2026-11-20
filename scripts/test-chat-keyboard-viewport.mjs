@@ -13,10 +13,10 @@ assert.doesNotThrow(() => new Function(source), "keyboard viewport controller mu
 
 assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
-assert.match(encounterScene, /top:var\(--poyozz-visual-viewport-top,0px\)!important/);
-assert.match(encounterScene, /height:var\(--poyozz-chat-viewport-height,100dvh\)!important/);
-assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
-assert.match(encounterScene, /bottom:0!important;max-height:calc/);
+assert.match(encounterScene, /top:0!important;bottom:auto!important/);
+assert.match(encounterScene, /height:100lvh!important/);
+assert.match(encounterScene, /bottom:calc\(var\(--poyozz-encounter-composer-height,190px\) \+ var\(--encounter-keyboard-offset,0px\)\)!important/);
+assert.match(encounterScene, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
 assert.match(encounterScene, /encounterTypingPulse/);
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
@@ -36,6 +36,7 @@ assert.match(html, /latestAssistantSuggestions/);
 assert.match(encounterScene, /\.encounter-scene \.messages\{/);
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
+assert.match(source, /--encounter-keyboard-offset/);
 assert.match(source, /orientationchange/);
 assert.match(source, /window\.visualViewport/);
 assert.match(source, /addEventListener\('resize'/);
@@ -95,6 +96,7 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
 {
   const h = createHarness();
   assert.equal(h.variables["--poyozz-chat-viewport-height"], "720px");
+  assert.equal(h.variables["--encounter-keyboard-offset"], "0px");
   h.viewport.height = 410;
   h.viewportListeners.resize();
   h.flush();
@@ -134,6 +136,8 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
   h.listeners.focusin({ target: input });
   h.flush();
   assert.ok(h.classes.has("chat-keyboard-open"));
+  assert.equal(h.variables["--encounter-keyboard-offset"], "398px",
+    "Encounter composer offset must be calculated by the single shared viewport controller");
   assert.ok(input.scrolled, "encounter input should be scrolled into the visible area on focus");
   h.viewport.height = 720;
   h.viewport.offsetTop = 0;
