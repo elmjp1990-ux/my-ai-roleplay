@@ -36,8 +36,8 @@ INSERT INTO auth.users (id)
 VALUES ('a1000000-0000-4000-8000-000000000001');
 INSERT INTO public.profiles (id, handle, nickname)
 VALUES ('a1000000-0000-4000-8000-000000000001', 'affinity-ci-user', 'Affinity CI');
-INSERT INTO public.characters (id, author_id, name)
-VALUES ('a2000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'Affinity CI Character');
+INSERT INTO public.characters (id, author_id, name, visibility, review_status, rights_confirmed, first_published_at)
+VALUES ('a2000000-0000-4000-8000-000000000001', 'a1000000-0000-4000-8000-000000000001', 'Affinity CI Character', 'public', 'approved', true, now());
 INSERT INTO public.encounter_character_state
   (user_id, character_id, affinity, relationship_stage, first_met_at, last_interaction_at)
 VALUES
