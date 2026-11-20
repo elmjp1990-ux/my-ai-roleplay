@@ -6688,21 +6688,12 @@ function showEncounterLeaveDialog(session) {
 async function openNewStoryDialog(characterId, latest = null) {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) return toast('此角色目前無法開啟新故事。');
-  const stageLabels = {
-    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
-    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
-  };
-  showDialog('選擇故事開始方式',
-    '<p class="small muted">你曾與這個角色相遇。可以延續當時累積的關係，或重新展開一段故事；兩者都會建立獨立聊天室，不會覆蓋相遇紀錄。</p>'+
-    '<div class="stack" style="gap:10px;margin-top:14px">'+
-    (latest?.session_id
-      ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇日記')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'
-      : '<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>代入相遇好感度</strong><small>目前沒有已結算的相遇紀錄，暫時無法代入。</small></span><span>—</span></div>')+
-    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>開啟全新故事</strong><small>從初次見面開始，好感度為 0。</small></span><span>›</span></button>'+
-    '</div>');
+  const stageLabels = { hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆' };
+  const choices = (originMode, sourceId, label, note) => '<div class="stack" style="gap:6px"><div class="small muted">'+note+'</div>'+['shared','independent'].map(sync=>'<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="'+originMode+'" data-source-encounter-session-id="'+e(sourceId||'')+'" data-affinity-mode="'+sync+'"><span><strong>'+label+'｜'+(sync==='shared'?'同步相遇好感度':'獨立故事好感度')+'</strong><small>'+(sync==='shared'?'與相遇共用累積；故事每回合也會更新相遇關係。':'只在此故事聊天室累積，不影響相遇或其他故事。')+'</small></span><span>›</span></button>').join('')+'</div>';
+  showDialog('選擇故事開始方式', '<p class="small muted">新故事會建立獨立聊天室。好感度可預設與相遇共用，或選擇只在本故事累積。</p><div class="stack" style="gap:12px;margin-top:14px">'+(latest?.session_id?choices('encounter_snapshot',latest.session_id,'承接相遇','承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇日記')+'，並帶入已保存的關係記憶。'):'<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>承接相遇</strong><small>目前沒有已結算的相遇紀錄，暫時無法承接。</small></span><span>—</span></div>')+choices('fresh_story',null,'開啟全新故事','從初次見面開始，初始好感度為 0。')+'</div>');
 }
 
-async function createStorySession(characterId, originMode, sourceEncounterSessionId = null) {
+async function createStorySession(characterId, originMode, sourceEncounterSessionId = null, affinityMode = 'shared') {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) throw new Error('此角色目前無法開啟新故事。');
   const client = window.mySupabase;
@@ -6716,7 +6707,8 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
       characterId,
       sessionId,
       originMode,
-      sourceEncounterSessionId
+      sourceEncounterSessionId,
+      affinityMode
     }
   });
   let payload = data;
@@ -11701,9 +11693,10 @@ document.addEventListener('click',async event => {
         const mode=button.dataset.value;
         const sourceId=button.dataset.sourceEncounterSessionId||null;
         if(!['fresh_story','encounter_snapshot'].includes(mode))break;
+        const affinityMode=button.dataset.affinityMode==='independent'?'independent':'shared';
         if(mode==='encounter_snapshot'&&!isUuid(sourceId)){toast('找不到可承接的相遇紀錄。');break;}
         $('modal')?.close();
-        try{await createStorySession(characterId,mode,sourceId);}
+        try{await createStorySession(characterId,mode,sourceId,affinityMode);}
         catch(error){console.error('建立新故事失敗：',error);toast(error?.message||'新故事建立失敗，請稍後再試。');}
         break;
       }
