@@ -567,7 +567,7 @@
       if(!Number.isInteger(affinity)||affinity < -100||affinity > 100||!stage)throw new Error('好感度資料格式不正確');
       const progress=Math.round((affinity+100)/2);
       const score=affinity>0?'+'+affinity:String(affinity);
-      liveTarget.innerHTML='<div class="city-character-affinity-heading"><span>好感度</span><strong>'+score+'</strong><em>'+stage+'</em></div><div class="city-character-affinity-meter" role="img" aria-label="好感度進度 '+progress+'%"><i style="width:'+progress+'%"></i></div>';
+      liveTarget.innerHTML='<div class="city-character-affinity-heading"><span class="city-character-affinity-icon" aria-hidden="true">♡</span><span>好感度</span><strong>'+score+'</strong><em>'+stage+'</em></div><div class="city-character-affinity-meter" role="img" aria-label="好感度進度 '+progress+'%"><i style="width:'+progress+'%"></i></div>';
       liveTarget.setAttribute('aria-label','好感度 '+score+'，關係階段 '+stage);
     }catch(error){
       console.warn('城市角色好感度載入失敗：',error?.message||error);
@@ -617,7 +617,7 @@
           : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
     const name=escapeHTML(person.name||'未命名角色');
     const gender=escapeHTML(person.gender||'未設定');
-    const ageValue=person.age??person.characterAge??person.character_age,ageText=ageValue==null?'':String(ageValue).trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
+    const ageValue=person.age??person.characterAge??person.character_age,ageText=ageValue==null?'':String(ageValue).trim(),ageNote=String(person.ageNote||person.age_note||'').trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定')+(ageNote?'（'+escapeHTML(ageNote)+'）':'');
     const statusDescription=escapeHTML(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
