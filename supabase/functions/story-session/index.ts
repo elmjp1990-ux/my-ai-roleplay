@@ -219,6 +219,13 @@ Deno.serve(async (request: Request) => {
     }
   }
 
+  if (affinityMode === "shared") {
+    const { data: sharedState, error: sharedStateError } = await admin.from("encounter_character_state")
+      .select("affinity,relationship_stage").eq("user_id",user.id).eq("character_id",character.id).maybeSingle();
+    if (sharedStateError) return json({ error: "shared_affinity_lookup_failed" }, 503);
+    if (sharedState) { affinity=Number(sharedState.affinity||0); relationshipStage=String(sharedState.relationship_stage||"first_meeting"); }
+  }
+
   const { data: session, error: createError } = await admin.rpc(
     "create_story_session_with_relationship",
     {
