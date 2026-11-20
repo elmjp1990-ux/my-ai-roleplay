@@ -51,12 +51,16 @@ export function parseEncounterTurnOutput(raw) {
       return size >= 30 && size <= 90;
     }).slice(0, 3);
   if (suggestedReplies.length !== 3) return null;
+  const rawDelta = value.affinity_delta ?? value.affinityDelta;
+  const affinityDelta = Number.isInteger(rawDelta) && rawDelta >= -3 && rawDelta <= 3 ? rawDelta : null;
+  if (affinityDelta === null) return null;
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);
   const sceneBackgroundId = optionalUuid(value.scene_background_id ?? value.sceneBackgroundId);
 
   return {
     reply,
     suggestedReplies,
+    affinityDelta,
     illustrationId,
     sceneBackgroundId,
   };
