@@ -194,10 +194,9 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     "你是 POYOZZ 相遇模式的整場互動評估器，不是角色扮演者。",
     "只根據提供的實際對話評估玩家與角色在本次相遇中的關係變化；不可虛構未發生的事件，也不可把角色單方面的台詞當成玩家已同意或已做出的行動。",
     "請評估整體互動品質、互相尊重、信任、衝突、界線、情緒支持與關係發展。正負向都可以，沒有足夠互動時應接近 0。",
-    "affinity_delta 是本次整場相遇的總變化，整數 -100 至 100；relationship_stage 必須從 hostile、dislike、wary、first_meeting、acquaintance、close、intimate、special 選一個，並與本次結束後的 affinity 一致。",
     "memories 僅保留 0 至 5 條對未來互動有幫助、由實際對話確認的長期事實；不得記錄推測、短暫瑣事、敏感個資或角色未確認的玩家資訊。",
     "diary_summary 是 1 至 1200 字元的繁體中文相遇摘要。rationale 是簡短、可稽核的結論理由，不要輸出隱藏思考過程。",
-    "只輸出 JSON object：{\"affinity_delta\":整數,\"relationship_stage\":\"八種階段之一\",\"memories\":[\"記憶\"] ,\"diary_summary\":\"摘要\",\"rationale\":\"簡短理由\"}。不得輸出 Markdown 或其他欄位。",
+    "只輸出 JSON object：{\"memories\":[\"記憶\"],\"diary_summary\":\"摘要\",\"rationale\":\"簡短理由\"}。不得輸出 Markdown 或其他欄位。",
   ].join("\n");
   const user = [
     "角色：" + (asText(snapshot.name) || asText(session.character_name) || "角色"),
