@@ -21,7 +21,7 @@ assert.match(encounterScene, /encounterTypingPulse/);
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
-const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\\s\\S]*?)<\\/style>/g)].map(item=>item[1]).join("\\n");
+const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(item=>item[1]).join("\n");
 assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
 assert.match(encounterScene, /\\.encounter-scene \\.messages\\{/);
