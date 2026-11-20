@@ -53,7 +53,7 @@ assert.match(queryOptimizationMigration, /s\.user_id = \(SELECT auth\.uid\(\)\)/
 assert.match(queryOptimizationMigration, /LIMIT 10/);
 assert.match(queryOptimizationMigration, /SECURITY INVOKER/);
 assert.match(frontend, /get_latest_settled_encounter_session/);
-assert.match(frontend, /代入相遇好感度/);
+assert.match(frontend, /同步相遇好感度/);
 assert.match(frontend, /開啟全新故事/);
 assert.match(frontend, /await openNewStoryDialog\(characterId, latestEncounter \\|\\| null\)/);
 assert.match(frontend, /目前沒有已結算的相遇紀錄，暫時無法代入/);
