@@ -20,6 +20,8 @@ assert.match(encounterScene, /encounterTypingPulse/);
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
+assert.doesNotMatch(html.match(/<style[^>]*>[\\s\\S]*?<\\/style>/g)?.join("\\n")||"", /encounter-mode-active|encounter-scene/,
+  "No Encounter-specific visual selectors may remain in index.html style blocks");
 assert.match(encounterScene, /Encounter-specific final refinements migrated out of index\.html/,
   "Encounter-specific final visual refinements must be centralized in encounter-scene.js");
 assert.match(source, /baselineViewportHeight/);
