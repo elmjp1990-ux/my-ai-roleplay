@@ -622,7 +622,10 @@
       .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=20);
     const consistentSnapshotAge=snapshotAges.length&&snapshotAges.every(value=>value===snapshotAges[0])?snapshotAges[0]:'';
     const ageValue=liveAge??consistentSnapshotAge,ageText=ageValue==null?'':String(ageValue).trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
-    const statusDescription=escapeHTML(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
+    const rawTimeRange=String(person.cityStartTime||'')+'–'+String(person.cityEndTime||'');
+    const requestedSleepScene=person.name==='陸沈宵'&&rawTimeRange==='08:00–09:00';
+    const rawStatusDescription=requestedSleepScene?'安靜且完全遮光的臥室，深層睡眠中。':(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
+    const statusDescription=escapeHTML(rawStatusDescription);
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
     const placeName=escapeHTML(cityPlaceNames[placeKey]||'城市地點');
