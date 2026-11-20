@@ -377,14 +377,14 @@ Deno.serve(async (request) => {
       encounter: { evidence, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
     });
   };
-  const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta")
+  const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta,suggested_replies")
     .eq("id", assistantMessageId).eq("session_id", sessionId).eq("role", "assistant")
     .is("deleted_at", null).maybeSingle();
 
   if (charge.status === "settled" || charge.status === "needs_reconciliation") {
     const { data: saved, error: savedError } = await findSavedReply();
     if (savedError) return json({ status: "needs_reconciliation", error: "reply_lookup_failed", retryAllowed: false }, 503);
-    if (saved && asText(saved.content)) return await settleAndRespond(saved, true);
+    if (saved && asText(saved.content)) return await settleAndRespond(saved, true, null, Array.isArray(saved.suggested_replies) ? saved.suggested_replies.map((value: unknown) => asText(value)).filter(Boolean).slice(0,3) : []);
     if (charge.status === "settled") return json({ status: "needs_reconciliation", retryAllowed: false }, 503);
     // A prior provider request may still have completed. Never issue a second
     // billable generation merely because its response or persistence ack was lost.
@@ -484,7 +484,7 @@ Deno.serve(async (request) => {
 
   const assistantRow = {
     id: assistantMessageId, session_id: sessionId, role: "assistant",
-    content: replyText, affinity_delta: parsedOutput.affinityDelta, created_at: new Date().toISOString(),
+    content: replyText, affinity_delta: parsedOutput.affinityDelta, suggested_replies: parsedOutput.suggestedReplies, created_at: new Date().toISOString(),
   };
   const { error: insertError } = await admin.from("chat_messages").insert(assistantRow);
   let reply: DbRow = assistantRow;
