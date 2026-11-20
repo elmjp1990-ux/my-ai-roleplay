@@ -41,6 +41,7 @@ Deno.serve(async (request: Request) => {
   const sessionId = body.sessionId;
   const originMode = body.originMode;
   const sourceEncounterSessionId = body.sourceEncounterSessionId ?? null;
+  const affinityMode = body.affinityMode === "independent" ? "independent" : "shared";
   if (
     !isUuid(characterId) ||
     !isUuid(sessionId) ||
@@ -93,7 +94,7 @@ Deno.serve(async (request: Request) => {
       .eq("user_id", user.id)
       .maybeSingle();
     if (stateError || !relationshipState) return json({ error: "relationship_state_lookup_failed" }, 503);
-    return json({ session: existing, relationship: relationshipState, idempotent: true });
+    return json({ session: existing, relationship: relationshipState, affinityMode: existing.session_data?.affinityMode === "independent" ? "independent" : "shared", idempotent: true });
   }
 
   // Run the existing role-access check under the caller JWT, not service_role.
@@ -237,6 +238,10 @@ Deno.serve(async (request: Request) => {
     console.error("Story session creation failed:", createError?.message || "invalid_rpc_result");
     return json({ error: "story_session_create_failed" }, 503);
   }
+  const { error: affinityModeError } = await admin.from("chat_sessions").update({
+    session_data: { affinityMode, affinitySyncVersion: 1 },
+  }).eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "story");
+  if (affinityModeError) return json({ error: "story_affinity_mode_persistence_failed" }, 503);
 
   const { data: relationshipState, error: stateError } = await admin
     .from("story_relationship_states")
@@ -246,5 +251,5 @@ Deno.serve(async (request: Request) => {
     .maybeSingle();
   if (stateError || !relationshipState) return json({ error: "relationship_state_lookup_failed" }, 503);
 
-  return json({ session, relationship: relationshipState, idempotent: false }, 201);
+  return json({ session, relationship: relationshipState, affinityMode, idempotent: false }, 201);
 });
