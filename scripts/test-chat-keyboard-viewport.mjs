@@ -24,6 +24,15 @@ assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
 const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(item=>item[1]).join("\n");
 assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
+assert.match(encounterScene, /brightness>=140&&spread<=42/);
+assert.match(encounterScene, /background:transparent!important/);
+assert.match(html, /data-action="encounter-temporary-leave"/);
+assert.match(html, /data-action="encounter-end-prompt"/);
+assert.match(html, /data-action="encounter-end-confirm"/);
+assert.match(html, /function conversationTypingIndicatorHTML/);
+assert.match(html, /activeTurnInFlight\)\$\('messages'\)\.insertAdjacentHTML\('beforeend',conversationTypingIndicatorHTML\(\)\)/);
+assert.match(html, /function renderSuggestions/);
+assert.match(html, /latestAssistantSuggestions/);
 assert.match(encounterScene, /\.encounter-scene \.messages\{/);
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
