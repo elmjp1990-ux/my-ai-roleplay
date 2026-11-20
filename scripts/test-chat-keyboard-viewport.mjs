@@ -18,6 +18,8 @@ assert.match(encounterScene, /height:100lvh!important/);
 assert.match(encounterScene, /bottom:calc\(var\(--poyozz-encounter-composer-height,190px\) \+ var\(--encounter-keyboard-offset,0px\)\)!important/);
 assert.match(encounterScene, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
 assert.match(encounterScene, /encounterTypingPulse/);
+assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\);\s*\}\s*\}else\{/,
+  "The sprite source-change conditional must close before the no-art fallback branch");
 assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
 assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
   "Encounter visual overrides must not remain in index.html");
