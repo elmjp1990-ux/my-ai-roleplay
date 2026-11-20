@@ -5,6 +5,10 @@ const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 
 assert.match(html, /<script src="\.\/city-map\.js"><\/script>/);
+assert.match(html, /session_encounter_temporarily_left_at:session_data->>encounterTemporarilyLeftAt/);
+assert.match(html, /encounterTemporarilyLeftAt:Number\(row\.session_encounter_temporarily_left_at\)/);
+assert.match(cityMap, /get_encounter_character_affinity/);
+assert.match(cityMap, /findResumableEncounterSession=async/);
 assert.match(html, /function renderCityMapMVP\(\)\s*\{[\s\S]*?window\.PoyozzCityMap\?\.render/);
 assert.ok(html.indexOf('<script src="./city-map.js"></script>') < html.indexOf('function renderCityMapMVP()'),
   'City map module must load before the main application can invoke it.');
