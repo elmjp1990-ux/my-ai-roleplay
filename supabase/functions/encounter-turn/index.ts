@@ -356,6 +356,11 @@ Deno.serve(async (request) => {
       p_user_id: user.id, p_turn_id: turnId, p_assistant_message_id: assistantMessageId,
     });
     if (settleError) return json({ status: "needs_reconciliation", replySaved: true, retryAllowed: false }, 503);
+    const affinityDelta = Number(reply.affinity_delta);
+    const { data: affinityResult, error: affinityError } = await admin.rpc("apply_encounter_turn_affinity", {
+      p_turn_id: turnId, p_user_id: user.id, p_character_id: session.character_id, p_affinity_delta: affinityDelta,
+    });
+    if (affinityError || !affinityResult) return json({ status: "needs_reconciliation", error: "encounter_affinity_apply_failed", retryAllowed: true }, 503);
     const { data: evidence, error: evidenceError } = await persistEvidence();
     if (evidenceError || !evidence) {
       return json({ status: "needs_reconciliation", error: "encounter_evidence_persistence_failed", retryAllowed: true }, 503);
@@ -365,10 +370,10 @@ Deno.serve(async (request) => {
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
       ...(suggestedReplies.length === 3 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
-      encounter: { evidence, affinityPendingUntilSceneEnd: true, ...(visuals ? { visuals } : {}) },
+      encounter: { evidence, affinity: affinityResult, ...(visuals ? { visuals } : {}) },
     });
   };
-  const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role")
+  const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta")
     .eq("id", assistantMessageId).eq("session_id", sessionId).eq("role", "assistant")
     .is("deleted_at", null).maybeSingle();
 
@@ -475,7 +480,7 @@ Deno.serve(async (request) => {
 
   const assistantRow = {
     id: assistantMessageId, session_id: sessionId, role: "assistant",
-    content: replyText, created_at: new Date().toISOString(),
+    content: replyText, affinity_delta: parsedOutput.affinityDelta, created_at: new Date().toISOString(),
   };
   const { error: insertError } = await admin.from("chat_messages").insert(assistantRow);
   let reply: DbRow = assistantRow;
