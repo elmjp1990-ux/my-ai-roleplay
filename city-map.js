@@ -563,7 +563,7 @@
     try{
       const client=window.mySupabase;
       if(!client)throw new Error('關係資料服務尚未連線');
-      const {data,error}=await client.rpc('get_latest_settled_encounter_affinity',{p_character_id:characterId});
+      const {data,error}=await client.rpc('get_encounter_character_affinity',{p_character_id:characterId});
       if(error)throw error;
       const row=Array.isArray(data)?data[0]:data;
       const liveTarget=$('cityCharacterAffinity');
