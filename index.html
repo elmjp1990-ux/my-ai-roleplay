@@ -6686,9 +6686,10 @@ async function setEncounterLifecycleState(sessionId, action) {
 function showEncounterLeaveDialog(session) {
   if(!session?.encounterMode)return;
   showDialog('離開相遇',
-    '<p class="small muted">這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</p>'+ 
+    '<p class="small muted">選擇暫時離開，或結束這次相遇並整理相遇日記。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
-    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>稍後可回到同一場相遇繼續聊天。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>保留今天同一地標的相遇，稍後可以接續。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-prompt" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
     '</div>');
 }
 
@@ -11318,8 +11319,8 @@ document.addEventListener('click',async event => {
           await setEncounterLifecycleState(session.id,'pause');
           session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
           if(!persist())throw new Error('本機聊天狀態無法保存。');
-          const saved=await saveChatSessionSafely(session);
-          if(saved!==true)throw new Error('雲端聊天狀態未確認保存。');
+          // Lifecycle metadata is persisted by encounter-session-state; avoid a
+          // second chat snapshot write that can fail on pending-message races.
         }catch(error){
           session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;
           persist();
@@ -11331,6 +11332,12 @@ document.addEventListener('click',async event => {
           break;
         }
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
+      }
+      case 'encounter-end-prompt': {
+        const session=state.sessions[key]||currentSession();
+        if(!session?.encounterMode)break;
+        showDialog('結束這次相遇','<p>確定要結束這次相遇嗎？結束後將整理好感度與相遇日記，今天這個地標不再提供續談。</p><div class="row" style="justify-content:flex-end;margin-top:16px"><button type="button" data-action="encounter-dialog-dismiss">取消</button><button type="button" class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">結束相遇</button></div>');
+        break;
       }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
