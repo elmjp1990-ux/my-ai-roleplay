@@ -14,6 +14,9 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
   'index.html must retain only the small city-map dependency adapter, not the extracted implementation.');
 
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
+assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
+assert.match(cityMap, /snapshotAges\.every\(value=>value===snapshotAges\[0\]\)/,
+  'When live age is missing, only a consistent age across loaded chat snapshots may be used as fallback');
 assert.match(cityMap, /render\(dependencies\)/);
 for (const name of [
   'state', 'accessible', 'escapeHTML', 'safeImage', 'currentUser', 'toast', 'go', 'requireLogin',
