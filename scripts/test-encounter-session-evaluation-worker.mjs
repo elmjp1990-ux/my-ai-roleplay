@@ -114,8 +114,8 @@ assert.match(sessionStateEdge, /encounter_session_evaluation_jobs/);
 assert.match(sessionStateEdge, /action === "pause" \|\| action === "resume"/);
 assert.match(sessionStateEdge, /persist_encounter_session_pause_resume_metadata/);
 const pauseResumeEdgeBlock = sessionStateEdge.slice(
-  sessionStateEdge.indexOf("if (action === \\"pause\\" || action === \\"resume\\")"),
-  sessionStateEdge.indexOf("if (action === \\"end\\")"),
+  sessionStateEdge.indexOf('if (action === "pause" || action === "resume")'),
+  sessionStateEdge.indexOf('if (action === "end")'),
 );
 assert.ok(pauseResumeEdgeBlock.length > 0, "pause/resume handler block must exist");
 assert.doesNotMatch(pauseResumeEdgeBlock, /\.from\("chat_sessions"\)[\s\S]{0,400}\.update\(\{\s*session_data:/,
