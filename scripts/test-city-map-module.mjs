@@ -174,10 +174,12 @@ assert.match(html, /正式環境不提供此工具/);
 
 
 assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
-assert.match(cityMap, /renderCityCharacterCard\(live\?\{\.\.\.live,\.\.\.person\}:person,0\)/,
-  'Opening a city character card must preserve the schedule-resolved fields from city presence.');
-assert.doesNotMatch(cityMap, /renderCityCharacterCard\(live,0\)/,
-  'The base character cache must never replace the schedule-resolved city presence object.');
+assert.match(cityMap, /mergeCityCharacterProfile\(live,person\)/,
+  'Opening a city character card must merge resolved schedule data without overwriting non-empty profile fields.');
+assert.match(cityMap, /if\(!hasProfileValue\(presence\?\.\[key\]\)&&hasProfileValue\(live\?\.\[key\]\)\)merged\[key\]=live\[key\]/,
+  'Null or empty schedule profile fields must fall back to the cached character profile.');
+assert.match(cityMap, /ageValue=person\.age\?\?person\.characterAge\?\?person\.character_age/);
+assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 assert.match(cityMap, /const isSleepingSchedule=/);
 assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
 assert.match(cityMap, /const left=.*meetControl/);
