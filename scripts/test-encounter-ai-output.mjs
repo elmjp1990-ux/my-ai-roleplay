@@ -38,7 +38,7 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_re
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(encounterScene, /const processEncounterSpriteBackdrop=/);
-assert.match(encounterScene, /brightness>=140&&Math\.max\(r,g,b\)-Math\.min\(r,g,b\)<=42/);
+assert.match(encounterScene, /\(r\+g\+b\)\/3>=140&&Math.max\(r,g,b\)-Math.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\)/);
 assert.equal((encounterScene.match(/const neutralBackdrop=i=>/g)||[]).length,1,
   'Portrait background-removal algorithm must exist only once');
