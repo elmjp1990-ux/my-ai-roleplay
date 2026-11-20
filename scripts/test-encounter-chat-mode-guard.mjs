@@ -221,7 +221,8 @@ assert.match(frontend, /async function setEncounterLifecycleState\(sessionId, ac
 assert.match(frontend, /functions\.invoke\(['"]encounter-session-state['"]/);
 assert.match(frontend, /setEncounterLifecycleState\(session\.id,'pause'\)/);
 assert.match(cityMap, /setEncounterLifecycleState\(resumedSession\.id,'resume'\)/);
-assert.match(cityMap, /const saved=await saveChatSessionSafely\(encounterSession\)/);
+assert.match(cityMap, /Resume metadata is committed by encounter-session-state on the server/);
+assert.doesNotMatch(cityMap, /saveChatSessionSafely\(encounterSession\)/);
 assert.match(frontend, /encounter_scene_expired_or_closed/);
 
 
