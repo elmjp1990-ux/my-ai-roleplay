@@ -4,9 +4,9 @@
   const PAGE_SIZE=50;
   const excludedMessages=new Set(['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）']);
   const cleanSummary=value=>String(value||'')
-    .replace(/你說：「\\[POYOZZ_ENCOUNTER_DISCOVERY_EVENT\\]」。?/g,'你選擇讓角色主動發現你。')
-    .replace(/\\[POYOZZ_ENCOUNTER_DISCOVERY_EVENT\\]/g,'你選擇讓角色主動發現你')
-    .replace(/（請接續目前的故事。）/g,'')
+    .replaceAll('你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。','你選擇讓角色主動發現你。')
+    .replaceAll('[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','你選擇讓角色主動發現你')
+    .replaceAll('（請接續目前的故事。）','')
     .trim();
   const renderHistory=(person,sessions,escapeHTML,placeNames)=>{
     if(person.encounterHistoryLoading)return '<p>正在讀取雲端相遇紀錄…</p>';
