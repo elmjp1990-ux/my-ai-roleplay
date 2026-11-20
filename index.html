@@ -6679,10 +6679,9 @@ async function setEncounterLifecycleState(sessionId, action) {
 function showEncounterLeaveDialog(session) {
   if(!session?.encounterMode)return;
   showDialog('離開相遇',
-    '<p class="small muted">你想暫時離開，還是結束這次相遇？</p>'+ 
+    '<p class="small muted">這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</p>'+ 
     '<div class="stack" style="gap:10px;margin-top:14px">'+
-    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</small></span><span>›</span></button>'+
-    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇日記，之後不再接續本次對話。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>稍後可回到同一場相遇繼續聊天。</small></span><span>›</span></button>'+
     '</div>');
 }
 
