@@ -4759,7 +4759,12 @@ async function executePendingChatTurn(s) {
       catch(error){console.warn('AI 選定立繪同步失敗：',error?.message||error);}
     }
   }
-  if(s.encounterMode===true&&result.encounter?.affinity){\n    const affinityResult=result.encounter.affinity;\n    if(Number.isInteger(affinityResult.affinity)&&affinityResult.affinity>=-100&&affinityResult.affinity<=100)s.encounterAffinity=affinityResult.affinity;\n    if(typeof affinityResult.relationship_stage==='string')s.encounterRelationshipStage=affinityResult.relationship_stage;\n  }\n  const replyWasAdded = !s.messages.some(message => message.id === reply.id);
+  if(s.encounterMode===true&&result.encounter?.affinity){
+    const affinityResult=result.encounter.affinity;
+    if(Number.isInteger(affinityResult.affinity)&&affinityResult.affinity>=-100&&affinityResult.affinity<=100)s.encounterAffinity=affinityResult.affinity;
+    if(typeof affinityResult.relationship_stage==='string')s.encounterRelationshipStage=affinityResult.relationship_stage;
+  }
+  const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
   const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90).slice(0,3);
   // Never substitute unrelated generic replies when contextual suggestions are absent.
@@ -6634,6 +6639,8 @@ async function createEncounterSession(character) {
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
     encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
+    encounterAffinity: Number.isInteger(data.session.session_data?.encounter?.affinity)?data.session.session_data.encounter.affinity:0,
+    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'first_meeting',
     messages: [],
     memories: [],
     album: [],
