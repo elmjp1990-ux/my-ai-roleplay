@@ -14,6 +14,15 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
   'index.html must retain only the small city-map dependency adapter, not the extracted implementation.');
 
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
+assert.match(cityMap, /client\.from\('chat_sessions'\)/);
+assert.match(cityMap, /\.eq\('chat_mode','encounter'\)/);
+assert.match(cityMap, /Number\(data\.encounterTemporarilyLeftAt\)>0/);
+assert.match(cityMap, /data\.encounterPlace===placeKey/);
+assert.match(cityMap, /loadCloudChatSessions\(user,\{onlySessionId:candidate\.id,listPage:false\}\)/,
+  'Resume lookup must hydrate the candidate cloud session before reopening it');
+assert.match(cityMap, /hydrated\?\.cloudOwned===true/);
+assert.doesNotMatch(cityMap, /PoyozzEncounterSessionResume/,
+  'Resume lookup must not depend on an undefined global module');
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
 assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/, 
   'Blank live age fields must fall back to a consistent cloud character snapshot');
