@@ -35,6 +35,8 @@ assert.match(scheduleEndedMetadataMigration, /NEW\.scheduled_end_at<=clock_times
 assert.match(scheduleEndedMetadataMigration, /'archived',true/);
 assert.match(scheduleEndedMetadataMigration, /'encounterEndedAt'/);
 assert.match(scheduleEndedMetadataMigration, /AFTER INSERT OR UPDATE OF status ON public\.encounter_session_lifecycle/);
+assert.match(scheduleEndedMetadataMigration, /UPDATE public\.chat_sessions AS session/);
+assert.match(scheduleEndedMetadataMigration, /lifecycle\.status IN \('active','paused','ready_to_settle'\)/);
 
 assert.match(worker, /claim_encounter_evaluation_jobs/);
 assert.match(worker, /requestedSessionId/);
