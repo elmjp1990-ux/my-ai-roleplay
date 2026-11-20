@@ -196,33 +196,6 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3
     messages.dataset.encounterBeatKey=beatKey;
     messages.dataset.encounterBeatIndex=String(idx);
   };
-  let encounterViewportPanel=null,encounterViewportCleanup=null;
-  const trackEncounterKeyboard=panel=>{
-    if(encounterViewportPanel===panel)return;
-    encounterViewportCleanup?.();
-    encounterViewportPanel=panel;
-    const viewport=window.visualViewport;
-    const update=()=>{
-      if(!panel.isConnected){
-        encounterViewportCleanup?.();
-        encounterViewportCleanup=null;
-        encounterViewportPanel=null;
-        return;
-      }
-      const layoutHeight=Math.max(window.innerHeight,document.documentElement.clientHeight);
-      const offset=viewport?Math.max(0,layoutHeight-(viewport.height+viewport.offsetTop)):0;
-      panel.style.setProperty('--encounter-keyboard-offset',offset+'px');
-    };
-    viewport?.addEventListener('resize',update,{passive:true});
-    viewport?.addEventListener('scroll',update,{passive:true});
-    window.addEventListener('resize',update,{passive:true});
-    encounterViewportCleanup=()=>{
-      viewport?.removeEventListener('resize',update);
-      viewport?.removeEventListener('scroll',update);
-      window.removeEventListener('resize',update);
-    };
-    update();
-  };
   const encounterRenderLifecycle=window.PoyozzChatRenderLifecycle;
   if(encounterRenderLifecycle){
     encounterRenderLifecycle.register('afterSingleConversation','encounter.single-scene',({session:renderSession,panel:renderPanel})=>{
@@ -230,7 +203,6 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3
       const panel=renderPanel||$('view')?.querySelector('.chat-main');
       if(!session?.encounterMode||!panel)return;
       panel.classList.add('encounter-scene');
-      trackEncounterKeyboard(panel);
       const character=sessionCharacter(session);
       const selectedBackgroundPath=safeImage(session?.encounterVisuals?.sceneBackgroundPath||'');
       const sceneImage=safeImage(selectedBackgroundPath||character?.encounterSceneImage||session?.encounterSceneImage||character?.sceneImage||'');
