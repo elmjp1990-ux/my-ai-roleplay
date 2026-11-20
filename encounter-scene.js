@@ -3,6 +3,12 @@
 (function installEncounterScenePresentation(){
   const processEncounterSpriteBackdrop=(image,source)=>{
     image.crossOrigin='anonymous';
+    image.onerror=()=>{
+      image.dataset.encounterProcessed=source;
+      image.classList.add('encounter-auto-bg-fallback');
+      image.onload=null;
+      image.onerror=null;
+    };
     image.onload=()=>{
       if(image.dataset.encounterProcessed===source)return;
       try{
