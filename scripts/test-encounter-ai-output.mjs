@@ -6,7 +6,7 @@ const text = "相遇內容。".repeat(30);
 const illustrationId = "11111111-1111-4111-8111-111111111111";
 const sceneBackgroundId = "22222222-2222-4222-8222-222222222222";
 assert.equal(Array.from(text).length, 150);
-const validSuggestions = ["我想了解你剛才為什麼會來這裡，以及你現在的想法。", "如果方便的話，我想陪你做點別的事，看看接下來會發生什麼。", "我先回應你剛剛的話，再問一個和眼前情況有關的小問題。"];
+const validSuggestions = ["我想了解你剛才為什麼會來這裡，以及你現在的想法，我也想多了解一點。", "如果方便的話，我想陪你做點別的事，看看接下來會發生什麼，也讓我一起參與。", "我先回應你剛剛的話，再問一個和眼前情況有關的小問題，慢慢聊下去。"];
 
 assert.deepEqual(
   parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
