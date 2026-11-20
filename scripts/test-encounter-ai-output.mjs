@@ -36,6 +36,11 @@ assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"], affinity_delta: 1 })), null, "Invalid suggestions must reject the response");
 
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
+const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
+assert.match(encounterScene, /const processEncounterSpriteBackdrop=/);
+assert.match(encounterScene, /brightness>=140&&Math\.max\(r,g,b\)-Math\.min\(r,g,b\)<=42/);
+assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\)/);
+assert.doesNotMatch(encounterScene, /const neutralBackdrop=\(i\)=>/);
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
 const guidelines = fs.readFileSync("supabase/functions/_shared/encounter-response-guidelines.ts", "utf8");
 const affinityMigration = fs.readFileSync("supabase/migrations/20261120020000_encounter_per_turn_affinity.sql", "utf8");
