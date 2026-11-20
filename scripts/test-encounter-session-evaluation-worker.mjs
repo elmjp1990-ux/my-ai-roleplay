@@ -120,6 +120,8 @@ assert.match(pauseResumeMetadataMigration,/persist_encounter_session_pause_resum
 assert.match(pauseResumeMetadataMigration,/COALESCE\(session_data,'\{\}'::jsonb\)\|\|/);
 assert.match(pauseResumeMetadataMigration,/encounterTemporarilyLeftAt/);
 assert.match(pauseResumeMetadataMigration,/is_service_role_request/);
+assert.doesNotMatch(pauseResumeMetadataMigration,/v_session_data/,
+  'Atomic metadata RPC must not retain an undeclared return variable');
 assert.match(pauseResumeMetadataMigration,/GRANT EXECUTE[\s\S]*TO service_role/);
 assert.match(sessionStateEdge, /encounter_state_metadata_persistence_failed/);
 assert.match(sessionStateEdge, /EdgeRuntime/);
