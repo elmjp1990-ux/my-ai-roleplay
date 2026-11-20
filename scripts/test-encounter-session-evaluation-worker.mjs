@@ -26,6 +26,16 @@ assert.match(worker, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(worker, /玩家選擇留空，讓角色主動發現自己/);
 assert.match(worker, /玩家留空發送，請角色自然延續目前互動/);
 assert.match(worker, /Authorization.*Bearer.*serviceRoleKey/);
+const scheduleEndedMetadataMigration = fs.readFileSync(
+  "supabase/migrations/20261120040000_mark_encounter_ended_when_schedule_closes.sql",
+  "utf8",
+);
+assert.match(scheduleEndedMetadataMigration, /NEW\.status='ready_to_settle'/);
+assert.match(scheduleEndedMetadataMigration, /NEW\.scheduled_end_at<=clock_timestamp\(\)/);
+assert.match(scheduleEndedMetadataMigration, /'archived',true/);
+assert.match(scheduleEndedMetadataMigration, /'encounterEndedAt'/);
+assert.match(scheduleEndedMetadataMigration, /AFTER INSERT OR UPDATE OF status ON public\.encounter_session_lifecycle/);
+
 assert.match(worker, /claim_encounter_evaluation_jobs/);
 assert.match(worker, /requestedSessionId/);
 assert.match(worker, /claim_encounter_evaluation_job/);
