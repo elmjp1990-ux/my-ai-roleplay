@@ -578,20 +578,6 @@
       }
     }
   };
-  const hasProfileValue=value=>value!==null&&value!==undefined&&
-    (typeof value!=='string'||value.trim()!=='')&&
-    (!Array.isArray(value)||value.length>0)&&
-    (typeof value!=='object'||Array.isArray(value)||Object.keys(value).length>0);
-  const mergeCityCharacterProfile=(live,presence)=>{
-    if(!live)return presence;
-    const merged={...live,...presence};
-    ['name','gender','age','image','avatar_url','avatar','avatarVideoPath','avatar_video_path',
-      'characterVideoPath','character_video_path','videoUrl','video_url','intro','description',
-      'personalityProfile','style','tags'].forEach(key=>{
-      if(!hasProfileValue(presence?.[key])&&hasProfileValue(live?.[key]))merged[key]=live[key];
-    });
-    return merged;
-  };
   const renderCityCharacterCard=(person,page=0,mode='status')=>{
     const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
     if(!card||!body||!person)return;
@@ -631,9 +617,7 @@
           : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
     const name=escapeHTML(person.name||'未命名角色');
     const gender=escapeHTML(person.gender||'未設定');
-    const ageValue=person.age??person.characterAge??person.character_age;
-     const ageText=ageValue!==null&&ageValue!==undefined?String(ageValue).trim():'';
-     const age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
+    const ageValue=person.age??person.characterAge??person.character_age,ageText=ageValue==null?'':String(ageValue).trim(),age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
     const statusDescription=escapeHTML(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
     const timeRange=person.cityStartTime&&person.cityEndTime?escapeHTML(person.cityStartTime+'–'+person.cityEndTime):'時間未設定';
     const placeKey=locationModal.dataset.place;
@@ -721,7 +705,9 @@
       // The base character cache does not contain cityStartTime/cityEndTime/
       // cityActivity/citySceneDescription, so passing `live` alone resets the
       // status card to its "time not set" and generic-status fallbacks.
-      renderCityCharacterCard(mergeCityCharacterProfile(live,person),0);
+      const cardPerson={...live,...person};
+     ['name','gender','age','image','avatar_url','avatarVideoPath','avatar_video_path','intro','description'].forEach(key=>{if((person?.[key]==null||person?.[key]==='')&&live?.[key]!=null)cardPerson[key]=live[key];});
+     renderCityCharacterCard(cardPerson,0);
       return;
     }
     const cardAction=event.target.closest('[data-action^="city-character-"]')?.dataset.action;
