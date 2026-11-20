@@ -33,7 +33,7 @@ assert.match(html, /data-action="encounter-end-prompt"/);
 assert.match(html, /data-action="encounter-end-confirm"/);
 assert.match(html, /function conversationTypingIndicatorHTML/);
 assert.match(html, /activeTurnInFlight\)\$\('messages'\)\.insertAdjacentHTML\('beforeend',conversationTypingIndicatorHTML\(\)\)/);
-assert.match(html, /function renderSuggestions/);
+assert.match(html, /function conversationSuggestionsHTML/);
 assert.match(html, /latestAssistantSuggestions/);
 assert.match(encounterScene, /\.encounter-scene \.messages\{/);
 assert.match(source, /baselineViewportHeight/);
