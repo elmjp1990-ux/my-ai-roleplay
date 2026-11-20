@@ -28,6 +28,8 @@ assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
 assert.match(encounterScene, /\(r\+g\+b\)\/3>=140&&Math.max\(r,g,b\)-Math.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /background:transparent!important/);
+assert.match(encounterScene, /image\.onerror=\(\)=>\{[\s\S]*?encounter-auto-bg-fallback/,
+  "Portrait backdrop processing must gracefully mark cross-origin or canvas failures");
 assert.match(html, /data-action="encounter-temporary-leave"/);
 assert.match(html, /data-action="encounter-end-prompt"/);
 assert.match(html, /data-action="encounter-end-confirm"/);
