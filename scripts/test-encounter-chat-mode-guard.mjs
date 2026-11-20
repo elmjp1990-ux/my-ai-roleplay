@@ -421,7 +421,7 @@ assert.match(frontend, /async function loadStoryRelationshipState\(session\)/);
 assert.match(frontend, /get_story_relationship_state/);
 assert.match(frontend, /storyRelationshipLabel/);
 assert.match(frontend, /story-relationship-meter/);
-assert.match(cityMap, /get_latest_settled_encounter_affinity/);
+assert.match(cityMap, /get_encounter_character_affinity/);
 assert.match(frontend, /city-character-affinity/);
 assert.match(cityMap, /你們還不認識/);
 assert.match(cityMap, /登入後查看與角色的好感度/);
