@@ -12,20 +12,14 @@ assert.doesNotThrow(() => new Function(source), "keyboard viewport controller mu
 
 assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
-assert.match(style, /body\.encounter-mode-active/);
-assert.match(style, /--poyozz-chat-viewport-height/);
-assert.match(style, /--poyozz-visual-viewport-top/);
-assert.match(style, /--poyozz-encounter-composer-height/);
-assert.match(style, /chat-keyboard-open/);
-assert.match(style, /height:78lvh!important/);
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
-assert.match(encounterScene, /top:0!important;bottom:auto!important;inset-inline:0!important/);
-assert.match(encounterScene, /height:100lvh!important;min-height:100lvh!important;max-height:100lvh!important/);
-assert.match(encounterScene, /layoutHeight-\(viewport\.height\+viewport\.offsetTop\)/);
+assert.match(encounterScene, /height:var\(--poyozz-chat-viewport-height,100dvh\)!important/);
+assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
+assert.match(encounterScene, /bottom:0!important;max-height:calc/);
 assert.match(encounterScene, /encounterTypingPulse/);
-assert.match(encounterScene, /composer-height,190px\)\s*\+\s*var\(--encounter-keyboard-offset/);
-assert.match(style, /bottom:calc\(var\(--poyozz-encounter-composer-height/);
-assert.match(style, /padding-bottom:0!important/);
+assert.doesNotMatch(encounterScene, /trackEncounterKeyboard|encounter-keyboard-offset/);
+assert.doesNotMatch(style, /encounter-mode-active|encounter-character-sprite|encounter-dialogue-beat/,
+  "Encounter styles must not be duplicated in the shared index keyboard CSS");
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
 assert.match(source, /orientationchange/);
