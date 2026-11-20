@@ -229,8 +229,8 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
 
   const { data: settled, error: settlementError } = await admin.rpc("settle_encounter_session", {
     p_session_id: job.session_id,
-    p_affinity_delta: evaluation.affinityDelta,
-    p_relationship_stage: evaluation.relationshipStage,
+    p_affinity_delta: 0,
+    p_relationship_stage: currentStage,
     p_memories: evaluation.memories,
     p_evaluation: {
       source: "encounter_session_evaluation_worker",
@@ -240,6 +240,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
       omitted_turn_count: transcript.omittedTurns,
       diary_summary: evaluation.diarySummary,
       rationale: evaluation.rationale,
+      affinity_evaluation_ignored: true,
       provider_request_id: response.requestId || null,
     },
   });
