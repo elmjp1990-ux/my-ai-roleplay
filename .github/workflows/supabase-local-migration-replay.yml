@@ -12,6 +12,7 @@ on:
       - "supabase/drafts/replay-encounter-sparse-schedule-windows.sql"
       - "supabase/drafts/replay-encounter-scene-catalog.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
+      - "supabase/drafts/replay-encounter-per-turn-affinity.sql"
       - "supabase/drafts/encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-relationship-greeting-pools.sql"
       - "supabase/drafts/replay-encounter-worldview-manual-review.sql"
