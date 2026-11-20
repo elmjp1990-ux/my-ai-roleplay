@@ -14294,56 +14294,6 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
   height:100%;
   min-height:0;
 }
-/* Encounter mode has its own fixed full-screen shell; resize every fixed layer with visualViewport. */
-html body.encounter-mode-active .app,
-html body.encounter-mode-active #view,
-html body.encounter-mode-active .chat-layout,
-html body.encounter-mode-active .chat-main.encounter-scene{
-  top:var(--poyozz-visual-viewport-top,0px)!important;
-  bottom:auto!important;
-  height:var(--poyozz-chat-viewport-height,100dvh)!important;
-  min-height:0!important;
-}
-html body.encounter-mode-active .app,
-html body.encounter-mode-active #view,
-html body.encounter-mode-active .chat-layout{
-  inset-inline:0!important;
-}
-html body.encounter-mode-active .chat-main.encounter-scene{
-  inset-inline:0!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .messages{
-  bottom:calc(var(--poyozz-encounter-composer-height,190px) + var(--encounter-keyboard-offset,0px))!important;
-  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
-  padding-bottom:0!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{
-  margin-bottom:0!important;
-  border-radius:16px 16px 0 0!important;
-  border-bottom:0!important;
-  background:rgba(20,20,28,.68)!important;
-  box-shadow:none!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .composer{
-  padding-top:0!important;
-  border-top:0!important;
-  border-radius:0 0 16px 16px!important;
-  background:rgba(20,20,28,.68)!important;
-}
-body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
-  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;
-}
-body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .messages{
-  bottom:calc(var(--poyozz-encounter-composer-height,190px) + var(--encounter-keyboard-offset,0px))!important;
-  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
-  padding-bottom:0!important;
-}
-body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
-  bottom:0!important;
-  height:78lvh!important;
-  opacity:.96!important;
-  visibility:visible!important;
-}
 </style>
 <script id="poyozz-chat-keyboard-viewport">
 (() => {
