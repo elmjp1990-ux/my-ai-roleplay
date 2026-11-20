@@ -45,7 +45,7 @@ assert.match(affinityMigration, /status='settled'/);
 assert.match(affinityMigration, /story_relationship_states/);
 assert.match(endpoint, /apply_encounter_turn_affinity/);
 assert.match(endpoint, /affinity_delta/);
-assert.match(endpoint, /不要輸出總好感度或關係階段/);
+assert.match(endpoint, /不得輸出總好感度或關係階段/);
 const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
