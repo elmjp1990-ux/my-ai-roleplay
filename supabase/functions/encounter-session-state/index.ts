@@ -64,5 +64,62 @@ Deno.serve(async (request: Request) => {
     return json({ error: "encounter_state_update_failed" }, 503);
   }
 
+  if (action === "end") {
+    const queueEvaluation = async () => {
+      try {
+        const { data: lifecycle, error: lifecycleError } = await admin
+          .from("encounter_session_lifecycle")
+          .select("session_id,user_id,character_id,status,scheduled_end_at")
+          .eq("session_id", sessionId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (lifecycleError || !lifecycle || lifecycle.status !== "ready_to_settle" ||
+            new Date(lifecycle.scheduled_end_at).getTime() > Date.now()) {
+          if (lifecycleError) console.error("Encounter evaluation queue lookup failed:", lifecycleError.message);
+          return;
+        }
+
+        const { error: queueError } = await admin
+          .from("encounter_session_evaluation_jobs")
+          .insert({
+            session_id: lifecycle.session_id,
+            user_id: lifecycle.user_id,
+            character_id: lifecycle.character_id,
+            status: "pending",
+          });
+        // A pre-existing job is expected on an idempotent end retry. Never reset a
+        // completed job or create a second evaluation for the same scene.
+        if (queueError && queueError.code !== "23505") {
+          throw new Error("encounter_evaluation_job_enqueue_failed");
+        }
+
+        const workerUrl = url.replace(/\\/+$/, "") + "/functions/v1/encounter-evaluation-worker";
+        const workerResponse = await fetch(workerUrl, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + serviceRoleKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ limit: 1 }),
+        });
+        if (!workerResponse.ok) {
+          throw new Error("encounter_evaluation_worker_http_" + workerResponse.status);
+        }
+      } catch (evaluationError) {
+        console.error(
+          "Encounter evaluation background trigger failed:",
+          evaluationError instanceof Error ? evaluationError.message : "unknown_error",
+        );
+      }
+    };
+
+    const runtime = (globalThis as unknown as {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void };
+    }).EdgeRuntime;
+    const task = queueEvaluation();
+    if (typeof runtime?.waitUntil === "function") runtime.waitUntil(task);
+    else await task;
+  }
+
   return json({ encounter: data });
 });
