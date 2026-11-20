@@ -55,7 +55,7 @@ const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/ind
 const storySession = fs.readFileSync("supabase/functions/story-session/index.ts", "utf8");
 assert.match(storySession, /\.\.\.existingSessionData, affinityMode, affinitySyncVersion: 1/);
 assert.match(affinityMigration, /affinityMode.*shared/);
-assert.match(affinityMigration, /affinityMode.*independent/);
+assert.match(affinityMigration, /v_mode<>'shared'/);
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const sparseScheduleMigration = fs.readFileSync("supabase/migrations/20261118074655_encounter_schedules_allow_unavailable_windows.sql", "utf8");
