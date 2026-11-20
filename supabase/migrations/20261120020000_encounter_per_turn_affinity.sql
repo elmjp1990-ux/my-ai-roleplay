@@ -55,3 +55,38 @@ REVOKE ALL ON FUNCTION public.apply_encounter_turn_affinity(uuid,uuid,uuid,integ
 GRANT EXECUTE ON FUNCTION public.apply_encounter_turn_affinity(uuid,uuid,uuid,integer) TO service_role;
 
 ALTER TABLE public.chat_messages ADD COLUMN IF NOT EXISTS affinity_delta smallint CHECK (affinity_delta IS NULL OR affinity_delta BETWEEN -3 AND 3);
+-- Keep shared affinity synchronized across Encounter and Story sessions.
+CREATE OR REPLACE FUNCTION public.sync_shared_affinity_from_story()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+DECLARE v_mode text; v_stage text;
+BEGIN
+  IF pg_trigger_depth()>1 THEN RETURN NEW; END IF;
+  SELECT COALESCE(s.session_data->>'affinityMode','shared') INTO v_mode FROM public.chat_sessions s WHERE s.id=NEW.session_id;
+  IF v_mode<>'shared' OR NEW.character_id IS NULL THEN RETURN NEW; END IF;
+  v_stage := CASE WHEN NEW.affinity=-100 THEN 'hostile' WHEN NEW.affinity<0 THEN 'dislike' ELSE NEW.relationship_stage END;
+  INSERT INTO public.encounter_character_state(user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at,updated_at)
+  VALUES(NEW.user_id,NEW.character_id,NEW.affinity,v_stage,now(),now(),now())
+  ON CONFLICT(user_id,character_id) DO UPDATE SET affinity=EXCLUDED.affinity,relationship_stage=EXCLUDED.relationship_stage,last_interaction_at=now(),updated_at=now();
+  RETURN NEW;
+END; $$;
+
+CREATE OR REPLACE FUNCTION public.sync_shared_affinity_to_story()
+RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = '' AS $$
+BEGIN
+  IF pg_trigger_depth()>1 THEN RETURN NEW; END IF;
+  UPDATE public.story_relationship_states r SET affinity=NEW.affinity,relationship_stage=NEW.relationship_stage,updated_at=now()
+  FROM public.chat_sessions s WHERE s.id=r.session_id AND s.user_id=NEW.user_id AND s.character_id=NEW.character_id
+    AND s.chat_mode='story' AND s.deleted_at IS NULL AND COALESCE(s.session_data->>'affinityMode','shared')='shared';
+  RETURN NEW;
+END; $$;
+
+DROP TRIGGER IF EXISTS story_relationship_sync_shared_affinity ON public.story_relationship_states;
+CREATE TRIGGER story_relationship_sync_shared_affinity AFTER UPDATE OF affinity,relationship_stage ON public.story_relationship_states
+FOR EACH ROW WHEN (OLD.affinity IS DISTINCT FROM NEW.affinity OR OLD.relationship_stage IS DISTINCT FROM NEW.relationship_stage)
+EXECUTE FUNCTION public.sync_shared_affinity_from_story();
+DROP TRIGGER IF EXISTS encounter_state_sync_shared_affinity ON public.encounter_character_state;
+CREATE TRIGGER encounter_state_sync_shared_affinity AFTER UPDATE OF affinity,relationship_stage ON public.encounter_character_state
+FOR EACH ROW WHEN (OLD.affinity IS DISTINCT FROM NEW.affinity OR OLD.relationship_stage IS DISTINCT FROM NEW.relationship_stage)
+EXECUTE FUNCTION public.sync_shared_affinity_to_story();
+REVOKE ALL ON FUNCTION public.sync_shared_affinity_from_story() FROM PUBLIC,anon,authenticated;
+REVOKE ALL ON FUNCTION public.sync_shared_affinity_to_story() FROM PUBLIC,anon,authenticated;
