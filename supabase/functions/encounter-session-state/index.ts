@@ -69,8 +69,9 @@ Deno.serve(async (request: Request) => {
     const { data: sessionRow, error: sessionReadError } = await admin.from("chat_sessions")
       .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
     if (sessionReadError || !sessionRow) return json({ error: "encounter_end_metadata_unavailable" }, 503);
-    const currentSessionData = sessionRow.session_data && typeof sessionRow.session_data === "object" && !Array.isArray(sessionRow.session_data)
-      ? sessionRow.session_data as Record<string, unknown> : {};
+    const persistedSessionData = sessionRow as unknown as { session_data?: unknown };
+    const currentSessionData = persistedSessionData.session_data && typeof persistedSessionData.session_data === "object" && !Array.isArray(persistedSessionData.session_data)
+      ? persistedSessionData.session_data as Record<string, unknown> : {};
     const { error: metadataError } = await admin.from("chat_sessions").update({
       session_data: { ...currentSessionData, archived: true, encounterEndedAt: Date.now() },
       updated_at: new Date().toISOString(),
