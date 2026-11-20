@@ -3,32 +3,18 @@ import fs from "node:fs";
 import { parseEncounterSessionEvaluation } from "../supabase/functions/_shared/encounter-session-evaluation.mjs";
 
 const valid = {
-  affinity_delta: 6,
-  relationship_stage: "acquaintance",
   memories: ["玩家喜歡在雨天去咖啡廳。"],
   diary_summary: "兩人一起在咖啡廳避雨，聊了彼此近期的生活。",
   rationale: "玩家主動分享近況，角色也有回應與互相理解。",
 };
 assert.deepEqual(parseEncounterSessionEvaluation(JSON.stringify(valid)), {
-  affinityDelta: 6,
-  relationshipStage: "acquaintance",
   memories: ["玩家喜歡在雨天去咖啡廳。"],
   diarySummary: valid.diary_summary,
   rationale: valid.rationale,
 });
 
-for (const stage of [
-  "hostile", "dislike", "wary", "first_meeting",
-  "acquaintance", "close", "intimate", "special",
-]) {
-  assert.equal(parseEncounterSessionEvaluation({ ...valid, relationship_stage: stage }).relationshipStage, stage);
-}
 assert.equal(parseEncounterSessionEvaluation("{not-json"), null);
 assert.equal(parseEncounterSessionEvaluation([]), null);
-assert.equal(parseEncounterSessionEvaluation({ ...valid, affinity_delta: 101 }), null);
-assert.equal(parseEncounterSessionEvaluation({ ...valid, affinity_delta: -101 }), null);
-assert.equal(parseEncounterSessionEvaluation({ ...valid, affinity_delta: 1.5 }), null);
-assert.equal(parseEncounterSessionEvaluation({ ...valid, relationship_stage: "unknown" }), null);
 assert.equal(parseEncounterSessionEvaluation({ ...valid, memories: Array(6).fill("記憶") }), null);
 assert.equal(parseEncounterSessionEvaluation({ ...valid, memories: [""] }), null);
 assert.equal(parseEncounterSessionEvaluation({ ...valid, memories: ["x".repeat(501)] }), null);
@@ -119,4 +105,4 @@ assert.match(sessionStateEdge, /encounter-evaluation-worker/);
 assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
   "A manual end must not enqueue or drain unrelated users' due sessions");
 
-console.log("Encounter session evaluator parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
+assert.doesNotMatch(worker, /affinity_delta.*整場相遇|relationship_stage.*八種階段/);\nconsole.log("Encounter session evaluator summary/memory parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
