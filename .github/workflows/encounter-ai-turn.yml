@@ -11,8 +11,11 @@ on:
       - "scripts/test-encounter-chat-mode-guard.mjs"
       - "index.html"
       - "encounter-scene.js"
+      - "encounter-history.js"
       - "city-map.js"
       - "scripts/test-city-map-module.mjs"
+      - "scripts/test-chat-keyboard-viewport.mjs"
+      - "supabase/functions/encounter-session-state/**"
       - "scripts/test-encounter-public-character-eligibility.mjs"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-evaluation-worker/**"
@@ -65,6 +68,10 @@ jobs:
         run: node scripts/test-encounter-session-evaluation-worker.mjs
       - name: Test city map dynamic scene registry contract
         run: node scripts/test-city-map-module.mjs
+      - name: Test Encounter history, end flow, and blank-send UI regressions
+        run: node scripts/test-encounter-chat-mode-guard.mjs
+      - name: Test Android keyboard dismissal and encounter viewport anchoring
+        run: node scripts/test-chat-keyboard-viewport.mjs
       - name: Test public character schedule eligibility and adult visibility
         run: node scripts/test-encounter-public-character-eligibility.mjs
       - name: Test schedule worker security and wallet isolation
@@ -81,4 +88,4 @@ jobs:
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
       - name: Type-check Encounter and Character Profile Edge Functions
-        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts
+        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-session-state/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts
