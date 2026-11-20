@@ -107,89 +107,20 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3
 @keyframes encounterTypingPulse{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media(max-width:767px){.encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}.encounter-character-sprite{width:min(108%,680px)!important;height:78lvh!important}.encounter-scene .composer{max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 60px)!important}.encounter-scene .messages{padding:8px 14px!important}}
 
-/* Encounter-specific final refinements migrated out of index.html: this file owns all Encounter presentation. */
-/* Final encounter overrides intentionally come after all legacy chat styles. */
-body.encounter-mode-active .chat-main.encounter-scene,
-body.encounter-mode-active .chat-main.encounter-scene:before{background-color:transparent!important}
-body.encounter-mode-active .chat-main.encounter-scene:before{
-  background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;
-  background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .composer{
-  background:linear-gradient(180deg,rgba(17,14,24,.04),rgba(17,14,24,.20) 24%,rgba(17,14,24,.48) 100%)!important;
-  backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;
-}
-/* Keep the character avatar in the heading as specified; remove only duplicate message/speaker avatars. */
-body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,
-body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,
-body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{gap:8px!important}
-body.encounter-mode-active .chat-main.encounter-scene .messages{overflow-y:auto!important;overscroll-behavior:contain!important}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;cursor:pointer}
+/* Consolidated final Encounter polish. */
+body.encounter-mode-active .chat-main.encounter-scene:before{background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading{background:linear-gradient(110deg,rgba(25,22,35,.30),rgba(45,38,55,.18) 52%,rgba(25,22,35,.10))!important;border-color:rgba(255,255,255,.12)!important;box-shadow:0 8px 28px rgba(8,6,14,.08)!important;backdrop-filter:blur(12px)!important}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{max-width:calc(100% - 12px)!important;gap:8px!important}
+body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{position:relative;z-index:2;width:min(100%,760px)!important;margin:0 auto!important;gap:9px!important;padding:17px 19px 12px!important;color:rgba(255,250,247,.96)!important;background:linear-gradient(135deg,rgba(35,29,43,.54),rgba(61,48,66,.43) 48%,rgba(31,28,42,.48))!important;border-color:rgba(255,237,242,.22)!important;box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px rgba(255,255,255,.10)!important;backdrop-filter:blur(15px)!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;color:rgba(255,239,224,.98)!important;background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;border-left:2px solid rgba(244,204,218,.72)!important;box-shadow:inset 0 1px rgba(255,255,255,.12)!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:15px!important;line-height:1.9!important;font-weight:450!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;font-size:10px!important}
+body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel,body.encounter-mode-active .chat-main.encounter-scene .suggestion-cards,body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card,body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card.active{background:linear-gradient(135deg,rgba(38,32,47,.30),rgba(72,57,77,.22) 52%,rgba(36,31,46,.26))!important;border-color:rgba(255,255,255,.13)!important;box-shadow:0 6px 22px rgba(8,6,14,.07),inset 0 1px rgba(255,255,255,.07)!important;backdrop-filter:blur(13px)!important}
+body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-action,body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-dialogue{background:transparent!important}
+body.encounter-mode-active .chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(24,20,31,.015),rgba(36,29,43,.13) 42%,rgba(26,22,34,.30))!important}
+body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
-@media(max-width:767px){
-  body.encounter-mode-active .chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(17,14,24,.02),rgba(17,14,24,.18) 22%,rgba(17,14,24,.42) 100%)!important}
-}
-
-/* Encounter visual-novel polish: soft glass gradients, restrained nameplate and lighter dialogue surfaces. */
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading{
-  background:linear-gradient(110deg,rgba(25,22,35,.30) 0%,rgba(45,38,55,.18) 52%,rgba(25,22,35,.10) 100%)!important;
-  border-color:rgba(255,255,255,.12)!important;
-  box-shadow:0 8px 28px rgba(8,6,14,.08)!important;
-  backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{
-  max-width:calc(100% - 12px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{
-  display:flex!important;flex-direction:column!important;align-items:stretch!important;
-  width:min(100%,760px)!important;margin:0 auto!important;text-align:left!important;
-  gap:9px!important;padding:17px 19px 12px!important;
-  color:rgba(255,250,247,.96)!important;
-  background:linear-gradient(135deg,rgba(35,29,43,.54) 0%,rgba(61,48,66,.43) 48%,rgba(31,28,42,.48) 100%)!important;
-  border:1px solid rgba(255,237,242,.22)!important;border-radius:17px!important;
-  box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px 0 rgba(255,255,255,.10)!important;
-  backdrop-filter:blur(15px)!important;-webkit-backdrop-filter:blur(15px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{
-  align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;
-  padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;
-  font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;
-  color:rgba(255,239,224,.98)!important;
-  background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;
-  border-left:2px solid rgba(244,204,218,.72)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{
-  display:block!important;font-size:15px!important;line-height:1.9!important;
-  font-weight:450!important;white-space:pre-wrap!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{
-  align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;
-  color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;
-  font-size:10px!important;letter-spacing:.05em!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel,
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-cards,
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card,
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card.active{
-  background:linear-gradient(135deg,rgba(38,32,47,.30),rgba(72,57,77,.22) 52%,rgba(36,31,46,.26))!important;
-  border-color:rgba(255,255,255,.13)!important;
-  box-shadow:0 6px 22px rgba(8,6,14,.07),inset 0 1px 0 rgba(255,255,255,.07)!important;
-  backdrop-filter:blur(13px)!important;-webkit-backdrop-filter:blur(13px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-action,
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-dialogue{
-  background:transparent!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .composer{
-  background:linear-gradient(180deg,rgba(24,20,31,.015),rgba(36,29,43,.13) 42%,rgba(26,22,34,.30) 100%)!important;
-}
-@media(max-width:767px){
-  body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}
-  body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}
-  body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}
-}
+@media(max-width:767px){body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}}
 /* Final full-bleed chat frame: remove the outer panel inset and let header/composer glass meet the phone edges. */
 body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
 body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
