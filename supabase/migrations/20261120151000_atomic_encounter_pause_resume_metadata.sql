@@ -10,13 +10,12 @@ SECURITY DEFINER
 SET search_path TO ''
 AS $function$
 DECLARE
-  v_session_data jsonb;
   v_left_at bigint;
 BEGIN
   IF NOT public.is_service_role_request() THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE='42501';
   END IF;
-  IF p_session_id IS NULL OR p_user_id IS NULL OR p_action NOT IN ('pause','resume') THEN
+  IF p_session_id IS NULL OR p_user_id IS NULL OR p_action IS NULL OR p_action NOT IN ('pause','resume') THEN
     RAISE EXCEPTION 'invalid_encounter_pause_resume_metadata' USING ERRCODE='22023';
   END IF;
 
