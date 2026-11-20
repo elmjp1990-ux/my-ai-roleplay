@@ -26,7 +26,7 @@ for (const name of [
   'state', 'accessible', 'escapeHTML', 'safeImage', 'currentUser', 'toast', 'go', 'requireLogin',
   'persist', 'hydratePublicCharacterIllustrations', 'characterVideoObserver',
   'releaseCharacterVideo', 'hydrateCharacterVideo', 'findResumableEncounterSession',
-  'setEncounterLifecycleState', 'saveChatSessionSafely', 'createEncounterSession'
+  'setEncounterLifecycleState', 'createEncounterSession'
 ]) {
   assert.ok(cityMap.includes(name), 'Injected city-map dependency must remain explicit: ' + name);
 }
