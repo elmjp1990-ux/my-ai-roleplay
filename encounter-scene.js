@@ -232,10 +232,6 @@
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
     const allMessages=Array.isArray(session?.messages)?session.messages:[];
-    const isInternalEvent=value=>{
-      const text=String(value??'').trim();
-      return text==='[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]'||text==='（請接續目前的故事。）';
-    };
     const openingText=String(session?.initialOpeningMessage?.text||'').trim();
     const latestReply=[...allMessages].reverse().find(m=>m&&m.role==='assistant'&&String(m.text??m.content??'').trim())||
       (openingText?{id:'opening-'+session.id,content:openingText}:null);
@@ -247,12 +243,13 @@
       if(message?.role==='user')latestUserIndex=i;
       if(message?.role==='assistant'&&String(message.text??message.content??'').trim())latestAssistantIndex=i;
     }
-    const hasAssistantTurnReply=latestUserIndex>=0&&latestAssistantIndex>latestUserIndex;
+    const hasAnyPlayerTurn=latestUserIndex>=0;
+    const hasAssistantTurnReply=hasAnyPlayerTurn&&latestAssistantIndex>latestUserIndex;
     const composer=panel.querySelector('.composer');
     if(composer){
       const input=composer.querySelector('#messageInput');
       const characterName=String(sessionCharacter(session)?.name||sessionCharacter(session)?.display_name||'角色').trim();
-      if(input)input.placeholder=hasAssistantTurnReply?'留空發送，角色會繼續說下去':'先跟'+characterName+'打招呼，或者留空發送，讓'+characterName+'發現你';
+      if(input)input.placeholder=hasAnyPlayerTurn?'留空發送，角色會繼續說下去':'先跟'+characterName+'打招呼，或者留空發送，讓'+characterName+'發現你';
       const suggestions=composer.querySelector('.suggestions');
       if(suggestions)suggestions.hidden=!hasAssistantTurnReply;
     }
