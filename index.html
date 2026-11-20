@@ -8141,7 +8141,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   if(kind==='settings'){
     const encounterMode=!isGroup&&!!ctx.session.encounterMode;
     const items=encounterMode
-      ?[['encounter-record','相遇日記','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      ?[['encounter-record','相遇日記','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],]
       :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
@@ -8928,7 +8928,7 @@ function conversationSuggestionsHTML(s) {
   return `<div class="suggestions">
     <details class="suggestions-panel">
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-      ${!hasPlayerMessage||replies.length===0
+      ${(!hasPlayerMessage&&s.encounterMode!==true)||replies.length===0
         ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
@@ -11304,7 +11304,6 @@ document.addEventListener('click',async event => {
         if(option==='persona'){personaPickerSelection=null;openModal('persona');break;}
         if(option==='group-persona'){openModal('group-persona-settings');break;}
         if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
-        if(option==='encounter-end'){const session=currentSession();if(session?.encounterMode)showDialog('結束相遇','<p>結束本次相遇，期待下次與您相遇。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">再聊一下</button><button type="button" class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">結束相遇</button></div>');break;}
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
@@ -11338,11 +11337,13 @@ document.addEventListener('click',async event => {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
         const messages=session.messages||[];
         const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
-        const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
+        const isEncounterSystemMessage=message=>['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message?.text||message?.content||'').trim());
+         const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()&&!isEncounterSystemMessage(m)).slice(-1)[0];
         const previous={archived:session.archived,archivedAt:session.archivedAt,endedAt:session.encounterEndedAt,
           temporarilyLeftAt:session.encounterTemporarilyLeftAt,name:session.name,summary:session.encounterSummary};
         const summaryParts=[];
         if(lastUser)summaryParts.push('你說：「'+String(lastUser.text||lastUser.content).trim().slice(0,70)+'」。');
+         else if(messages.some(m=>m.role==='user'&&isEncounterSystemMessage(m)))summaryParts.push('你選擇讓角色主動發現你。');
         if(lastCharacter)summaryParts.push((sessionCharacter(session)?.name||'角色')+'回應：「'+String(lastCharacter.text||lastCharacter.content).trim().slice(0,90)+'」。');
         session.encounterSummary=summaryParts.join(' ').slice(0,360)||'這次相遇留下了一段尚待整理的回憶。';
         session.encounterEndedAt=Date.now();session.archived=true;session.archivedAt=session.encounterEndedAt;
@@ -14302,16 +14303,35 @@ html body.encounter-mode-active .chat-layout{
 html body.encounter-mode-active .chat-main.encounter-scene{
   inset-inline:0!important;
 }
+body.encounter-mode-active .chat-main.encounter-scene .messages{
+  bottom:calc(var(--poyozz-encounter-composer-height,190px) + var(--encounter-keyboard-offset,0px))!important;
+  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
+  padding-bottom:0!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{
+  margin-bottom:0!important;
+  border-radius:16px 16px 0 0!important;
+  border-bottom:0!important;
+  background:rgba(20,20,28,.68)!important;
+  box-shadow:none!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .composer{
+  padding-top:0!important;
+  border-top:0!important;
+  border-radius:0 0 16px 16px!important;
+  background:rgba(20,20,28,.68)!important;
+}
 body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
   max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;
 }
 body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .messages{
-  bottom:calc(var(--poyozz-encounter-composer-height,190px) + 8px)!important;
+  bottom:calc(var(--poyozz-encounter-composer-height,190px) + var(--encounter-keyboard-offset,0px))!important;
   max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
+  padding-bottom:0!important;
 }
 body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
-  bottom:var(--poyozz-encounter-composer-height,190px)!important;
-  height:clamp(180px,48dvh,420px)!important;
+  bottom:0!important;
+  height:78lvh!important;
   opacity:.96!important;
   visibility:visible!important;
 }
@@ -14323,6 +14343,37 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
   let framePending = false;
   let observedEncounterComposer = null;
   let composerResizeObserver = null;
+  let baselineViewportHeight = Math.max(
+    Number(window.innerHeight) || 0,
+    Number(root.clientHeight) || 0,
+    Number(viewport?.height) || 0
+  );
+
+  const isChatComposer = element =>
+    !!element?.matches?.('#messageInput, #groupMessageInput');
+
+  const syncKeyboardState = () => {
+    const layoutHeight = Math.max(
+      Number(window.innerHeight) || 0,
+      Number(root.clientHeight) || 0,
+      baselineViewportHeight
+    );
+    const visibleHeight = Number(viewport?.height) || layoutHeight;
+    const threshold = Math.max(120, baselineViewportHeight * 0.18);
+    const keyboardOpen = isChatComposer(document.activeElement) &&
+      (viewport ? baselineViewportHeight - visibleHeight > threshold : true);
+
+    if (keyboardOpen) document.body.classList.add('chat-keyboard-open');
+    else document.body.classList.remove('chat-keyboard-open');
+
+    if (!keyboardOpen && visibleHeight >= baselineViewportHeight - threshold) {
+      baselineViewportHeight = Math.max(
+        Number(window.innerHeight) || 0,
+        Number(root.clientHeight) || 0,
+        visibleHeight
+      );
+    }
+  };
 
   const updateEncounterComposerHeight = () => {
     const composer = document.querySelector('.chat-main.encounter-scene .composer');
@@ -14351,6 +14402,7 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
     if (height > 0) root.style.setProperty('--poyozz-chat-viewport-height', height + 'px');
     root.style.setProperty('--poyozz-visual-viewport-top', top + 'px');
     updateEncounterComposerHeight();
+    syncKeyboardState();
   };
   const scheduleViewportUpdate = () => {
     if (framePending) return;
@@ -14360,17 +14412,22 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
       updateViewportHeight();
     });
   };
-  const isChatComposer = element =>
-    !!element?.matches?.('#messageInput, #groupMessageInput');
 
   updateViewportHeight();
   window.addEventListener('resize', scheduleViewportUpdate, { passive: true });
+  window.addEventListener('orientationchange', () => {
+    baselineViewportHeight = Math.max(
+      Number(window.innerHeight) || 0,
+      Number(root.clientHeight) || 0,
+      Number(viewport?.height) || 0
+    );
+    scheduleViewportUpdate();
+  }, { passive: true });
   viewport?.addEventListener('resize', scheduleViewportUpdate, { passive: true });
   viewport?.addEventListener('scroll', scheduleViewportUpdate, { passive: true });
 
   document.addEventListener('focusin', event => {
     if (!isChatComposer(event.target)) return;
-    document.body.classList.add('chat-keyboard-open');
     updateViewportHeight();
     scheduleViewportUpdate();
     if (document.body.classList.contains('encounter-mode-active')) {
