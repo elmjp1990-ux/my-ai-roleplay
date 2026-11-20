@@ -1,7 +1,3 @@
-/* City map module.
- * App-owned state and actions are injected explicitly; this module does not own
- * persistence, authentication, chat, encounter, or wallet business rules.
- */
 (function (global) {
   'use strict';
 
@@ -140,15 +136,10 @@
   const zoomBy=f=>{scale*=f;clamp();};
   stage.addEventListener('pointerdown',e=>{
     const direct=e.target instanceof Element?e.target.closest('[data-action="city-landmark"]'):null;
-    // Detect marker taps here only to keep them out of map-drag handling.
-    // Do NOT open the modal on pointerdown: on touch devices the synthesized click
-    // may then land on the newly displayed backdrop and immediately close it.
     const marker=direct||[...stage.querySelectorAll('[data-action="city-landmark"]')].find(node=>{
       const r=node.getBoundingClientRect();
       return e.clientX>=r.left-8&&e.clientX<=r.right+8&&e.clientY>=r.top-8&&e.clientY<=r.bottom+8;
     });
-    // Keep marker taps out of map-drag handling without cancelling the browser's synthesized click.
-    // Calling preventDefault() on pointerdown can suppress click on mobile browsers, leaving the static modal content unchanged.
     if(marker){e.stopPropagation();return;}
     if(e.target instanceof Element&&e.target.closest('button,.city-map-info,.city-map-zoom,.city-map-bottom,.city-map-people'))return;
     stage.setPointerCapture?.(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;
@@ -704,10 +695,6 @@
         return;
       }
       const live=state.characters.find(item=>item.id===person.id);
-      // Keep the schedule-resolved fields from the city presence result.
-      // The base character cache does not contain cityStartTime/cityEndTime/
-      // cityActivity/citySceneDescription, so passing `live` alone resets the
-      // status card to its "time not set" and generic-status fallbacks.
       const cardPerson={...live,...person};
      ['name','gender','age','image','avatar_url','avatarVideoPath','avatar_video_path','intro','description'].forEach(key=>{if((person?.[key]==null||person?.[key]==='')&&live?.[key]!=null)cardPerson[key]=live[key];});
      renderCityCharacterCard(cardPerson,0);
