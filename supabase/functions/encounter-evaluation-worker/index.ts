@@ -22,6 +22,7 @@ const ENCOUNTER_CONTINUE_SENTINEL = "（請接續目前的故事。）";
 const ENCOUNTER_CONTINUE_TRANSCRIPT = "玩家留空發送，請角色自然延續目前互動（玩家沒有新增台詞）。";
 const MAX_TRANSCRIPT_CHARS = 60_000;
 const MAX_TURNS = 1_000;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type ClaimedJob = {
   session_id: string;
@@ -240,9 +241,16 @@ Deno.serve(async (request: Request) => {
     return json({ error: "service_role_required" }, 401);
   }
   let requestedLimit = 1;
+  let requestedSessionId: string | null = null;
   try {
-    const body = await request.json();
-    if (body && Number.isInteger(body.limit)) requestedLimit = Math.min(Math.max(body.limit, 1), 3);
+    const body = asRow(await request.json());
+    const limitValue = Number(body.limit);
+    if (Number.isInteger(limitValue)) requestedLimit = Math.min(Math.max(limitValue, 1), 3);
+    const sessionId = asText(body.sessionId);
+    if (sessionId) {
+      if (!UUID_PATTERN.test(sessionId)) return json({ error: "invalid_session_id" }, 400);
+      requestedSessionId = sessionId;
+    }
   } catch {
     return json({ error: "invalid_json" }, 400);
   }
@@ -250,9 +258,9 @@ Deno.serve(async (request: Request) => {
   const admin = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const { data: claimed, error: claimError } = await admin.rpc("claim_encounter_evaluation_jobs", {
-    p_limit: requestedLimit,
-  });
+  const { data: claimed, error: claimError } = requestedSessionId
+    ? await admin.rpc("claim_encounter_evaluation_job", { p_session_id: requestedSessionId })
+    : await admin.rpc("claim_encounter_evaluation_jobs", { p_limit: requestedLimit });
   if (claimError) return json({ error: "evaluation_job_claim_failed" }, 503);
   const jobs = Array.isArray(claimed) ? claimed as ClaimedJob[] : [];
   const results: Record<string, unknown>[] = [];
