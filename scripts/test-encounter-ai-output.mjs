@@ -22,7 +22,7 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".rep
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123 })), null);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, illustration_id: "invented-id" })).illustrationId, null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, illustration_id: "invented-id" })).illustrationId, null);
 
 const max = "相遇內容".repeat(150);
 assert.equal(Array.from(max).length, 600);
