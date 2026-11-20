@@ -14,7 +14,7 @@
         const visited=new Uint8Array(total),stack=new Int32Array(total);let top=0;
         const neutralBackdrop=i=>{
           const p=i*4,r=pixels[p],g=pixels[p+1],b=pixels[p+2];
-          return (r+g+b)/3>=158&&Math.max(r,g,b)-Math.min(r,g,b)<=36;
+          return (r+g+b)/3>=140&&Math.max(r,g,b)-Math.min(r,g,b)<=42;
         };
         const push=i=>{if(i>=0&&i<total&&!visited[i]&&neutralBackdrop(i)){visited[i]=1;stack[top++]=i;}};
         for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
@@ -391,7 +391,7 @@
                   const p=i*4,red=pixels[p],green=pixels[p+1],blue=pixels[p+2];
                   const spread=Math.max(red,green,blue)-Math.min(red,green,blue);
                   const brightness=(red+green+blue)/3;
-                  return brightness>=158&&spread<=36;
+                  return brightness>=140&&spread<=42;
                 };
                 const push=(i)=>{if(i>=0&&i<total&&!visited[i]&&neutralBackdrop(i)){visited[i]=1;stack[top++]=i;}};
                 for(let x=0;x<w;x++){push(x);push((h-1)*w+x);}
