@@ -122,12 +122,12 @@ BEGIN
     RAISE EXCEPTION 'Invalid Encounter session lifecycle input' USING ERRCODE = '22023';
   END IF;
 
-  SELECT state.affinity, state.relationship_stage INTO v_affinity, v_stage
+  SELECT state.affinity INTO v_affinity
   FROM public.encounter_character_state state
   WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
 
   v_affinity := COALESCE(v_affinity,0);
-  v_stage := COALESCE(v_stage,public.story_relationship_stage_for_affinity(v_affinity));
+  v_stage := public.story_relationship_stage_for_affinity(v_affinity);
 
   INSERT INTO public.chat_sessions (
     id,user_id,character_id,character_name,status,character_snapshot,session_data,chat_mode
