@@ -6745,6 +6745,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
+    storyAffinityMode:affinityMode,
     storyOriginMode:relationship.origin_mode,
     storySourceEncounterSessionId:relationship.source_encounter_session_id || null,
     storyAffinity:Number(relationship.affinity || 0),
