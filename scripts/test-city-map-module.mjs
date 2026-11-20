@@ -184,7 +184,7 @@ assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/,
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/,
   'Null or empty schedule profile fields must fall back to the cached character profile.');
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
-assert.match(cityMap, /ageValue=person\.age\?\?person\.characterAge\?\?person\.character_age/);
+assert.match(cityMap, /const liveAge=person\.age\?\?person\.characterAge\?\?person\.character_age/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 assert.match(cityMap, /const isSleepingSchedule=/);
 assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
