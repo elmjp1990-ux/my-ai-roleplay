@@ -68,7 +68,7 @@ assert.notEqual(encounterRenderStart, -1, 'encounter sprite renderer must exist'
 assert.ok(encounterRenderEnd > encounterRenderStart, 'encounter sprite renderer boundary must exist');
 const encounterRender = encounterScene.slice(encounterRenderStart, encounterRenderEnd);
 assert.match(encounterRender, /if\(existingSprite\.dataset\.encounterSource!==halfBodyImage\)\s*\{/);
-assert.match(encounterRender, /existingSprite\.src=halfBodyImage;/);
+assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/);\nassert.match(encounterRender, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\);/);
 assert.match(encounterRender, /existingSprite\.dataset\.encounterSource=halfBodyImage;/);
 assert.match(html, /\.upload\(path,blob,\{upsert:false,contentType:blob\.type,cacheControl:'3600'\}\)/);
 
