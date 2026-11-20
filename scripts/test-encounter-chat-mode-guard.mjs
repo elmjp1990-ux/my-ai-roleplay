@@ -25,7 +25,10 @@ assert.match(frontend, /function compactLocalStateForQuota\(sourceState = state\
 assert.match(frontend, /localStorageCompactMode = true/);
 assert.match(frontend, /雲端聊天仍會照常同步/);
 assert.match(frontend, /character\\?\\.visibility!==['\"]public['\"]\\|\\|character\\.deletedAt\\|\\|!accessible\\(character\\)/);
-assert.match(cityMap, /Author access to a private character is for management only/);
+assert.match(cityMap, /const isCurrentCityCharacterEligible=\(person\)=>\{/);
+assert.match(cityMap, /live\.visibility===\x27public\x27&&!live\.deletedAt/);
+assert.match(cityMap, /live\.cloudPublic!==false&&live\.localOnly!==true/);
+assert.match(cityMap, /accessible\(live\)/);
 
 assert.ok(frontend.includes("Object.prototype.hasOwnProperty.call(priorSnapshot,'authorId') && priorSnapshot.authorId !== ''"));
 assert.ok(frontend.includes("snapshot.authorId === null || isUuid(snapshot.authorId)"));
