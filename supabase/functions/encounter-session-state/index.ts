@@ -93,7 +93,7 @@ Deno.serve(async (request: Request) => {
           throw new Error("encounter_evaluation_job_enqueue_failed");
         }
 
-        const workerUrl = url.replace(/\\/+$/, "") + "/functions/v1/encounter-evaluation-worker";
+        const workerUrl = url.replace(/\/+$/, "") + "/functions/v1/encounter-evaluation-worker";
         const workerResponse = await fetch(workerUrl, {
           method: "POST",
           headers: {
