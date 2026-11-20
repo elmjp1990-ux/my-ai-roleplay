@@ -24,8 +24,7 @@ assert.doesNotMatch(html, /<style id="encounter-mode-render-conflict-fix">/,
 const htmlStyleBlocks=[...html.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(item=>item[1]).join("\n");
 assert.doesNotMatch(htmlStyleBlocks, /encounter-mode-active|encounter-scene/,
   "No Encounter-specific visual selectors may remain in index.html style blocks");
-assert.match(encounterScene, /\\.encounter-scene \\.messages\\{/);
-  "Encounter-specific final visual refinements must be centralized in encounter-scene.js");
+assert.match(encounterScene, /\.encounter-scene \.messages\{/);
 assert.match(source, /baselineViewportHeight/);
 assert.match(source, /syncKeyboardState/);
 assert.match(source, /orientationchange/);
