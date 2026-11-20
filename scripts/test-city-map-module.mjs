@@ -45,7 +45,7 @@ for (const contract of [
   'POYOZZ 城市地圖',
   'taipeiSunTimes2025',
   'loadCityCharacterSchedules',
-  'get_latest_settled_encounter_affinity',
+  'get_encounter_character_affinity',
   'city-character-meet',
   'findResumableEncounterSession',
   'setEncounterLifecycleState',
@@ -64,6 +64,11 @@ assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoad
   'Weather loader must be initialized before invocation.');
 
 assert.match(cityMap, /get_encounter_scene_catalog/);
+const liveAffinityMigration=fs.readFileSync('supabase/migrations/20261120150000_encounter_character_affinity_live_read.sql','utf8');
+assert.match(liveAffinityMigration,/get_encounter_character_affinity/);
+assert.match(liveAffinityMigration,/state\.affinity, state\.relationship_stage/);
+assert.match(liveAffinityMigration,/auth\.uid\(\)/);
+assert.match(liveAffinityMigration,/GRANT EXECUTE ON FUNCTION public\.get_encounter_character_affinity\(uuid\) TO authenticated/);
 const sceneAvailabilityMigration=fs.readFileSync('supabase/migrations/20261118074708_resolve_only_published_encounter_scenes.sql','utf8');
 const hourlyOptionsMigration=fs.readFileSync('supabase/migrations/20261118074718_encounter_hourly_schedule_options.sql','utf8');
 assert.match(sceneAvailabilityMigration,/get_encounter_scene_catalog/,
