@@ -93,6 +93,14 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 // Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
 assert.match(html, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
 assert.match(html, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
+ 
+// City-scene avatars must be clipped by a dedicated transparent circular frame;
+// the clickable button must not inherit the legacy square avatar backing.
+assert.match(cityMap, /city-location-person-avatar-frame/);
+assert.doesNotMatch(cityMap, /class="city-location-avatar city-location-person"/);
+assert.match(html, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
+assert.match(html, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
+assert.match(html, /\.city-location-person\{[^}]*background:transparent!important/);
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
