@@ -1,6 +1,6 @@
 (function(g){
 'use strict';
-const N=10,skip=new Set(['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）']);
+const N=10;
 const clean=v=>String(v||'').replaceAll('你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。','你選擇讓角色主動發現你。').replaceAll('[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','你選擇讓角色主動發現你').replaceAll('（請接續目前的故事。）','').trim();
 const renderHistory=(p,rows,esc,places)=>{
  rows=Array.isArray(rows)?rows:[];
@@ -36,7 +36,7 @@ const loadCloudHistory=async(p,currentUser,client,{append=false}={})=>{
    return {id:r.id,encounterMode:true,characterId:p.id,archived:r.session_archived==='true'||!!ended,encounterEndedAt:ended,startedAt:Number(r.session_started_at)||Date.parse(r.created_at)||0,encounterPlace:r.encounter_place||'',encounterSummary:clean(r.encounter_summary||''),lastMessagePreview:clean(r.last_message_preview||'').slice(0,50),messages:[]};
   });
   const prev=append?p.encounterHistoryCloud||[]:[],seen=new Set(prev.map(x=>x.id));
-  p.encounterHistoryCloud=[...prev,...page.filter(x=>!seen.has(x.id))];p.encounterHistoryOffset=offset+batch.length;p.encounterHistoryHasMore=batch.length===N;p.encounterHistoryLoaded=true;p.encounterHistoryLoadedAt=Date.now();
+  p.encounterHistoryCloud=[...prev,...page.filter(x=>!seen.has(x.id))];p.encounterHistoryOffset=offset+batch.length;p.encounterHistoryHasMore=batch.length===N;p.encounterHistoryLoaded=true;
  }catch(e){p.encounterHistoryError=e?.message||'讀取相遇紀錄失敗。';throw e;}
  finally{p.encounterHistoryLoading=false;}
 };
