@@ -32,8 +32,11 @@ assert.ok(wrapperStart >= 0 && initializationStart > wrapperStart && initializat
 assert.match(cityMap, /global\.PoyozzCityMap = Object\.freeze/);
 assert.match(cityMap, /client\.from\('chat_sessions'\)/);
 assert.match(cityMap, /\.eq\('chat_mode','encounter'\)/);
-assert.match(cityMap, /Number\(data\.encounterTemporarilyLeftAt\)>0/);
-assert.match(cityMap, /data\.encounterPlace===placeKey/);
+assert.match(cityMap, /encounter_place:session_data->>encounterPlace/);
+assert.doesNotMatch(cityMap, /select\('id,character_id,chat_mode,session_data,updated_at'\)/,
+  'resumable encounter lookup must not transfer the full session_data JSON payload');
+assert.match(cityMap, /Number\(row\.encounter_left_at\)>0/);
+assert.match(cityMap, /row\.encounter_place===placeKey/);
 assert.match(cityMap, /loadCloudChatSessions\(user,\{onlySessionId:candidate\.id,listPage:false\}\)/,
   'Resume lookup must hydrate the candidate cloud session before reopening it');
 assert.match(cityMap, /hydrated\?\.cloudOwned===true/);
