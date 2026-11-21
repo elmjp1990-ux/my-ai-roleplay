@@ -430,7 +430,6 @@
  const people=pager?.people||[];
  const strip=$('cityMapAvatarStrip');
  if(!strip)return;
- const hasAnySchedule=(pager?.candidates||[]).some(person=>String(person.encounterSchedules||'').trim());
  const emptyMessage=pager?.loading
  ? '正在讀取這個場景的角色…'
  : pager?.error
