@@ -31,7 +31,7 @@ assert.doesNotMatch(cityMap, /inferCharacterAgeFromLore/,
   'Character age must not be guessed from introduction text');
 assert.ok(cityMap.includes('ageText=liveAge||consistentSnapshotAge'),
   'City character cards must use the live character age or a consistent saved chat snapshot only');
-assert.match(cityMap, /const ageDisplay=ageText\?\(\s*\/\^\\\\d\+\$\/\.test\(ageText\)\?ageText\+' 歲':ageText\):'未設定'/,
+assert.ok(cityMap.includes("const ageDisplay=ageText?( /^\\d+$/.test(ageText)?ageText+' 歲':ageText):'未設定'"),
   'Only a numeric age receives the 歲 suffix; descriptive text must remain unchanged');
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
 assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/, 
