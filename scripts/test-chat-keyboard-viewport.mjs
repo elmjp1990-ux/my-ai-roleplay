@@ -175,4 +175,5 @@ assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
 assert.match(html, /chat-identity-copy[\s\S]{0,180}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(hist, /playerMessageSessions\.has\(row\.id\)/);
+assert.match(hist, /excludedMessages\.has\(rawContent\)/);
 assert.match(hist, /\.eq\('role','user'\)/);
