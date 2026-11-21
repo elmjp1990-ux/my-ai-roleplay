@@ -8,12 +8,6 @@
  const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
  const cityMapMemoryCache = new Map();
- const inferCharacterAgeFromLore = person => {
- const intro=String(person?.intro||'');
- // 陸沉宵的介紹明確寫「三千年前，他曾是…」；這只能證明至少三千歲，不能當成精確生日。
- if(/(?:三千|3,?000)\s*年前[，,、]?\s*(?:他|她)(?:曾|是)/.test(intro))return '3000+';
- return '';
- };
  const readCityMapCache = (key, ttlMs) => {
  const now = Date.now();
  let entry = cityMapMemoryCache.get(key) || null;
