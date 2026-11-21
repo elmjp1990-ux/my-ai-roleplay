@@ -223,7 +223,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
   });
   const diagnosticId = await recordAiGenerationDiagnostic(admin, {
     generationType: "encounter_evaluation", userId: job.user_id, characterId: session.character_id,
-    sessionId: job.session_id, sourceRef: String(job.id || ""),
+    sessionId: job.session_id, sourceRef: job.session_id,
     model: response.model, provider: response.provider, requestId: response.requestId,
     httpStatus: response.httpStatus, finishReason: response.finishReason,
     responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
