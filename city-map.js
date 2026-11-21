@@ -439,7 +439,8 @@
  strip.innerHTML=people.length
  ? people.map((person,index)=>{
  const characterName=String(person.name||'角色');
- const portrait='<span class="city-location-person-avatar-frame">'+characterAvatarMarkup(person,{imageClass:'city-location-person-image',fallbackClass:'city-location-avatar-fallback'})+'</span>';
+ const image=safeImage(person.image||person.avatar_url||person.avatar);
+ const portrait='<span class="city-location-person-avatar-frame">'+characterAvatarMarkup({...person,image,avatar_url:image},{imageClass:'city-location-person-image',fallbackClass:'city-location-avatar-fallback'})+'</span>';
  return '<button type="button" class="city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
  }).join('')
  : '<p class="city-location-empty">'+emptyMessage+'</p>';
@@ -605,7 +606,7 @@
  ? '<video class="city-character-portrait city-character-portrait-video" data-character-video="'+escapeHTML(videoPath)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
  : videoUrl
  ? '<video class="city-character-portrait city-character-portrait-video" src="'+escapeHTML(videoUrl)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
- : characterAvatarMarkup(person,{imageClass:'city-character-portrait',fallbackClass:'city-character-portrait city-character-portrait-fallback'});
+ : characterAvatarMarkup({...person,image,avatar_url:image},{imageClass:'city-character-portrait',fallbackClass:'city-character-portrait city-character-portrait-fallback',loading:'eager'});
  const name=escapeHTML(person.name||'未命名角色');
  const gender=escapeHTML(person.gender||'未設定');
  const liveAge=[person.age,person.characterAge,person.character_age].map(value=>value==null?'':String(value).trim()).find(Boolean)||'';
