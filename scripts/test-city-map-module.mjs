@@ -4,10 +4,10 @@ import fs from 'node:fs';
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
-assert.match(encounterHistory,/const PAGE_SIZE=10/);
-assert.match(encounterHistory,/\.range\(offset,offset\+PAGE_SIZE-1\)/,
+assert.match(encounterHistory,/const N=10/);
+assert.match(encounterHistory,/\.range\(offset,offset\+N-1\)/,
   'City Encounter history must fetch only ten sessions per page');
-assert.match(encounterHistory,/\.limit\(PAGE_SIZE\)/,
+assert.match(encounterHistory,/\.limit\(N\)/,
   'City Encounter history preview hydration must be capped at ten messages');
 assert.match(encounterHistory,/observeEnd\(sentinel/ ,
   'City Encounter history must load the next ten records when scrolled to the end');
