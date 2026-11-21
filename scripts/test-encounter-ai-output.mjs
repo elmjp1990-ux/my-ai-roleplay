@@ -66,7 +66,7 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(frontend, /encounterAffinity=affinityResult\.affinity/);
 assert.match(scene, /目前關係：/);
-assert.match(scene, /affinityChip\.textContent='♡ '\+relationshipLabel/);
+assert.match(scene, /PoyozzAffinityUI\?\.render\(session\.encounterAffinity,session\.encounterRelationshipStage\|\|'first_meeting','encounter'\)/, 'Encounter affinity must use the shared affinity renderer.');
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 const storySession = fs.readFileSync("supabase/functions/story-session/index.ts", "utf8");
 assert.match(storySession, /\.\.\.existingSessionData, affinityMode, affinitySyncVersion: 1/);
