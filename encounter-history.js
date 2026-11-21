@@ -56,8 +56,10 @@
           if(messageError)throw messageError;
           const batch=Array.isArray(messages)?messages:[];
           for(const message of batch){
-            const text=cleanSummary(message.content||'').slice(0,50);
-            if(!text||excludedMessages.has(text))continue;
+            const rawContent=String(message.content||'').trim();
+            if(excludedMessages.has(rawContent))continue;
+            const text=cleanSummary(rawContent).slice(0,50);
+            if(!text)continue;
             playerMessageSessions.add(message.session_id);
             if(!latestBySession.has(message.session_id))latestBySession.set(message.session_id,'你：'+text);
           }
