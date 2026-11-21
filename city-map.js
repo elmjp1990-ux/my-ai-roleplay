@@ -63,16 +63,16 @@
  if(authError||authData?.user?.id!==user.uid||currentUser()?.uid!==user.uid)return null;
  const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
  const {data:rows,error}=await client.from('chat_sessions')
- .select('id,character_id,chat_mode,session_data,updated_at')
+ .select('id,character_id,chat_mode,encounter_place:session_data->>encounterPlace,encounter_day:session_data->>encounterDay,encounter_started_at:session_data->>startedAt,encounter_left_at:session_data->>encounterTemporarilyLeftAt,encounter_archived:session_data->>archived,encounter_ended_at:session_data->>encounterEndedAt,updated_at')
  .eq('user_id',user.uid).eq('character_id',characterId).eq('chat_mode','encounter')
  .is('deleted_at',null).order('updated_at',{ascending:false}).limit(8);
  if(error)throw new Error('讀取暫離相遇紀錄失敗：'+error.message);
  const candidate=(rows||[]).find(row=>{
- const data=row.session_data&&typeof row.session_data==='object'?row.session_data:{};
- const day=String(data.encounterDay||data.startedAt&&new Date(data.startedAt).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'})||'');
- return row.character_id===characterId&&data.encounterPlace===placeKey&&day===today&&
- Number(data.encounterTemporarilyLeftAt)>0&&data.archived!==true&&
- !(Number(data.encounterEndedAt)>0);
+ const startedAt=Number(row.encounter_started_at)||Date.parse(row.encounter_started_at)||0;
+ const day=String(row.encounter_day||startedAt&&new Date(startedAt).toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'})||'');
+ return row.character_id===characterId&&row.encounter_place===placeKey&&day===today&&
+ Number(row.encounter_left_at)>0&&row.encounter_archived!=='true'&&
+ !(Number(row.encounter_ended_at)>0);
  });
  if(!candidate)return null;
  await loadCloudChatSessions(user,{onlySessionId:candidate.id,listPage:false});
