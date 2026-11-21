@@ -25,6 +25,15 @@ function parseJsonObject(raw) {
   }
 }
 
+function buildFallbackEncounterSuggestions(reply) {
+  const anchor = Array.from(reply.replace(/[\\s*「」『』，。！？、,.!?]/g, "")).slice(0, 12).join("") || "剛才的話";
+  return [
+    `我想再了解你提到的「${anchor}」，可以多告訴我一些當時的情況嗎？`,
+    "聽你這麼說，我也想分享我的想法；你願意聽聽我怎麼看這件事嗎？",
+    "我想先順著現在的話題陪你聊下去，也想知道接下來你打算怎麼做。",
+  ];
+}
+
 export function parseEncounterTurnOutput(raw) {
   let value = parseJsonObject(raw);
   if (!value && typeof raw === "string") {
@@ -50,16 +59,19 @@ export function parseEncounterTurnOutput(raw) {
       const size = Array.from(item).length;
       return size >= 30 && size <= 90;
     }).slice(0, 3);
-  if (suggestedReplies.length !== 3) return null;
+  // Optional metadata drift must not discard a complete, usable character reply.
+  // DeepSeek can return valid prose while omitting one of the requested JSON fields.
+  const finalSuggestions = suggestedReplies.length === 3
+    ? suggestedReplies
+    : buildFallbackEncounterSuggestions(reply);
   const rawDelta = value.affinity_delta ?? value.affinityDelta;
-  const affinityDelta = Number.isInteger(rawDelta) && rawDelta >= -3 && rawDelta <= 3 ? rawDelta : null;
-  if (affinityDelta === null) return null;
+  const affinityDelta = Number.isInteger(rawDelta) && rawDelta >= -3 && rawDelta <= 3 ? rawDelta : 0;
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);
   const sceneBackgroundId = optionalUuid(value.scene_background_id ?? value.sceneBackgroundId);
 
   return {
     reply,
-    suggestedReplies,
+    suggestedReplies: finalSuggestions,
     affinityDelta,
     illustrationId,
     sceneBackgroundId,
