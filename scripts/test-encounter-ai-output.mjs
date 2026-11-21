@@ -262,7 +262,7 @@ assert.match(replay, /the next schedule must make a fresh weather decision/);
 assert.match(pipeline, /encounter-default-scene\.webp/);
 assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
 assert.match(endpoint, /illustration_id/);
-const encounterOutputFormat = endpoint.slice(endpoint.indexOf("【輸出格式】")).replace(/\\\"/g, '"\');
+const encounterOutputFormat = endpoint.slice(endpoint.indexOf("【輸出格式】")).split(String.fromCharCode(92) + '"' ).join('"');
 assert.match(encounterOutputFormat, /"reply".*"affinity_delta".*"illustration_id".*"scene_background_id".*"suggested_replies"/s, "Required affinity and visual metadata must precede optional suggestions");
 assert.match(endpoint, /scene_background_id/);
 assert.match(scene, /session\?\.encounterVisuals/);
