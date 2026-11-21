@@ -505,8 +505,8 @@ const historyRows = Array.from({ length: 51 }, (_, index) => ({
   chat_mode: "encounter",
   created_at: "2026-11-20T00:00:00.000Z",
   updated_at: "2026-11-20T00:00:00.000Z",
-  session_data: index === 0
-    ? { archived: true, encounterEndedAt: 1795134702137, encounterSummary: '你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。顧言回應：門沒有鎖。' }
+  session_data: index === 1
+    ? { archived: true, encounterEndedAt: 1795134702137, encounterSummary: '你說：「你在家嗎？」。顧言回應：門沒有鎖。' }
     : { archived: false, lastMessagePreview: "相遇片段 " + index },
 }));
 const rangeCalls = [];
