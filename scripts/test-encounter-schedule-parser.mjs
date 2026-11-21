@@ -100,7 +100,8 @@ assert.match(cityMap, /city-location-person-avatar-frame/);
 assert.doesNotMatch(cityMap, /class="city-location-avatar city-location-person"/);
 assert.match(html, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
 assert.match(html, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
-assert.match(html, /\.city-location-person\{[^}]*background:transparent!important/);
+assert.match(html, /#cityMapAvatarStrip > button\.city-location-person\{[^}]*all:unset!important[^}]*background:none!important[^}]*background-color:transparent!important[^}]*background-image:none!important/);
+assert.match(html, /#cityMapAvatarStrip > button\.city-location-person::before,#cityMapAvatarStrip > button\.city-location-person::after\{content:none!important/);
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
