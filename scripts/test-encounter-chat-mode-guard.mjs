@@ -420,7 +420,7 @@ assert.match(storyRelationshipReadMigration, /GRANT EXECUTE ON FUNCTION public\.
 assert.match(frontend, /async function loadStoryRelationshipState\(session\)/);
 assert.match(frontend, /get_story_relationship_state/);
 assert.match(frontend, /storyRelationshipLabel/);
-assert.match(frontend, /PoyozzAffinityUI\s*=\s*\{/);
+assert.match(frontend, /window\.PoyozzAffinityUI\s*=\s*window\.PoyozzAffinityUI\s*\|\|\s*\{/);
 assert.match(frontend, /window\.PoyozzAffinityUI\.render\(affinity,row\.relationship_stage,'story'\)/, 'Story chat affinity must use the shared renderer.');
 assert.match(cityMap, /get_encounter_character_affinity/);
 assert.match(frontend, /city-character-affinity/);
