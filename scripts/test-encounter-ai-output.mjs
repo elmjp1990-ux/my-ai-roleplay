@@ -31,9 +31,10 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_re
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 4 })).affinityDelta, 0, "Out-of-range affinity delta must be neutralized without rejecting the reply");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 1, illustration_id: "invented-id" })).illustrationId, null);
 
-const max = "相遇內容".repeat(150);
-assert.equal(Array.from(max).length, 600);
+const max = "相遇內容".repeat(75);
+assert.equal(Array.from(max).length, 300);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max, suggested_replies: validSuggestions, affinity_delta: -1 })).reply, max);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })), null, "Replies over 300 characters must be rejected");
 const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的狀況，這裡還有其他地方需要一起檢查嗎？", "你膝蓋上沾了不少灰塵，需要我幫你拿毛巾，還是先讓你把手邊工作收尾？", "浴室的濾網換好之後，有沒有什麼日常清潔方式可以避免排水管再次堵塞？"];
 const fence = String.fromCharCode(96).repeat(3);
 const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, affinity_delta: -2, illustration_id: illustrationId }) + "\n" + fence);
