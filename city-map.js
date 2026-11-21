@@ -439,9 +439,9 @@
  const characterName=String(person.name||'角色');
  const image=safeImage(person.image||person.avatar_url||person.avatar);
  const portrait=image
- ? '<img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">'
- : '';
- return '<button type="button" class="city-location-avatar city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
+ ? '<span class="city-location-person-avatar-frame"><img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer"></span>'
+ : '<span class="city-location-person-avatar-frame"><span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span></span>';
+ return '<button type="button" class="city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
  }).join('')
  : '<p class="city-location-empty">'+emptyMessage+'</p>';
  if(pager?.error){
