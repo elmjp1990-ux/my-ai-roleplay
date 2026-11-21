@@ -19,6 +19,15 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid, sugges
 const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(3);
 assert.equal(parseEncounterTurnOutput(plainTextReply).reply, plainTextReply, "A usable plain-text character reply must not be refunded for missing optional metadata");
 assert.equal(parseEncounterTurnOutput("not-json").reply, "not-json", "Plain-text fallback remains usable");
+const recoveredReply = "他停下腳步，確認你沒有受傷後，才放低原本緊繃的語氣。";
+const truncatedEnvelope = `{"reply":${JSON.stringify(recoveredReply)},"affinity_delta":-2,"illustration_id":"${illustrationId}","scene_background_id":"${sceneBackgroundId}","suggested_replies":[`;
+const recovered = parseEncounterTurnOutput(truncatedEnvelope);
+assert.equal(recovered.reply, recoveredReply, "A complete reply must survive a truncated optional JSON envelope");
+assert.equal(recovered.affinityDelta, -2, "Recover a complete affinity value before a truncated optional field");
+assert.equal(recovered.illustrationId, illustrationId, "Recover the AI-selected illustration when its field is complete");
+assert.equal(recovered.sceneBackgroundId, sceneBackgroundId, "Recover the AI-selected background when its field is complete");
+assert.equal(parseEncounterTurnOutput('{"reply":"尚未完成的字串'), null, "Never expose an incomplete JSON string as a reply");
+assert.equal(parseEncounterTurnOutput('{"suggested_replies":["x"],"affinity_delta":1}'), null, "Metadata without a usable reply remains invalid");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(151) })).reply, "相遇內容".repeat(151), "Replies beyond target length must be retained");
 assert.equal(parseEncounterTurnOutput("not-json").reply, "not-json", "Plain-text fallback remains usable");
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
