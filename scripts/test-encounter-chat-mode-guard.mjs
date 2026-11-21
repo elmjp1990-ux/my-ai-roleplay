@@ -420,13 +420,13 @@ assert.match(storyRelationshipReadMigration, /GRANT EXECUTE ON FUNCTION public\.
 assert.match(frontend, /async function loadStoryRelationshipState\(session\)/);
 assert.match(frontend, /get_story_relationship_state/);
 assert.match(frontend, /storyRelationshipLabel/);
-assert.match(frontend, /story-relationship-meter/);
+assert.match(frontend, /PoyozzAffinityUI\s*=\s*\{/);\nassert.match(frontend, /PoyozzAffinityUI\.render\(state\.affinity,state\.relationshipStage,'story'\)/, 'Story chat affinity must use the shared renderer.');
 assert.match(cityMap, /get_encounter_character_affinity/);
 assert.match(frontend, /city-character-affinity/);
 assert.match(cityMap, /你們還不認識/);
 assert.match(cityMap, /登入後查看與角色的好感度/);
 assert.match(cityMap, /loadCityCharacterAffinity\(person.id\)/);
-assert.match(frontend, /city-character-affinity-meter/);
+assert.match(frontend, /\.city-character-affinity\{[^}]*display:flex/);\nassert.match(cityMap, /PoyozzAffinityUI\?\.render\(row\?\.affinity,row\?\.relationship_stage,'compact'\)/, 'City character affinity must use the shared compact renderer.');
 assert.match(affinityMigration, /FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /FUNCTION public\.create_encounter_session_with_lifecycle/);
