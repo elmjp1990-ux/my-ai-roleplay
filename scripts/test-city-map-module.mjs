@@ -29,11 +29,11 @@ assert.doesNotMatch(cityMap, /PoyozzEncounterSessionResume/,
   'Resume lookup must not depend on an undefined global module');
 assert.match(cityMap, /const inferCharacterAgeFromLore = person =>/,
   'City character cards must have a deterministic fallback for explicit age evidence in the character introduction');
-assert.match(cityMap, /(?:三千|3,?000)\\s*年前/,
+assert.match(cityMap, /(?:三千|3,?000)\s*年前/,
   'The lore parser must recognize the explicit three-thousand-years-ago statement');
-assert.match(cityMap, /return '3000\\+'/,
+assert.match(cityMap, /return '3000\+'/,
   'The parser must express a lower bound, not claim an exact age');
-assert.match(cityMap, /ageText=liveAge\\|\\|consistentSnapshotAge\\|\\|loreAge/,
+assert.match(cityMap, /ageText=liveAge\|\|consistentSnapshotAge\|\|loreAge/,
   'Explicit database age and consistent chat snapshot age must take precedence over lore inference');
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
 assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/, 
