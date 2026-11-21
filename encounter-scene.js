@@ -134,6 +134,23 @@ body.chat-page .composer,body.conversation .composer,body.group-chat-page .compo
 body.chat-page .messages,body.conversation .messages,body.group-chat-page .messages{width:100%;max-width:none;}
 `;
 ;
+  style.textContent += `
+/* Header identity first; encounter controls intentionally move to a second line. */
+.encounter-scene .chat-heading>.row.between{align-items:flex-start!important;flex-wrap:wrap!important;gap:5px!important}
+.encounter-scene .chat-heading>.row.between>.row.grow{width:100%!important;max-width:100%!important;min-width:0!important;flex-wrap:nowrap!important;gap:7px!important}
+.encounter-scene .chat-heading>.row.between>.row:last-child{width:100%!important;justify-content:flex-end!important;gap:3px!important}
+.encounter-scene .chat-heading .chat-name{min-width:0!important;max-width:none!important;flex:1 1 auto!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+.encounter-scene .chat-heading .encounter-affinity-chip{max-width:none!important}
+.encounter-scene .chat-heading .encounter-mode-icon,.encounter-scene .chat-heading [data-encounter-mode-icon]{flex:0 0 auto!important}
+.encounter-scene .composer .composer-bottom-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}
+.encounter-scene .composer .composer-bottom-left{display:flex!important;align-items:center!important;gap:6px!important}
+.encounter-scene .composer .composer-icon-button,.encounter-scene .composer [data-action="send-message"],.encounter-scene .composer [type="submit"]{display:inline-flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important}
+.encounter-scene .composer .composer-input-row{display:flex!important;align-items:flex-end!important}
+.encounter-scene .composer #messageInput{min-height:42px!important;max-height:24dvh!important}
+body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{height:calc(var(--poyozz-chat-viewport-height,100dvh) - 150px)!important;max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 150px)!important;bottom:calc(100lvh - var(--poyozz-chat-viewport-height,100dvh))!important;object-position:center bottom!important}
+body.encounter-mode-active.chat-keyboard-open .encounter-scene .composer{bottom:calc(100lvh - var(--poyozz-chat-viewport-height,100dvh))!important;max-height:var(--poyozz-chat-viewport-height,100dvh)!important}
+body.encounter-mode-active.chat-keyboard-open .encounter-scene .messages{bottom:calc(var(--poyozz-encounter-composer-height,190px) + 100lvh - var(--poyozz-chat-viewport-height,100dvh))!important;max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 65px)!important}
+`;
   document.head.appendChild(style);
   const splitEncounterBeats=(value)=>{
     const source=String(value||'').replace(/\r\n?/g,'\n').replace(/[ \t]+\n/g,'\n').trim();
