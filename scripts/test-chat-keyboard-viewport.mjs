@@ -48,7 +48,7 @@ assert.match(source, /addEventListener\('resize'/);
 assert.match(source, /addEventListener\('scroll'/);
 assert.match(source, /#messageInput, #groupMessageInput/);
 assert.match(source, /ResizeObserver/);
-assert.match(source, /scrollIntoView/);
+assert.doesNotMatch(source, /scrollIntoView/, "Encounter keyboard focus must not scroll the scene sprite with the composer");
 
 function createHarness({ visualViewport = true, encounter = false } = {}) {
   const listeners = {};
@@ -144,7 +144,7 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
   assert.ok(h.classes.has("chat-keyboard-open"));
   assert.equal(h.variables["--encounter-keyboard-offset"], undefined,
     "Encounter layout must not use a second keyboard offset after the shared viewport shrinks");
-  assert.ok(input.scrolled, "encounter input should be scrolled into the visible area on focus");
+  assert.ok(!input.scrolled, "Encounter focus must leave the character sprite anchored to the scene");
   h.viewport.height = 720;
   h.viewport.offsetTop = 0;
   h.viewportListeners.resize();
@@ -164,15 +164,19 @@ console.log("Passed: single, group, and encounter chat keyboard viewport behavio
 
 assert.match(html, /#storyRelationshipLabel\{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important\}/);
 assert.doesNotMatch(html, /character-status-label[^>]*>[\s\S]{0,120}公開中/);
-assert.match(encounterScene, /chat-heading>\.row\.between\{align-items:flex-start!important;flex-wrap:wrap!important/);
+assert.match(encounterScene, /chat-heading>\.row\.between\{[\s\S]{0,120}flex-wrap:nowrap!important/);
 assert.match(encounterScene, /composer-bottom-row\{display:flex!important;align-items:center!important;justify-content:space-between!important/);
 assert.match(encounterScene, /composer-icon-button,[\s\S]{0,150}visibility:visible!important/);
 assert.match(encounterScene, /chat-keyboard-open \.encounter-character-sprite\{height:78lvh!important/);
 assert.match(encounterScene, /composer-bottom-row\{position:sticky!important;bottom:0!important/);
-assert.match(encounterScene, /encounter-scene-label\{width:calc\(4em \+ 28px\)!important/);
+assert.match(encounterScene, /encounter-scene-label\{[\s\S]{0,180}width:calc\(5\.5em \+ 30px\)!important/);
 assert.match(encounterScene, /encounter-identity-stack/);
-assert.match(encounterScene, /controlsRow\.appendChild\(tag\)/);
+assert.match(encounterScene, /controlsRow\.insertBefore\(tag,menuButton\|\|null\)/);
 assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
+assert.match(encounterScene, /\.chat-heading>\.row\.between>\.row:last-child\{[\s\S]{0,180}position:absolute!important/);
+assert.match(encounterScene, /encounter-character-sprite[\s\S]{0,220}bottom:0!important/);
+assert.match(encounterScene, /composer-bottom-row\{[\s\S]{0,120}transform:translateY\(-6px\)!important/);
+assert.match(html, /\.poyozz-affinity-ui \\{box-sizing:border-box!important;width:calc\\(5\\.5em \\+ 30px\\)!important/);
 assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(encounterHistory, /playerMessageSessions\.has\(row\.id\)/);
