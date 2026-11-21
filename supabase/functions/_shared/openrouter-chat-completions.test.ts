@@ -47,6 +47,7 @@ Deno.test("shared OpenRouter transport applies model options, privacy policy and
     assertEquals(result.provider, "deepinfra");
     assertEquals(result.model, "openai/gpt-oss-20b");
     assertEquals(result.usage.total_tokens, 20);
+    assertEquals(result.rawResponseBody.includes('"summary":"ok"'), true);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -156,6 +157,7 @@ Deno.test("content refusals do not switch providers", async () => {
     assertEquals(call, 1);
     assertEquals(result.result, { kind: "content_rejected", reason: "provider_refusal" });
     assertEquals(result.rawRefusalText, "blocked by provider policy");
+    assertEquals(result.rawResponseBody.includes("blocked by provider policy"), true);
   } finally {
     globalThis.fetch = originalFetch;
   }
