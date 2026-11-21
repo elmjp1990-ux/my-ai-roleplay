@@ -29,17 +29,11 @@ assert.doesNotMatch(cityMap, /PoyozzEncounterSessionResume/,
   'Resume lookup must not depend on an undefined global module');
 assert.doesNotMatch(cityMap, /inferCharacterAgeFromLore/,
   'Character age must not be guessed from introduction text');
-assert.ok(cityMap.includes('ageText=liveAge||consistentSnapshotAge'),
-  'City character cards must use the live character age or a consistent saved chat snapshot only');
-assert.ok(cityMap.includes("const ageDisplay=ageText?( /^\\d+$/.test(ageText)?ageText+' 歲':ageText):'未設定'"),
+assert.doesNotMatch(cityMap, /snapshotAges|consistentSnapshotAge|cloudCharacterSnapshot\.age/,
+  'City cards must not replace the authoritative live age with stale chat snapshots');
+assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/);
+assert.ok(cityMap.includes("const ageDisplay=liveAge?( /^\\d+$/.test(liveAge)?liveAge+' 歲':liveAge):'未設定'"),
   'Only a numeric age receives the 歲 suffix; descriptive text must remain unchanged');
-assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
-assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/, 
-  'Blank live age fields must fall back to a consistent cloud character snapshot');
-assert.match(cityMap, /map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)/,
-  'Blank live age must be treated as missing so the consistent snapshot fallback is used');
-assert.match(cityMap, /snapshotAges\.every\(value=>value===snapshotAges\[0\]\)/,
-  'When live age is missing, only a consistent age across loaded chat snapshots may be used as fallback');
 assert.match(cityMap, /requestedSleepScene=person\.name==='陸沈宵'&&rawTimeRange==='08:00–09:00'/);
 assert.match(cityMap, /安靜且完全遮光的臥室，深層睡眠中。/);
 assert.match(cityMap, /render\(dependencies\)/);
