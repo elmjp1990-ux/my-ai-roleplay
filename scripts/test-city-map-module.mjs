@@ -4,6 +4,10 @@ import fs from 'node:fs';
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
+assert.match(html,/session_id:metadata->>session_id/,
+  'Encounter diary list must select only the session ID from JSON metadata');
+assert.doesNotMatch(html,/select\('id,summary,occurred_at,metadata'\)/,
+  'Encounter diary list and detail pages must not transfer unused metadata JSON');
 assert.match(encounterHistory,/const N=10/);
 assert.match(encounterHistory,/\.range\(offset,offset\+N-1\)/,
   'City Encounter history must fetch only ten sessions per page');
