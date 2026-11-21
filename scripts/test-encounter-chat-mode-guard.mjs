@@ -215,6 +215,17 @@ const pauseResumeEndpoint = fs.readFileSync(
   "supabase/functions/encounter-session-state/index.ts",
   "utf8",
 );
+const endMetadataMigration = fs.readFileSync(
+  "supabase/migrations/20261122100000_atomic_encounter_end_metadata.sql",
+  "utf8",
+);
+assert.match(endMetadataMigration, /FUNCTION public\\.persist_encounter_session_end_metadata/);
+assert.match(endMetadataMigration, /COALESCE\\(session_data, '\\{\\}'::jsonb\\)/);
+assert.match(endMetadataMigration, /GRANT EXECUTE ON FUNCTION public\\.persist_encounter_session_end_metadata\\(uuid,uuid\\) TO service_role/);
+assert.match(pauseResumeEndpoint, /persist_encounter_session_end_metadata/);
+assert.doesNotMatch(pauseResumeEndpoint, /select\\("session_data"\\)/,
+  "Ending an Encounter must not fetch and resend the full session_data JSON");
+
 assert.match(pauseResumeMigration, /FUNCTION public\.set_encounter_session_lifecycle_state/);
 assert.match(pauseResumeMigration, /FOR UPDATE/);
 assert.match(pauseResumeMigration, /p_action='pause'/);
