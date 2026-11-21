@@ -179,6 +179,6 @@ assert.match(encounterScene, /composer-bottom-row\{[\s\S]{0,120}transform:transl
 assert.match(html, /\.poyozz-affinity-ui\{box-sizing:border-box!important;width:calc\(5\.5em \+ 30px\)!important/);
 assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
-assert.match(encounterHistory, /hasPlayer\\.has\\(r\\.id\\)/);
-assert.match(encounterHistory, /skip\\.has\\(raw\\)/);
+assert.match(encounterHistory, /hasPlayer\.has\(r\.id\)/);
+assert.match(encounterHistory, /skip\.has\(raw\)/);
 assert.match(encounterHistory, /\.eq\('role','user'\)/);
