@@ -7926,7 +7926,12 @@ async function loadEncounterMemoryPage(list,session,pager){
     const rows=sessionRows||[];
     const sessionIds=rows.map(row=>row.id).filter(isUuid);
     const diaryBySession=new Map();
+    const sessionsWithAssistantReply=new Set();
     if(sessionIds.length){
+      const {data:replyRows,error:replyError}=await client.from('chat_messages')
+        .select('session_id').in('session_id',sessionIds).eq('role','assistant').is('deleted_at',null).limit(200);
+      if(replyError)throw replyError;
+      for(const row of replyRows||[])if(isUuid(row.session_id))sessionsWithAssistantReply.add(row.session_id);
       const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
         .select('id,event_type,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
@@ -7939,7 +7944,7 @@ async function loadEncounterMemoryPage(list,session,pager){
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
-    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id));
+    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id)||sessionsWithAssistantReply.has(row.id));
     const cards=[];
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
@@ -7992,7 +7997,7 @@ async function loadEncounterMemoryPage(list,session,pager){
       pager.observer=window.PoyozzListPagination.observeEnd(sentinel,()=>void loadEncounterMemoryPage(list,session,pager));
     }
     if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore&&!pager.buffer.length){
-      list.innerHTML='<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
+      list.innerHTML='<div class="empty"><p>這裡收藏你與'+e(sessionCharacter(session)?.name||'角色')+'的過往相遇</p><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶。</p></div>';
     }
   }catch(error){
     console.error('載入相遇日記失敗：',error);
@@ -8884,7 +8889,7 @@ window.PoyozzAffinityUI = window.PoyozzAffinityUI || {
     const score=Number(affinity);
     const tone=Number.isFinite(score)&&score<0?'is-negative':Number.isFinite(score)&&score>0?'is-positive':'is-neutral';
     const heartColor=tone==='is-negative'?'#b9a3d2':tone==='is-positive'?'#f4b9df':'#d8cde4';
-    if(!label)return '<span class="poyozz-affinity-empty"><span class="poyozz-affinity-heart" aria-hidden="true" style="color:'+heartColor+'">♥</span><span>你們還不認識</span></span>';
+    if(!label)return '<span class="poyozz-affinity-empty"><span class="poyozz-affinity-heart" aria-hidden="true" style="color:'+heartColor+'">♥</span><span>陌生人</span></span>';
     return '<span class="poyozz-affinity-ui '+variant+' '+tone+'" role="status" aria-label="好感度關係：'+label+'"><span class="poyozz-affinity-heart" aria-hidden="true">♥</span><span class="poyozz-affinity-label">'+label+'</span></span>';
   }
 };
@@ -12947,7 +12952,7 @@ const {
           const encounterHasStarted = s.encounterMode && (s.messages || []).some(message =>
             message?.role === 'user' && String(message.text || message.content || '').trim()
           );
-          text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL;
+          text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : ENCOUNTER_CONTINUE_SENTINEL;
         }
         const platformCommand = parsePlatformCommand(text);
         if (platformCommand.type === 'platform') {
