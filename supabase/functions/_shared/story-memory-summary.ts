@@ -323,6 +323,7 @@ export async function processDueStoryMemorySummary(
     responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
     responseParsed: response.responseParsed,
     rawOutputText: response.rawOutputText || (response.result.kind === "generated" ? response.result.text : ""),
+    rawResponseBody: response.rawResponseBody,
     refusalText: response.rawRefusalText, usage: response.usage,
     status: summary && response.result.kind === "generated" ? "received" : "failed",
     failureStage: summary && response.result.kind === "generated" ? null : "summary_output_validation",
