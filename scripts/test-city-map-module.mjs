@@ -27,12 +27,12 @@ assert.match(cityMap, /loadCloudChatSessions\(user,\{onlySessionId:candidate\.id
 assert.match(cityMap, /hydrated\?\.cloudOwned===true/);
 assert.doesNotMatch(cityMap, /PoyozzEncounterSessionResume/,
   'Resume lookup must not depend on an undefined global module');
-assert.ok(cityMap.includes('const inferCharacterAgeFromLore = person =>'),
-  'City character cards must have a deterministic fallback for explicit age evidence in the character introduction');
-assert.ok(cityMap.includes('3,?000') && cityMap.includes('年前') && cityMap.includes("return '3000+'"),
-  'The lore parser must recognize the explicit three-thousand-years-ago statement as a minimum age');
-assert.ok(cityMap.includes('ageText=liveAge||consistentSnapshotAge||loreAge'),
-  'Explicit database age and consistent chat snapshot age must take precedence over lore inference');
+assert.doesNotMatch(cityMap, /inferCharacterAgeFromLore/,
+  'Character age must not be guessed from introduction text');
+assert.ok(cityMap.includes('ageText=liveAge||consistentSnapshotAge'),
+  'City character cards must use the live character age or a consistent saved chat snapshot only');
+assert.match(cityMap, /const ageDisplay=ageText\?\(\s*\/\^\\\\d\+\$\/\.test\(ageText\)\?ageText\+' 歲':ageText\):'未設定'/,
+  'Only a numeric age receives the 歲 suffix; descriptive text must remain unchanged');
 assert.match(cityMap, /const snapshotAges=Object\.values\(state\.sessions\|\|\{\}\)/);
 assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?'':String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|''/, 
   'Blank live age fields must fall back to a consistent cloud character snapshot');
@@ -125,7 +125,18 @@ assert.match(html, /poyozz-city-rain/);
 assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
 assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
 
-console.log('City map module extraction, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
+
+const ageTextMigration=fs.readFileSync('supabase/migrations/20261121100000_character_age_as_text.sql','utf8');
+assert.match(ageTextMigration,/ALTER COLUMN age TYPE text/);
+assert.match(ageTextMigration,/USING age::text/);
+assert.match(html,/const age=ageValue \|\| null/);
+assert.match(html,/ageValue\.length > 40/);
+assert.match(html,/select\('visibility, age, first_published_at/);
+assert.match(html,/String\(savedCharacter\.age \?\? ''\) !== ageValue/);
+assert.match(html,/name="age" type="text" maxlength="40"/);
+assert.match(html,/age: row\.age == null \? '' : String\(row\.age\)/);
+
+console.log('City map module extraction, descriptive character age, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
