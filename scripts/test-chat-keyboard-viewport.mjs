@@ -180,5 +180,7 @@ assert.match(html, /\.poyozz-affinity-ui\{box-sizing:border-box!important;width:
 assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(encounterHistory, /hasPlayer\.has\(r\.id\)/);
-assert.match(encounterHistory, /skip\.has\(raw\)/);
+assert.match(encounterHistory, /\.not\('content','ilike','%POYOZZ_ENCOUNTER_DISCOVERY_EVENT%'\)/);
+assert.match(encounterHistory, /\.neq\('content','（請接續目前的故事。）'\)/);
+assert.match(encounterHistory, /\.select\('session_id'\)/);
 assert.match(encounterHistory, /\.eq\('role','user'\)/);
