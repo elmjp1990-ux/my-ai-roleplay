@@ -634,7 +634,7 @@
  .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=40);
  const consistentSnapshotAge=snapshotAges.length&&snapshotAges.every(value=>value===snapshotAges[0])?snapshotAges[0]:'';
  const ageText=liveAge||consistentSnapshotAge;
- const ageDisplay=ageText?( /^\\d+$/.test(ageText)?ageText+' 歲':ageText):'未設定';
+ const ageDisplay=ageText?( /^\d+$/.test(ageText)?ageText+' 歲':ageText):'未設定';
  const age=escapeHTML(ageDisplay);
  const rawTimeRange=String(person.cityStartTime||'')+'–'+String(person.cityEndTime||'');
  const requestedSleepScene=person.name==='陸沈宵'&&rawTimeRange==='08:00–09:00';
