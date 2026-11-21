@@ -1,4 +1,4 @@
-/* Cloud-backed Encounter history. Loads every matching session in small metadata-only pages. */
+/* Cloud-backed Encounter history. Reads session metadata and a bounded latest-message preview only. */
 (function(global){
   'use strict';
   const PAGE_SIZE=50;
@@ -15,16 +15,8 @@
     return sessions.map(session=>{
       const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
       const venue=placeNames[session.encounterPlace]||'城市相遇';
-      const ended=session.archived===true||Number(session.encounterEndedAt)>0;
-      const summary=cleanSummary(session.encounterSummary)||(
-        !excludedMessages.has(String(session.lastMessagePreview||'').trim())
-          ? cleanSummary(session.lastMessagePreview)
-          : ''
-      );
-      const description=summary
-        ? (session.encounterSummary?'相遇摘要：':'對話片段：')+summary.slice(0,120)
-        : ended?'本次相遇已結束，尚未產生文字摘要。':'這次相遇仍在進行中。';
-      return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong><span class="city-encounter-history-status">'+(ended?'已結束':'進行中')+'</span></div><p>'+escapeHTML(description)+'</p></article>';
+      const preview=cleanSummary(session.lastMessagePreview||'').slice(0,50);
+      return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong></div>'+(preview?'<p>'+escapeHTML(preview)+'</p>':'')+'</article>';
     }).join('');
   };
   const loadCloudHistory=async(person,currentUser,client)=>{
@@ -52,17 +44,31 @@
         offset+=PAGE_SIZE;
       }
       if(currentUser()?.uid!==uid)throw new Error('登入狀態已變更，請重新登入。');
+      const ids=rows.map(row=>row.id),latestBySession=new Map();
+      if(ids.length){
+        const {data:messages,error:messageError}=await client.from('chat_messages')
+          .select('session_id,role,content,created_at,deleted_at')
+          .in('session_id',ids).is('deleted_at',null)
+          .order('created_at',{ascending:false}).limit(200);
+        if(!messageError){
+          for(const message of messages||[]){
+            if(latestBySession.has(message.session_id))continue;
+            const speaker=message.role==='user'?'你':(person.name||'角色');
+            const text=cleanSummary(message.content||'').slice(0,50);
+            if(text&&!excludedMessages.has(text))latestBySession.set(message.session_id,speaker+'：'+text);
+          }
+        }
+      }
       person.encounterHistoryCloud=rows.map(row=>{
         const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
         const endedAt=Number(data.encounterEndedAt)||null;
         return {
           id:row.id,encounterMode:true,characterId:person.id,
-          archived:data.archived===true||!!endedAt,
-          encounterEndedAt:endedAt,
+          archived:data.archived===true||!!endedAt,encounterEndedAt:endedAt,
           startedAt:Number(data.startedAt)||Date.parse(row.created_at)||0,
           encounterPlace:data.encounterPlace||data.encounter?.locationKey||'',
-          encounterSummary:cleanSummary(data.encounterSummary||''),
-          lastMessagePreview:cleanSummary(data.lastMessagePreview||''),
+          encounterSummary:'',
+          lastMessagePreview:latestBySession.get(row.id)||cleanSummary(data.lastMessagePreview||'').slice(0,50),
           messages:[]
         };
       });
@@ -77,9 +83,7 @@
     if(!person||person.encounterHistoryLoading)return;
     const request=loadCloudHistory(person,currentUser,client);
     render?.();
-    void request.then(()=>{
-      if(!isActive||isActive())render?.();
-    }).catch(error=>onError?.(error));
+    void request.then(()=>{if(!isActive||isActive())render?.();}).catch(error=>onError?.(error));
   };
   global.PoyozzEncounterHistory=Object.freeze({renderHistory,loadCloudHistory,openHistory});
 })(window);
