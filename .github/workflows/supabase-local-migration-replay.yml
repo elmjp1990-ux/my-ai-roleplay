@@ -168,6 +168,44 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
 
+      - name: Replay and verify descriptive character age migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261121100000_character_age_as_text.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $
+          DECLARE
+            v_age_type text;
+          BEGIN
+            SELECT data_type INTO v_age_type
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'characters'
+              AND column_name = 'age';
+            IF v_age_type IS DISTINCT FROM 'text' THEN
+              RAISE EXCEPTION 'characters.age must be text after migration; found %', v_age_type;
+            END IF;
+          END;
+          $;
+          CREATE TEMP TABLE character_age_conversion_fixture(age integer);
+          INSERT INTO character_age_conversion_fixture(age) VALUES (28), (3000), (NULL);
+          ALTER TABLE character_age_conversion_fixture
+            ALTER COLUMN age TYPE text
+            USING age::text;
+          DO $
+          DECLARE
+            v_values text[];
+          BEGIN
+            SELECT array_agg(age ORDER BY age NULLS LAST) INTO v_values
+            FROM character_age_conversion_fixture;
+            IF v_values IS DISTINCT FROM ARRAY['28','3000',NULL]::text[] THEN
+              RAISE EXCEPTION 'Integer-to-text age conversion did not preserve values: %', v_values;
+            END IF;
+          END;
+          $;
+          SQL
+
       - name: Replay and behavior-test per-turn Encounter affinity migration
         shell: bash
         run: |
