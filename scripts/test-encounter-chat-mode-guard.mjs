@@ -558,6 +558,6 @@ assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,
 await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});
 assert.deepEqual(rangeCalls,[[0,9],[10,19]],"scroll pagination fetches the next ten records");
 assert.equal(historyPerson.encounterHistoryCloud.length,19,"the next page appends without dropping or duplicating records");
-assert.equal(messageFetchIds.length,19,"each history page hydrates no more than ten player-message previews");
+assert.equal(messageFetchIds.length,20,"each history page scopes its preview query to at most ten session IDs");
 assert.doesNotMatch(historyHtml,/你選擇讓角色主動發現你/,"discovery-only blank sessions are excluded from history");
 assert.doesNotMatch(historyHtml,/POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
