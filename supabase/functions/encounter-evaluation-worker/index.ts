@@ -4,6 +4,7 @@ import {
   POYOZZ_DEFAULT_CHAT_MODEL,
 } from "../_shared/openrouter-chat-completions.ts";
 import { parseEncounterSessionEvaluation } from "../_shared/encounter-session-evaluation.mjs";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -220,11 +221,32 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     temperature: 0.2,
     responseFormat: { type: "json_object" },
   });
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "encounter_evaluation", userId: job.user_id, characterId: session.character_id,
+    sessionId: job.session_id, sourceRef: String(job.id || ""),
+    model: response.model, provider: response.provider, requestId: response.requestId,
+    httpStatus: response.httpStatus, finishReason: response.finishReason,
+    responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
+    responseParsed: response.responseParsed,
+    rawOutputText: response.rawOutputText || (response.result.kind === "generated" ? response.result.text : ""),
+    refusalText: response.rawRefusalText, usage: response.usage,
+    status: response.result.kind === "generated" ? "received" : "failed",
+    failureStage: response.result.kind === "generated" ? null : "provider_response",
+    failureCode: response.result.kind === "provider_error" ? response.result.code :
+      response.result.kind === "content_rejected" ? "provider_content_rejected" :
+      response.result.kind === "empty_output" ? "empty_output" : null,
+  });
   if (response.result.kind !== "generated") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response",
+      failureCode: response.result.kind === "provider_error" ? response.result.code :
+        response.result.kind === "content_rejected" ? "provider_content_rejected" : "empty_output" });
     throw new Error("encounter_evaluation_provider_" + response.result.kind);
   }
   const evaluation = parseEncounterSessionEvaluation(response.result.text);
-  if (!evaluation) throw new Error("encounter_evaluation_output_invalid");
+  if (!evaluation) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_parsing", failureCode: "encounter_evaluation_output_invalid", validationErrors: ["encounter_evaluation_output_invalid"] });
+    throw new Error("encounter_evaluation_output_invalid");
+  }
 
   const { data: settled, error: settlementError } = await admin.rpc("settle_encounter_session", {
     p_session_id: job.session_id,
@@ -247,6 +269,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     throw new Error("encounter_evaluation_settlement_failed");
   }
   await persistEncounterSummary(admin, job.session_id, evaluation.diarySummary, new Date().toISOString());
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
   return { sessionId: job.session_id, settled: true, idempotent: settled.idempotent === true, summarySynced: true, result: settled.result };
 }
 
