@@ -12939,9 +12939,11 @@ const {
           break;
         }
         if (!text.trim()) {
-          const encounterHasStarted = s.encounterMode && (
-            !!s.initialOpeningMessage ||
-            (s.messages || []).some(message => message.role === 'assistant' && String(message.text || message.content || '').trim())
+          // The first blank Encounter send must always be a discovery event.
+          // An initial scene/opening payload is not a player turn; only a persisted
+          // player message means the Encounter has already started.
+          const encounterHasStarted = s.encounterMode && (s.messages || []).some(message =>
+            message?.role === 'user' && String(message.text || message.content || '').trim()
           );
           text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL;
         }
@@ -13745,7 +13747,7 @@ function renderCityMapMVP() {
     return;
   }
   return renderCityMap({
-    $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
+    $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
     setEncounterLifecycleState, createEncounterSession,
@@ -14321,9 +14323,8 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
     if (!isChatComposer(event.target)) return;
     updateViewportHeight();
     scheduleViewportUpdate();
-    if (document.body.classList.contains('encounter-mode-active')) {
-      requestAnimationFrame(() => event.target.scrollIntoView?.({ block:'nearest', inline:'nearest' }));
-    }
+    // Encounter scene art is anchored to the scene; never scroll the page or sprite
+    // together with the composer when the software keyboard opens.
   });
   document.addEventListener('focusout', () => {
     requestAnimationFrame(() => {
