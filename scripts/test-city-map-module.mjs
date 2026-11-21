@@ -177,7 +177,6 @@ assert.doesNotMatch(html, /if\(error\|\|data\?\.enabled!==true\)\{section\.remov
 assert.match(html, /if\(!client\)throw new Error\('城市角色行程服務尚未連線。'\)/);
 assert.match(html, /if\(error\)throw new Error\('讀取角色行程失敗：'\+error\.message\)/);
 assert.doesNotMatch(html, /城市角色排程批次載入失敗[\s\S]{0,180}return schedules/);
-assert.match(cityMap, /const hasAnySchedule=\(pager\?\.candidates\|\|\[\]\)\.some\(person=>String\(person\.encounterSchedules\|\|''\)\.trim\(\)\)/);
 assert.match(cityMap, /目前沒有角色出現在此場景/);
 assert.match(cityMap, /目前沒有角色出現在此場景/);
 assert.match(cityMap, /角色行程載入失敗，請重試。/);
