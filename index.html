@@ -6348,7 +6348,7 @@ function renderEditor() {
             ${[['male','男'],['female','女'],['ambiguous','模糊']].map(([v,t]) =>
               `<option value="${v}" ${c.gender === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select></label>
-          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}" placeholder="例如：28、28（實際 3000）"></label>
+          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
