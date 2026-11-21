@@ -97,6 +97,14 @@ assert.match(html, /\.city-character-portrait,\.city-character-portrait-video\{b
 // City-scene avatars must be clipped by a dedicated transparent circular frame;
 // the clickable button must not inherit the legacy square avatar backing.
 assert.match(cityMap, /city-location-person-avatar-frame/);
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}/,
+  "City map avatars must prefer the refreshed image URL over a stale raw avatar_url");
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}[^\n]*loading:'eager'/,
+  "The selected character detail portrait must load eagerly");
+assert.match(cityMap, /image\.dataset\.characterAvatarId\)return/,
+  "City map must not replace shared avatar images before the signed-URL recovery handler retries them");
+assert.match(html, /const loading=options\.loading==='eager'\?'eager':'lazy'/,
+  "The shared avatar renderer must keep lazy loading by default and support eager detail portraits");
 assert.doesNotMatch(cityMap, /class="city-location-avatar city-location-person"/);
 assert.match(html, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
 assert.match(html, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
