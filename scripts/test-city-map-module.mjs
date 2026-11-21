@@ -9,7 +9,7 @@ assert.match(encounterHistory,/\.range\(offset,offset\+N-1\)/,
   'City Encounter history must fetch only ten sessions per page');
 assert.match(encounterHistory,/\.limit\(N\)/,
   'City Encounter history preview hydration must be capped at ten messages');
-assert.match(encounterHistory,/observeEnd\(sentinel/ ,
+assert.match(encounterHistory,/observeEnd\\(el/ ,
   'City Encounter history must load the next ten records when scrolled to the end');
 assert.match(encounterHistory,/encounterHistoryOffset=offset\+batch\.length/);
 assert.doesNotMatch(encounterHistory,/while\(true\)|\.limit\(200\)/,
