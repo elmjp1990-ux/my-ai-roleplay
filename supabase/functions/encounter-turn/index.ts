@@ -37,8 +37,8 @@ const ENCOUNTER_LOCATION_LABELS: Record<string, string> = {
   bakery: "麵包店", "coworking-space": "共享辦公室",
 };
 const ENCOUNTER_RELATIONSHIP_LABELS: Record<string, string> = {
-  hostile: "敵意", dislike: "反感", wary: "戒備", first_meeting: "初次見面",
-  acquaintance: "逐漸熟悉", close: "親近信任", intimate: "深厚親密", special: "特殊關係",
+  hostile: "敵對", dislike: "反感", wary: "戒備", first_meeting: "初次見面",
+  acquaintance: "熟識", close: "親近", intimate: "親密", special: "特殊羈絆",
 };
 
 async function refundEncounterTurn(admin: any, userId: string, turnId: string, assistantMessageId: string, failureCode: string): Promise<DbRow | null> {
