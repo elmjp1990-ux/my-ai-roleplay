@@ -1851,7 +1851,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           id: row.id,
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
-          age: row.age == null ? (local.age || '') : String(row.age),
+          // Cloud age is authoritative; never resurrect a stale local age when the
+          // database value is intentionally empty.
+          age: row.age == null ? '' : String(row.age),
           image: ownerPrimaryIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
           primaryIllustrationPath:ownerPrimaryIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
           galleryIllustrations:local.galleryIllustrations || [],
@@ -2883,9 +2885,10 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     }
 
     const ageValue = String(character.age ?? '').trim();
-    const age = ageValue && Number.isFinite(Number(ageValue))
-      ? Number.parseInt(ageValue, 10)
-      : null;
+    if (ageValue.length > 40) throw new Error('角色年齡描述最多 40 字。');
+    // Character age is descriptive text (e.g.「28（實際 3000）」), not the
+    // account-age eligibility value. Adult access is checked via profiles.birthdate.
+    const age = ageValue || null;
 
     const nextVisibility = character.visibility === 'public' ? 'public' : 'private';
     // 公開必須由創作者明確勾選權利確認；私密草稿不會自動視為已確認。
@@ -2988,7 +2991,7 @@ if (characterError) {
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
+      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2996,6 +2999,9 @@ if (characterError) {
     if (!savedCharacter) throw new Error('角色寫入後查不到資料，請檢查 Supabase 權限設定。');
     if (savedCharacter.visibility !== nextVisibility) {
       throw new Error('資料庫中的角色狀態仍是「' + savedCharacter.visibility + '」，沒有成功改成「' + nextVisibility + '」。請檢查 Supabase RLS 政策或資料庫 trigger。');
+    }
+    if (String(savedCharacter.age ?? '') !== ageValue) {
+      throw new Error('角色年齡回讀結果與送出內容不一致，為避免年齡資料遺失，本次請重新儲存。');
     }
     if (nextVisibility === 'public' && savedCharacter.rights_confirmed !== true) {
       throw new Error('資料庫尚未記錄權利確認，角色不能公開。');
@@ -6342,7 +6348,7 @@ function renderEditor() {
             ${[['male','男'],['female','女'],['ambiguous','模糊']].map(([v,t]) =>
               `<option value="${v}" ${c.gender === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select></label>
-          <label class="field"><span>年齡</span><input name="age" maxlength="20" value="${e(c.age || '')}"></label>
+          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="40" value="${e(c.age || '')}" placeholder="例如：28、28（實際 3000）"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
@@ -13606,7 +13612,7 @@ async function importCharacter(file) {
   const character = {
     id:id(),name,intro,opening,image,tags,
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
-    age:String(data.age || '').slice(0,20),
+    age:String(data.age ?? '').trim().slice(0,40),
     race:String(data.race || '').slice(0,50),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
     authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
