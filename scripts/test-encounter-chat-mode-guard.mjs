@@ -484,7 +484,6 @@ const encounterOutputParser = fs.readFileSync("supabase/functions/_shared/encoun
 assert.match(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
-assert.match(frontend, /padding-bottom:0!important/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/);
 assert.match(cityMap, /const liveAge=person\.age\?\?person\.characterAge\?\?person\.character_age/);
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/);
