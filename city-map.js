@@ -637,10 +637,11 @@
  const gender=escapeHTML(person.gender||'未設定');
  const liveAge=[person.age,person.characterAge,person.character_age].map(value=>value==null?'':String(value).trim()).find(Boolean)||'';
  const snapshotAges=Object.values(state.sessions||{}).filter(session=>session?.characterId===person.id&&session?.cloudCharacterSnapshot?.age!=null)
- .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=20);
+ .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=40);
  const consistentSnapshotAge=snapshotAges.length&&snapshotAges.every(value=>value===snapshotAges[0])?snapshotAges[0]:'';
- const loreAge=inferCharacterAgeFromLore(person);
- const ageText=liveAge||consistentSnapshotAge||loreAge,age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
+ const ageText=liveAge||consistentSnapshotAge;
+ const ageDisplay=ageText?( /^\\d+$/.test(ageText)?ageText+' 歲':ageText):'未設定';
+ const age=escapeHTML(ageDisplay);
  const rawTimeRange=String(person.cityStartTime||'')+'–'+String(person.cityEndTime||'');
  const requestedSleepScene=person.name==='陸沈宵'&&rawTimeRange==='08:00–09:00';
  const rawStatusDescription=requestedSleepScene?'安靜且完全遮光的臥室，深層睡眠中。':(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
