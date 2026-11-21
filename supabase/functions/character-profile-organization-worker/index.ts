@@ -48,6 +48,7 @@ type ProfileUsageMetadata = {
   requestId: string | null;
   usage: Record<string, unknown>;
   rawOutputText?: string | null;
+  rawResponseBody?: string | null;
   refusalText?: string | null;
   httpStatus?: number | null;
   finishReason?: string | null;
@@ -241,6 +242,7 @@ async function generateProfile(
             ? result.usage as Record<string, unknown>
             : {},
           rawOutputText: typeof result?.choices?.[0]?.message?.content === "string" ? result.choices[0].message.content : null,
+          rawResponseBody: responseText,
           refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
           httpStatus: response.status,
           finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
@@ -264,6 +266,7 @@ async function generateProfile(
           /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
         usage,
         rawOutputText: typeof content === "string" ? content : null,
+        rawResponseBody: responseText,
         refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
         httpStatus: response.status,
         finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
@@ -389,7 +392,7 @@ export default {
           sourceRef: item.source_hash, model: generated.model, provider: generated.provider,
           requestId: generated.requestId, httpStatus: generated.httpStatus, finishReason: generated.finishReason,
           responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
-          responseParsed: generated.responseParsed, rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
+          rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed, rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
           refusalText: generated.refusalText, usage: generated.usage, status: "completed",
         });
         await recordProfileUsage(supabase, item, generated, "generated");
@@ -409,8 +412,8 @@ export default {
             sourceRef: item.source_hash, model: failedUsage.model, provider: failedUsage.provider,
             requestId: failedUsage.requestId, httpStatus: failedUsage.httpStatus,
             finishReason: failedUsage.finishReason, responseContentType: failedUsage.responseContentType,
-            responseBodyLength: failedUsage.responseBodyLength, responseParsed: failedUsage.responseParsed,
-            rawOutputText: failedUsage.rawOutputText, refusalText: failedUsage.refusalText,
+            responseBodyLength: failedUsage.responseBodyLength, rawResponseBody: failedUsage.rawResponseBody,
+            responseParsed: failedUsage.responseParsed, rawOutputText: failedUsage.rawOutputText, refusalText: failedUsage.refusalText,
             usage: failedUsage.usage, status: "failed", failureStage: "profile_output_validation", failureCode: code,
             validationErrors: code.startsWith("profile_schema_invalid_") ? [code] : code === "model_json_invalid" ? ["model_json_invalid"] : [],
           });
