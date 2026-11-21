@@ -78,16 +78,10 @@ Deno.serve(async (request: Request) => {
 
   if (action === "end") {
     // Persist the ended state immediately, independently of the asynchronous AI summary.
-    const { data: sessionRow, error: sessionReadError } = await admin.from("chat_sessions")
-      .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
-    if (sessionReadError || !sessionRow) return json({ error: "encounter_end_metadata_unavailable" }, 503);
-    const persistedSessionData = sessionRow as unknown as { session_data?: unknown };
-    const currentSessionData = persistedSessionData.session_data && typeof persistedSessionData.session_data === "object" && !Array.isArray(persistedSessionData.session_data)
-      ? persistedSessionData.session_data as Record<string, unknown> : {};
-    const { error: metadataError } = await admin.from("chat_sessions").update({
-      session_data: { ...currentSessionData, archived: true, encounterEndedAt: Date.now() },
-      updated_at: new Date().toISOString(),
-    }).eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "encounter").is("deleted_at", null);
+    const { error: metadataError } = await admin.rpc("persist_encounter_session_end_metadata", {
+      p_session_id: sessionId,
+      p_user_id: user.id,
+    });
     if (metadataError) return json({ error: "encounter_end_metadata_persistence_failed" }, 503);
     const queueEvaluation = async () => {
       try {
