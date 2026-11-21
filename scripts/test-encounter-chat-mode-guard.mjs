@@ -485,7 +485,7 @@ assert.match(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/);
-assert.match(cityMap, /const liveAge=person\.age\?\?person\.characterAge\?\?person\.character_age/);
+assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?\x27\x27:String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|\x27\x27/);
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/);
 assert.match(pauseResumeEndpoint, /encounter_session_evaluation_jobs/);
 assert.match(pauseResumeEndpoint, /EdgeRuntime/);
