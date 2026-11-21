@@ -10,6 +10,7 @@ import {
   validateCharacterProfileSourcePayload,
   type CharacterProfileSourcePayload,
 } from "../_shared/character-profile-organization.ts";
+import { recordAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BATCH = 1;
@@ -46,6 +47,13 @@ type ProfileUsageMetadata = {
   provider: string;
   requestId: string | null;
   usage: Record<string, unknown>;
+  rawOutputText?: string | null;
+  refusalText?: string | null;
+  httpStatus?: number | null;
+  finishReason?: string | null;
+  responseContentType?: string | null;
+  responseBodyLength?: number | null;
+  responseParsed?: boolean | null;
 };
 
 type GeneratedProfile = ProfileUsageMetadata & {
@@ -232,6 +240,13 @@ async function generateProfile(
           usage: result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
             ? result.usage as Record<string, unknown>
             : {},
+          rawOutputText: typeof result?.choices?.[0]?.message?.content === "string" ? result.choices[0].message.content : null,
+          refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
+          httpStatus: response.status,
+          finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
+          responseContentType: response.headers.get("content-type") || "",
+          responseBodyLength: responseText.length,
+          responseParsed: true,
         });
       }
 
@@ -241,14 +256,21 @@ async function generateProfile(
       const responseProvider = typeof result?.provider === "string" ? result.provider : provider;
       const requestIdValue = response.headers.get("x-request-id") ||
         (typeof result?.id === "string" ? result.id : null);
+      const content = result?.choices?.[0]?.message?.content;
       const metadata: ProfileUsageMetadata = {
         model: CHARACTER_PROFILE_MODEL,
         provider: responseProvider.slice(0, 100),
         requestId: typeof requestIdValue === "string" &&
           /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
         usage,
+        rawOutputText: typeof content === "string" ? content : null,
+        refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
+        httpStatus: response.status,
+        finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
+        responseContentType: response.headers.get("content-type") || "",
+        responseBodyLength: responseText.length,
+        responseParsed: true,
       };
-      const content = result?.choices?.[0]?.message?.content;
       if (typeof content !== "string" || !content.trim()) {
         throw new ProfileGenerationError("model_content_missing", metadata);
       }
@@ -362,6 +384,14 @@ export default {
         const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
         const generated = await generateProfile(item, apiKey);
+        await recordAiGenerationDiagnostic(supabase, {
+          generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
+          sourceRef: item.source_hash, model: generated.model, provider: generated.provider,
+          requestId: generated.requestId, httpStatus: generated.httpStatus, finishReason: generated.finishReason,
+          responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
+          responseParsed: generated.responseParsed, rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
+          refusalText: generated.refusalText, usage: generated.usage, status: "completed",
+        });
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
         // The provider has already completed and may have billed this request.
@@ -374,6 +404,16 @@ export default {
         const code = safeCode(error, "profile_generation_failed");
         if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
           const failedUsage = error instanceof ProfileGenerationError ? error.metadata : null;
+          if (failedUsage) await recordAiGenerationDiagnostic(supabase, {
+            generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
+            sourceRef: item.source_hash, model: failedUsage.model, provider: failedUsage.provider,
+            requestId: failedUsage.requestId, httpStatus: failedUsage.httpStatus,
+            finishReason: failedUsage.finishReason, responseContentType: failedUsage.responseContentType,
+            responseBodyLength: failedUsage.responseBodyLength, responseParsed: failedUsage.responseParsed,
+            rawOutputText: failedUsage.rawOutputText, refusalText: failedUsage.refusalText,
+            usage: failedUsage.usage, status: "failed", failureStage: "profile_output_validation", failureCode: code,
+            validationErrors: code.startsWith("profile_schema_invalid_") ? [code] : code === "model_json_invalid" ? ["model_json_invalid"] : [],
+          });
           await recordProfileUsage(supabase, item, failedUsage, "failed", code);
           usageRecorded = true;
         }
