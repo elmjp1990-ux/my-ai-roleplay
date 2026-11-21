@@ -51,7 +51,7 @@
  render(dependencies) {
  destroyActiveMap();
  const {
- $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
+ $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
  persist, hydratePublicCharacterIllustrations, characterVideoObserver,
  releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
  setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
@@ -439,10 +439,7 @@
  strip.innerHTML=people.length
  ? people.map((person,index)=>{
  const characterName=String(person.name||'角色');
- const image=safeImage(person.image||person.avatar_url||person.avatar);
- const portrait=image
- ? '<span class="city-location-person-avatar-frame"><img class="city-location-person-image" src="'+escapeHTML(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer"></span>'
- : '<span class="city-location-person-avatar-frame"><span class="city-location-avatar-fallback">'+escapeHTML(characterName.slice(0,1))+'</span></span>';
+ const portrait='<span class="city-location-person-avatar-frame">'+characterAvatarMarkup(person,{imageClass:'city-location-person-image',fallbackClass:'city-location-avatar-fallback'})+'</span>';
  return '<button type="button" class="city-location-person" data-action="city-person" data-person-index="'+index+'" aria-label="查看 '+escapeHTML(characterName)+' 的角色資訊">'+portrait+'<span class="city-location-person-name">'+escapeHTML(characterName)+'</span></button>';
  }).join('')
  : '<p class="city-location-empty">'+emptyMessage+'</p>';
@@ -608,9 +605,7 @@
  ? '<video class="city-character-portrait city-character-portrait-video" data-character-video="'+escapeHTML(videoPath)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
  : videoUrl
  ? '<video class="city-character-portrait city-character-portrait-video" src="'+escapeHTML(videoUrl)+'" autoplay muted loop playsinline preload="metadata" poster="'+escapeHTML(image||'')+'" aria-label="'+escapeHTML(person.name||'角色')+'角色展示影片"></video>'
- : image
- ? '<img class="city-character-portrait" src="'+escapeHTML(image)+'" alt="'+escapeHTML(person.name||'角色')+'" loading="eager" referrerpolicy="no-referrer">'
- : '<div class="city-character-portrait city-character-portrait-fallback">'+escapeHTML(String(person.name||'角').slice(0,1))+'</div>';
+ : characterAvatarMarkup(person,{imageClass:'city-character-portrait',fallbackClass:'city-character-portrait city-character-portrait-fallback'});
  const name=escapeHTML(person.name||'未命名角色');
  const gender=escapeHTML(person.gender||'未設定');
  const liveAge=[person.age,person.characterAge,person.character_age].map(value=>value==null?'':String(value).trim()).find(Boolean)||'';
@@ -793,7 +788,7 @@
  });
  $('cityMapAvatarStrip')?.addEventListener('error',event=>{
  const image=event.target;
- if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-location-person-image'))return;
+ if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-location-person-image')||image.dataset.characterAvatarId)return;
  const fallback=document.createElement('span');
  fallback.className='city-location-avatar-fallback';
  fallback.textContent=image.alt?.slice(0,1)||'角';
@@ -801,7 +796,7 @@
  },true);
  $('cityCharacterCardBody')?.addEventListener('error',event=>{
  const image=event.target;
- if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-character-portrait'))return;
+ if(!(image instanceof HTMLImageElement)||!image.classList.contains('city-character-portrait')||image.dataset.characterAvatarId)return;
  const fallback=document.createElement('div');
  fallback.className='city-character-portrait city-character-portrait-fallback';
  fallback.textContent=image.alt?.slice(0,1)||'角';
