@@ -26,7 +26,7 @@ function parseJsonObject(raw) {
 }
 
 function buildFallbackEncounterSuggestions(reply) {
-  const anchor = Array.from(reply.replace(/[\\s*「」『』，。！？、,.!?]/g, "")).slice(0, 12).join("") || "剛才的話";
+  const anchor = Array.from(reply.replace(/[\s*「」『』，。！？、,.!?]/g, "")).slice(0, 12).join("") || "剛才的話";
   return [
     `我想再了解你提到的「${anchor}」，可以多告訴我一些當時的情況嗎？`,
     "聽你這麼說，我也想分享我的想法；你願意聽聽我怎麼看這件事嗎？",
