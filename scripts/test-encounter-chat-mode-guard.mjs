@@ -534,7 +534,7 @@ const historyRows = Array.from({ length: 20 }, (_, index) => ({
   created_at: "2026-11-20T00:00:00.000Z", updated_at: "2026-11-20T00:00:00.000Z",
   encounter_place: "apartment",
   encounter_summary: index === 1 ? '你說：「你在家嗎？」。顧言回應：門沒有鎖。' : '',
-  last_message_preview: "相遇片段 " + index,
+  last_message_preview: "你：相遇片段 " + index,
   session_archived: index === 1 ? 'true' : 'false',
   session_started_at: "1795134702137",
   encounter_ended_at: index === 1 ? "1795134702137" : null,
