@@ -483,7 +483,7 @@ assert.doesNotMatch(frontend, /Array\.from\(value\)\.length<=80/);
 const encounterOutputParser = fs.readFileSync("supabase/functions/_shared/encounter-turn-output.mjs", "utf8");
 assert.match(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
-assert.match(frontend, /body\.encounter-mode-active \.chat-main\.encounter-scene \.encounter-dialogue-beat/);
+assert.match(frontend, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
 assert.match(frontend, /padding-bottom:0!important/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/);
 assert.match(cityMap, /const liveAge=person\.age\?\?person\.characterAge\?\?person\.character_age/);
