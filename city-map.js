@@ -8,6 +8,12 @@
  const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
  const cityMapMemoryCache = new Map();
+ const inferCharacterAgeFromLore = person => {
+ const intro=String(person?.intro||'');
+ // 陸沉宵的介紹明確寫「三千年前，他曾是…」；這只能證明至少三千歲，不能當成精確生日。
+ if(/(?:三千|3,?000)\s*年前[，,、]?\s*(?:他|她)(?:曾|是)/.test(intro))return '3000+';
+ return '';
+ };
  const readCityMapCache = (key, ttlMs) => {
  const now = Date.now();
  let entry = cityMapMemoryCache.get(key) || null;
@@ -633,7 +639,8 @@
  const snapshotAges=Object.values(state.sessions||{}).filter(session=>session?.characterId===person.id&&session?.cloudCharacterSnapshot?.age!=null)
  .map(session=>String(session.cloudCharacterSnapshot.age).trim()).filter(value=>value&&value.length<=20);
  const consistentSnapshotAge=snapshotAges.length&&snapshotAges.every(value=>value===snapshotAges[0])?snapshotAges[0]:'';
- const ageText=liveAge||consistentSnapshotAge,age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
+ const loreAge=inferCharacterAgeFromLore(person);
+ const ageText=liveAge||consistentSnapshotAge||loreAge,age=escapeHTML(ageText?(ageText.endsWith('歲')?ageText:ageText+' 歲'):'未設定');
  const rawTimeRange=String(person.cityStartTime||'')+'–'+String(person.cityEndTime||'');
  const requestedSleepScene=person.name==='陸沈宵'&&rawTimeRange==='08:00–09:00';
  const rawStatusDescription=requestedSleepScene?'安靜且完全遮光的臥室，深層睡眠中。':(person.citySceneDescription||person.cityActivity||'在這個場景中度過自己的時間');
