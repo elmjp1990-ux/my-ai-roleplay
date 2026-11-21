@@ -8927,7 +8927,7 @@ function conversationSuggestionsHTML(s) {
     <details class="suggestions-panel">
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
       ${(!hasPlayerMessage&&s.encounterMode!==true)||replies.length===0
-        ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
+        ? '<p class="suggestion-first-message-hint">本回合沒有建議回覆。</p>'
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
           </div>
