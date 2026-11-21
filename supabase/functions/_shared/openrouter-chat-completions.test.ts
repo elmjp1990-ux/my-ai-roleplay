@@ -47,7 +47,7 @@ Deno.test("shared OpenRouter transport applies model options, privacy policy and
     assertEquals(result.provider, "deepinfra");
     assertEquals(result.model, "openai/gpt-oss-20b");
     assertEquals(result.usage.total_tokens, 20);
-    assertEquals(result.rawResponseBody.includes('"summary":"ok"'), true);
+    assertEquals(JSON.parse(result.rawResponseBody).choices[0].message.content, '{"summary":"ok"}');
   } finally {
     globalThis.fetch = originalFetch;
   }
