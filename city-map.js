@@ -9,6 +9,7 @@
  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
  const cityMapMemoryCache = new Map();
  const cityCharacterAffinityCache = new Map();
+ const cityCharacterAffinityPending = new Map();
  const readCityMapCache = (key, ttlMs) => {
  const now = Date.now();
  let entry = cityMapMemoryCache.get(key) || null;
@@ -556,19 +557,23 @@
  const loadCityCharacterAffinity=async(characterId)=>{
  const target=$('cityCharacterAffinity');if(!target||target.dataset.characterId!==String(characterId))return;
  const user=currentUser?.();if(!user?.uid){target.textContent='登入後查看與角色的好感度';return;}
- const cached=cityCharacterAffinityCache.get(String(characterId));
- if(cached&&Date.now()-cached.at<60_000){target.innerHTML=window.PoyozzAffinityUI?.render(cached.row?.affinity,cached.row?.relationship_stage,'compact')||'<span class="poyozz-affinity-empty">你們還不認識</span>';return;}
+ const key=String(characterId),renderRow=row=>{const live=$('cityCharacterAffinity');if(!live||live.dataset.characterId!==key)return;live.innerHTML=window.PoyozzAffinityUI?.render(row?.affinity,row?.relationship_stage,'compact')||'<span class="poyozz-affinity-empty">你們還不認識</span>';};
+ const cached=cityCharacterAffinityCache.get(key);
+ if(cached&&Date.now()-cached.at<60_000){renderRow(cached.row);return;}
+ const pending=cityCharacterAffinityPending.get(key);
+ if(pending){target.textContent='正在讀取好感度…';try{renderRow(await pending);}catch(error){showAffinityError(error);}return;}
  target.textContent='正在讀取好感度…';
- try{
+ const load=async()=>{
   const client=window.mySupabase;if(!client)throw new Error('關係資料服務尚未連線');
   const rpc=await client.rpc('get_encounter_character_affinity',{p_character_id:characterId});
   if(rpc.error)throw rpc.error;
   let row=Array.isArray(rpc.data)?rpc.data[0]||null:rpc.data||null;
   if(!row){const story=await client.from('story_relationship_states').select('affinity,relationship_stage,updated_at').eq('user_id',user.uid).eq('character_id',characterId).order('updated_at',{ascending:false}).limit(1);if(!story.error&&story.data?.[0])row=story.data[0];}
-  cityCharacterAffinityCache.set(String(characterId),{row,at:Date.now()});
-  const live=$('cityCharacterAffinity');if(!live||live.dataset.characterId!==String(characterId))return;
-  live.innerHTML=window.PoyozzAffinityUI?.render(row?.affinity,row?.relationship_stage,'compact')||'<span class="poyozz-affinity-empty">你們還不認識</span>';
- }catch(error){console.warn('城市角色好感度載入失敗：',error?.message||error);const live=$('cityCharacterAffinity');if(live&&live.dataset.characterId===String(characterId)){live.textContent='好感度暫時無法載入';live.setAttribute('aria-label','好感度暫時無法載入');}}
+  cityCharacterAffinityCache.set(key,{row,at:Date.now()});return row;
+ };
+ const showAffinityError=error=>{console.warn('城市角色好感度載入失敗：',error?.message||error);const live=$('cityCharacterAffinity');if(live&&live.dataset.characterId===key){live.textContent='好感度暫時無法載入';live.setAttribute('aria-label','好感度暫時無法載入');}};
+ const promise=load();cityCharacterAffinityPending.set(key,promise);
+ try{renderRow(await promise);}catch(error){showAffinityError(error);}finally{cityCharacterAffinityPending.delete(key);}
  };
  const renderCityCharacterCard=(person,page=0,mode='status')=>{
  const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
