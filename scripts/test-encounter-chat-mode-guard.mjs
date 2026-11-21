@@ -467,7 +467,9 @@ assert.match(encounterPresentation, /\(r\+g\+b\)\/3>=140&&Math\.max\(r,g,b\)-Mat
 assert.match(encounterPresentation, /encounter-auto-bg-fallback\{mix-blend-mode:normal!important/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.chat-heading/);
 assert.match(encounterPresentation, /processEncounterSpriteBackdrop/);
-assert.match(encounterPresentation, /panel\.clientHeight-\(viewport\.height\+viewport\.offsetTop\)/);
+assert.match(frontend, /const visibleHeight = Number\(viewport\?\.height\) \|\| layoutHeight;/);
+assert.match(frontend, /--poyozz-visual-viewport-top/);
+assert.match(frontend, /root\.style\.removeProperty\('--encounter-keyboard-offset'\)/);
 assert.match(encounterPresentation, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
 assert.doesNotMatch(frontend, /encounter-end','結束相遇/);
 assert.match(frontend, /data-action="encounter-end-prompt"/);
