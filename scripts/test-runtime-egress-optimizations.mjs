@@ -341,8 +341,17 @@ assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
 assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
   "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
-assert.doesNotMatch(encounterMemory,/from\(['"]chat_messages['"]\)/,
+const encounterListPage=between("async function loadEncounterMemoryPage(list,session,pager)","let encounterMemoryDetailPager");
+assert.doesNotMatch(encounterListPage,/from\(['"]chat_messages['"]\)/,
   "Encounter list hydration must not scan message rows just to detect completed sessions");
+const encounterDetail=between("function renderEncounterMemoryDetailDialog()","function renderChatSettingsOverlay");
+assert.match(encounterDetail,/const pageSize=10/);
+assert.match(encounterDetail,/observeEnd\(nextSentinel/);
+assert.match(encounterDetail,/pager\.source==='diary'/);
+assert.match(encounterDetail,/\.limit\(10\)/,
+  "Encounter message and diary details must fetch only ten records per page");
+assert.doesNotMatch(encounterDetail,/載入更早的 5 則訊息/,
+  "Encounter details must use scroll-triggered pagination instead of a manual five-message button");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next ten sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
