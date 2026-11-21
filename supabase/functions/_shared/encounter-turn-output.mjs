@@ -5,10 +5,56 @@ function optionalUuid(value) {
   return typeof value === "string" && UUID_PATTERN.test(value) ? value : null;
 }
 
+function cleanProviderText(raw) {
+  return raw.trim()
+    .replace(/^\uFEFF/, "")
+    .replace(/<think>[\s\S]*?<\/think>/gi, "")
+    .replace(/^\x60{3}(?:json)?\s*/i, "")
+    .replace(/\s*\x60{3}$/, "")
+    .trim();
+}
+
+function extractJsonStringField(text, fieldName) {
+  const objectStart = text.indexOf("{");
+  if (objectStart < 0) return "";
+  const keyIndex = text.indexOf(JSON.stringify(fieldName), objectStart);
+  if (keyIndex < 0) return "";
+  const colonIndex = text.indexOf(":", keyIndex + fieldName.length + 2);
+  if (colonIndex < 0) return "";
+  let start = colonIndex + 1;
+  while (/\s/.test(text[start] || "")) start += 1;
+  if (text[start] !== '"') return "";
+  let escaped = false;
+  for (let index = start + 1; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) escaped = false;
+    else if (char === "\\") escaped = true;
+    else if (char === '"') {
+      try {
+        const value = JSON.parse(text.slice(start, index + 1));
+        return typeof value === "string" ? value : "";
+      } catch { return ""; }
+    }
+  }
+  return "";
+}
+
+function extractJsonIntegerField(text, fieldName) {
+  const objectStart = text.indexOf("{");
+  if (objectStart < 0) return undefined;
+  const keyIndex = text.indexOf(JSON.stringify(fieldName), objectStart);
+  if (keyIndex < 0) return undefined;
+  const colonIndex = text.indexOf(":", keyIndex + fieldName.length + 2);
+  if (colonIndex < 0) return undefined;
+  const remainder = text.slice(colonIndex + 1).trimStart();
+  const match = remainder.match(/^-?\d+(?=\s*[,}])/);
+  return match ? Number(match[0]) : undefined;
+}
+
 function parseJsonObject(raw) {
   if (raw && typeof raw === "object" && !Array.isArray(raw)) return raw;
   if (typeof raw !== "string") return null;
-  const cleaned = raw.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/, "");
+  const cleaned = cleanProviderText(raw);
   try {
     const value = JSON.parse(cleaned);
     return value && typeof value === "object" && !Array.isArray(value) ? value : null;
@@ -28,16 +74,24 @@ function parseJsonObject(raw) {
 export function parseEncounterTurnOutput(raw) {
   let value = parseJsonObject(raw);
   if (!value && typeof raw === "string") {
-    const cleaned = raw.trim().replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/, "");
-    // Some providers return a useful plain-text reply despite JSON mode. Recover
-    // only ordinary text; malformed object/array output remains rejected.
-    if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+    const cleaned = cleanProviderText(raw);
+    // Recover only a complete JSON string from the top-level reply field when
+    // the provider truncates its envelope. Never expose malformed JSON syntax.
+    const recoveredReply = extractJsonStringField(cleaned, "reply");
+    if (recoveredReply.trim()) {
+      value = {
+        reply: recoveredReply,
+        affinity_delta: extractJsonIntegerField(cleaned, "affinity_delta"),
+        illustration_id: extractJsonStringField(cleaned, "illustration_id"),
+        scene_background_id: extractJsonStringField(cleaned, "scene_background_id"),
+      };
+    } else if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[")) {
+      // Some providers return plain text despite JSON mode.
       value = { reply: cleaned };
     }
   }
   if (!value) return null;
   const reply = typeof value.reply === "string" ? value.reply.trim() : "";
-  const length = Array.from(reply).length;
   // Length is a generation target, not a save gate: preserve usable replies
   // even when the model drifts shorter or longer than requested.
   if (!reply) return null;
