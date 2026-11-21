@@ -29,7 +29,7 @@ assert.doesNotMatch(cityMap, /PoyozzEncounterSessionResume/,
   'Resume lookup must not depend on an undefined global module');
 assert.match(cityMap, /const inferCharacterAgeFromLore = person =>/,
   'City character cards must have a deterministic fallback for explicit age evidence in the character introduction');
-assert.match(cityMap, /(?:三千|3,?000)\s*年前/,
+assert.match(cityMap, /(?:三千|3,?000)\\s*年前/,
   'The lore parser must recognize the explicit three-thousand-years-ago statement');
 assert.match(cityMap, /return '3000\+'/,
   'The parser must express a lower bound, not claim an exact age');
