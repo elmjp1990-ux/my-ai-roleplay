@@ -16,7 +16,7 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), n
 const shortValid = "相遇內容。".repeat(15);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid, suggested_replies: validSuggestions, affinity_delta: 0 })).reply, shortValid);
 const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(3);
-assert.equal(parseEncounterTurnOutput(plainTextReply), null, "Plain text without three suggestions must be rejected to avoid a missing-options turn");
+assert.equal(parseEncounterTurnOutput(plainTextReply).reply, plainTextReply, "A usable plain-text character reply must not be refunded for missing optional metadata");
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(151) })), null);
 assert.equal(parseEncounterTurnOutput("not-json"), null);
