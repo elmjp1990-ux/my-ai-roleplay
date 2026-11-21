@@ -90,6 +90,10 @@ assert.match(cleanupMigration, /GRANT SELECT, INSERT, UPDATE, DELETE/);
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\s\S]*?auth\.uid\(\)/);
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
+// Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
+assert.match(html, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
+assert.match(html, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
+
 // The card primary image is not reused as encounter-scene art.
 assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
