@@ -544,14 +544,11 @@ const rangeCalls = [], messageFetchIds = [];
 let orFilter = "";
 const query = {
   select() { return this; }, eq() { return this; },
-  or(value) { orFilter = value; return this; }, is() { return this; },
+  or(value) { orFilter = value; return this; }, is() { return this; }, not() { return this; }, neq() { return this; },
   in(column,ids) { messageFetchIds.push(...ids); return this; }, order() { return this; },
   limit(n) {
-    assert.equal(n,10,"preview query must be capped at ten");
-    const offset=rangeCalls.at(-1)[0],count=offset===0?9:10;
-    return Promise.resolve({data:Array.from({length:count},(_,index)=>({
-      session_id:"session-"+(offset+index),role:"user",content:"玩家訊息 "+index,created_at:"2026-11-20T01:00:00Z"
-    }))});
+    assert.equal(n,10,"legacy preview query must remain capped at ten");
+    return Promise.resolve({data:[]});
   },
   range(start,end) { rangeCalls.push([start,end]); return Promise.resolve({data:historyRows.slice(start,end+1),error:null}); },
 };
@@ -569,6 +566,6 @@ assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,
 await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});
 assert.deepEqual(rangeCalls,[[0,9],[10,19]],"scroll pagination fetches the next ten records");
 assert.equal(historyPerson.encounterHistoryCloud.length,19,"the next page appends without dropping or duplicating records");
-assert.equal(messageFetchIds.length,20,"each history page scopes its preview query to at most ten session IDs");
+assert.deepEqual(messageFetchIds,["session-9"],"fallback preview lookup only checks legacy sessions without the persisted player-message marker");
 assert.doesNotMatch(historyHtml,/你選擇讓角色主動發現你/,"discovery-only blank sessions are excluded from history");
 assert.doesNotMatch(historyHtml,/POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
