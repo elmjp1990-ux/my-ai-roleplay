@@ -563,7 +563,8 @@
   const client=window.mySupabase;if(!client)throw new Error('關係資料服務尚未連線');
   const rpc=await client.rpc('get_encounter_character_affinity',{p_character_id:characterId});
   if(rpc.error)throw rpc.error;
-  const row=Array.isArray(rpc.data)?rpc.data[0]||null:rpc.data||null;
+  let row=Array.isArray(rpc.data)?rpc.data[0]||null:rpc.data||null;
+  if(!row){const story=await client.from('story_relationship_states').select('affinity,relationship_stage,updated_at').eq('user_id',user.uid).eq('character_id',characterId).order('updated_at',{ascending:false}).limit(1);if(!story.error&&story.data?.[0])row=story.data[0];}
   cityCharacterAffinityCache.set(String(characterId),{row,at:Date.now()});
   const live=$('cityCharacterAffinity');if(!live||live.dataset.characterId!==String(characterId))return;
   live.innerHTML=window.PoyozzAffinityUI?.render(row?.affinity,row?.relationship_stage,'compact')||'<span class="poyozz-affinity-empty">你們還不認識</span>';
