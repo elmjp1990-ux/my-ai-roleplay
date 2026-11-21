@@ -160,3 +160,10 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
 }
 
 console.log("Passed: single, group, and encounter chat keyboard viewport behavior.");
+
+assert.match(html, /#storyRelationshipLabel\{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important\}/);
+assert.doesNotMatch(html, /character-status-label[^>]*>[\s\S]{0,120}公開中/);
+assert.match(scene, /chat-heading>\.row\.between\{align-items:flex-start!important;flex-wrap:wrap!important/);
+assert.match(scene, /composer-bottom-row\{display:flex!important;align-items:center!important;justify-content:space-between!important/);
+assert.match(scene, /composer-icon-button,[\s\S]{0,150}visibility:visible!important/);
+assert.match(scene, /chat-keyboard-open \.encounter-character-sprite\{height:calc\(var\(--poyozz-chat-viewport-height/);
