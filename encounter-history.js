@@ -25,15 +25,15 @@ const loadCloudHistory=async(p,currentUser,client,{append=false}={})=>{
   if(error)throw error;
   const batch=Array.isArray(rows)?rows:[];
   if(currentUser()?.uid!==uid)throw Error('登入狀態已變更，請重新登入。');
-  const ids=batch.map(r=>r.id),latest=new Map(),hasPlayer=new Set();
+  const ids=batch.filter(r=>r.session_has_user_message!=='true').map(r=>r.id),hasPlayer=new Set();
   if(ids.length){
-   const {data:msgs,error:me}=await client.from('chat_messages').select('session_id,content').in('session_id',ids).eq('role','user').is('deleted_at',null).order('created_at',{ascending:false}).limit(N);
+   const {data:msgs,error:me}=await client.from('chat_messages').select('session_id').in('session_id',ids).eq('role','user').is('deleted_at',null).not('content','ilike','%POYOZZ_ENCOUNTER_DISCOVERY_EVENT%').neq('content','（請接續目前的故事。）').order('created_at',{ascending:false}).limit(N);
    if(me)throw me;
-   for(const m of msgs||[]){const raw=String(m.content||'').trim(),v=clean(raw).slice(0,50);if(!skip.has(raw)&&v){hasPlayer.add(m.session_id);if(!latest.has(m.session_id))latest.set(m.session_id,'你：'+v);}}
+   for(const m of msgs||[])if(m.session_id)hasPlayer.add(m.session_id);
   }
   const page=batch.filter(r=>r.session_has_user_message==='true'||hasPlayer.has(r.id)).map(r=>{
    const ended=Number(r.encounter_ended_at)||null;
-   return {id:r.id,encounterMode:true,characterId:p.id,archived:r.session_archived==='true'||!!ended,encounterEndedAt:ended,startedAt:Number(r.session_started_at)||Date.parse(r.created_at)||0,encounterPlace:r.encounter_place||'',encounterSummary:clean(r.encounter_summary||''),lastMessagePreview:latest.get(r.id)||clean(r.last_message_preview||'').slice(0,50),messages:[]};
+   return {id:r.id,encounterMode:true,characterId:p.id,archived:r.session_archived==='true'||!!ended,encounterEndedAt:ended,startedAt:Number(r.session_started_at)||Date.parse(r.created_at)||0,encounterPlace:r.encounter_place||'',encounterSummary:clean(r.encounter_summary||''),lastMessagePreview:clean(r.last_message_preview||'').slice(0,50),messages:[]};
   });
   const prev=append?p.encounterHistoryCloud||[]:[],seen=new Set(prev.map(x=>x.id));
   p.encounterHistoryCloud=[...prev,...page.filter(x=>!seen.has(x.id))];p.encounterHistoryOffset=offset+batch.length;p.encounterHistoryHasMore=batch.length===N;p.encounterHistoryLoaded=true;p.encounterHistoryLoadedAt=Date.now();
