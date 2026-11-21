@@ -124,10 +124,10 @@ const ageTextMigration=fs.readFileSync('supabase/migrations/20261121100000_chara
 assert.match(ageTextMigration,/ALTER COLUMN age TYPE text/);
 assert.match(ageTextMigration,/USING age::text/);
 assert.match(html,/const age = ageValue \|\| null/);
-assert.match(html,/ageValue\.length > 40/);
+assert.match(html,/ageValue\.length > 25/);
 assert.match(html,/select\('visibility, age, first_published_at/);
 assert.match(html,/String\(savedCharacter\.age \?\? ''\) !== ageValue/);
-assert.match(html,/name="age" type="text" maxlength="40"/);
+assert.match(html,/name="age" type="text" maxlength="25"/);
 assert.match(html,/age: row\.age == null \? '' : String\(row\.age\)/);
 
 console.log('City map module extraction, descriptive character age, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
