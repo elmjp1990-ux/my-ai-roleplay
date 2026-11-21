@@ -537,9 +537,9 @@ const query = {
   in(column,ids) { messageFetchIds.push(...ids); return this; }, order() { return this; },
   limit(n) {
     assert.equal(n,10,"preview query must be capped at ten");
-    return Promise.resolve({data:Array.from({length:10},(_,index)=>({
-      session_id:"session-"+(rangeCalls.at(-1)[0]+index),
-      role:"user",content:"玩家訊息 "+index,created_at:"2026-11-20T01:00:00Z"
+    const offset=rangeCalls.at(-1)[0],count=offset===0?9:10;
+    return Promise.resolve({data:Array.from({length:count},(_,index)=>({
+      session_id:"session-"+(offset+index),role:"user",content:"玩家訊息 "+index,created_at:"2026-11-20T01:00:00Z"
     }))});
   },
   range(start,end) { rangeCalls.push([start,end]); return Promise.resolve({data:historyRows.slice(start,end+1),error:null}); },
@@ -558,6 +558,6 @@ assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,
 await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});
 assert.deepEqual(rangeCalls,[[0,9],[10,19]],"scroll pagination fetches the next ten records");
 assert.equal(historyPerson.encounterHistoryCloud.length,19,"the next page appends without dropping or duplicating records");
-assert.equal(messageFetchIds.length,20,"each history page hydrates no more than ten player-message previews");
+assert.equal(messageFetchIds.length,19,"each history page hydrates no more than ten player-message previews");
 assert.doesNotMatch(historyHtml,/你選擇讓角色主動發現你/,"discovery-only blank sessions are excluded from history");
 assert.doesNotMatch(historyHtml,/POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
