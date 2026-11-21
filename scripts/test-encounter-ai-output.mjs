@@ -28,7 +28,7 @@ assert.equal(missingOptionalFields.affinityDelta, 0, "Missing affinity metadata 
 assert.equal(missingOptionalFields.suggestedReplies.length, 3, "Missing suggestions receive three fallback choices");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions })).affinityDelta, 0,
   "Missing affinity metadata must not reject an otherwise valid response");
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 4 })), null, "Affinity delta is bounded");
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 4 })).affinityDelta, 0, "Out-of-range affinity delta must be neutralized without rejecting the reply");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 1, illustration_id: "invented-id" })).illustrationId, null);
 
 const max = "相遇內容".repeat(150);
@@ -38,7 +38,7 @@ const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的
 const fence = String.fromCharCode(96).repeat(3);
 const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, affinity_delta: -2, illustration_id: illustrationId }) + "\n" + fence);
 assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"], affinity_delta: 1 })), null, "Invalid suggestions must reject the response");
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"], affinity_delta: 1 })).suggestedReplies.length, 3, "Invalid suggestions must be replaced with three safe fallback choices");
 
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
