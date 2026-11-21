@@ -7,8 +7,10 @@ const helper = read("supabase/functions/_shared/ai-generation-diagnostics.ts");
 const migration = read("supabase/migrations/20261121120000_ai_generation_diagnostics_14_day_retention.sql");
 
 assert.match(helper, /raw_output_text:\s*input\.rawOutputText/);
+assert.match(helper, /raw_response_body:\s*input\.rawResponseBody/);
 assert.match(helper, /refusal_text:\s*input\.refusalText/);
 assert.match(helper, /never change generation,[\s\S]*billing/);
+assert.match(migration, /raw_response_body text/);
 assert.match(migration, /interval '14 days'/);
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /REVOKE ALL ON TABLE public\.ai_generation_diagnostics FROM PUBLIC, anon, authenticated/);
