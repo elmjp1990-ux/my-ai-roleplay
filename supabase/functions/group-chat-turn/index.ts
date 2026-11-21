@@ -5,6 +5,7 @@ import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } fr
 import { parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "../_shared/group-turn-envelope.ts";
 import { buildGroupMemoryContext, getGroupHistoryLimit, isCurrentGroupMemorySummary } from "../_shared/group-memory-context.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 import { processDueGroupMemorySummary } from "../_shared/story-memory-summary.ts";
 
@@ -410,6 +411,20 @@ Deno.serve(async (request) => {
   }
 
   console.info("group_chat_turn_provider_finished", { elapsedMs: Date.now() - providerStartedAt, resultKind: provider.result.kind, httpStatus: provider.httpStatus });
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "group_chat", userId: user.id, turnId, sourceRef: groupId,
+    model: provider.model, provider: provider.provider, requestId: provider.requestId,
+    httpStatus: provider.httpStatus, finishReason: provider.finishReason,
+    responseContentType: provider.responseContentType, responseBodyLength: provider.responseBodyLength,
+    responseParsed: provider.responseParsed,
+    rawOutputText: provider.rawOutputText || (provider.result.kind === "generated" ? provider.result.text : ""),
+    refusalText: provider.rawRefusalText, usage: provider.usage,
+    status: provider.result.kind === "generated" ? "received" : "failed",
+    failureStage: provider.result.kind === "generated" ? null : "provider_response",
+    failureCode: provider.result.kind === "provider_error" ? provider.result.code :
+      provider.result.kind === "content_rejected" ? "provider_content_rejected" :
+      provider.result.kind === "empty_output" ? "empty_output" : null,
+  });
   const safeRequestId = /^[A-Za-z0-9._:-]{1,128}$/.test(provider.requestId) ? provider.requestId : null;
   await admin.from("chat_group_ai_usage").upsert({
     group_id: groupId,
@@ -427,10 +442,12 @@ Deno.serve(async (request) => {
   }, { onConflict: "group_turn_id" });
 
   if (provider.result.kind === "content_rejected") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: "provider_content_rejected" });
     const refunded = await refund(admin, user.id, turnId, "provider_content_rejected");
     return json({ status: refunded.confirmed ? "content_rejected" : "needs_reconciliation", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
   if (provider.result.kind !== "generated") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: provider.result.kind === "provider_error" ? provider.result.code : "empty_output" });
     const confirmedClientRejection = provider.result.kind === "empty_output" ||
       (provider.result.kind === "provider_error" &&
        provider.httpStatus >= 400 && provider.httpStatus < 500 && provider.httpStatus !== 408 && provider.httpStatus !== 409);
@@ -442,6 +459,7 @@ Deno.serve(async (request) => {
   }
 
   if (findPrivateContextLeak(provider.result.text, protectedContext, [])) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_screening", failureCode: "private_context_output_blocked" });
     const refunded = await refund(admin, user.id, turnId, "private_context_output_blocked");
     return json({ status: refunded.confirmed ? "content_rejected" : "needs_reconciliation", error: "private_context_output_blocked", balance: refunded.balance, retryAllowed: false }, refunded.confirmed ? 200 : 503);
   }
@@ -450,6 +468,7 @@ Deno.serve(async (request) => {
   const parsed = envelopeResult.envelope;
   const suggestedReplies = extractGroupSuggestedReplies(provider.result.text);
   if (!parsed) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_parsing", failureCode: envelopeResult.errorCode || "invalid_group_turn_envelope", validationErrors: [envelopeResult.errorCode || "invalid_group_turn_envelope"] });
     console.warn("group_chat_turn_envelope_rejected", {
       reason: envelopeResult.errorCode || "unknown",
       outputChars: provider.result.text.length,
@@ -461,6 +480,7 @@ Deno.serve(async (request) => {
     console.info("group_chat_turn_metadata_warnings", { warningCount: envelopeResult.warningCount });
   }
 
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null, metadata: { parsed_speech_count: parsed.speeches.length, suggested_reply_count: suggestedReplies.length } });
   const speeches = parsed.speeches.map(item => ({ speaker_id: item.speakerId, content: item.content }));
   const phoneUpdatesForRpc = serializeGroupPhoneUpdatesForRpc(parsed.phoneUpdates);
   const { data: completed, error: completeError } = await admin.rpc("complete_group_chat_turn", {
