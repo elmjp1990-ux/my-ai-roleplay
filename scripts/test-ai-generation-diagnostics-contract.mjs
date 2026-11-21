@@ -11,6 +11,7 @@ assert.match(helper, /raw_response_body:\s*input\.rawResponseBody/);
 assert.match(helper, /refusal_text:\s*input\.refusalText/);
 assert.match(helper, /never change generation,[\s\S]*billing/);
 assert.match(migration, /raw_response_body text/);
+assert.match(migration, /raw_response_truncated boolean/);
 assert.match(migration, /interval '14 days'/);
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /REVOKE ALL ON TABLE public\.ai_generation_diagnostics FROM PUBLIC, anon, authenticated/);
@@ -30,6 +31,7 @@ const callSites = [
 for (const [file, generationType] of callSites) {
   const source = read(file);
   assert.match(source, /recordAiGenerationDiagnostic/, file + " must persist every provider output");
+  assert.match(source, /rawResponseBody/, file + " must retain the raw provider response body");
   assert.ok(source.includes('"'+generationType+'"'), file + " must identify " + generationType);
 }
 console.log("AI generation diagnostics coverage and 14-day retention contract passed.");
