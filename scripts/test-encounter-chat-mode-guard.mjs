@@ -264,7 +264,7 @@ assert.match(frontend, /from\(["']encounter_diary["']\)/);
 assert.match(frontend, /sessionsWithAssistantReply\.has\(row\.id\)/);
 assert.match(frontend, /select\(['"]session_id['"]\)\.in\(['"]session_id['"'],sessionIds\)/);
 assert.match(frontend, /這裡收藏你與['"]\+e\(sessionCharacter\(session\)\?\.name\|\|['"]角色['"]\)/);
-assert.match(frontend, /<span>陌生人<\\/span>/);
+assert.ok(frontend.includes('<span>陌生人</span>'));
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
 assert.match(frontend, /data-action="encounter-memory-open"/);
 assert.match(frontend, /相遇日記/);
