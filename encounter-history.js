@@ -46,25 +46,18 @@
       if(currentUser()?.uid!==uid)throw new Error('登入狀態已變更，請重新登入。');
       const ids=rows.map(row=>row.id),latestBySession=new Map(),playerMessageSessions=new Set();
       if(ids.length){
-        let messageOffset=0;
-        while(true){
-          const {data:messages,error:messageError}=await client.from('chat_messages')
-            .select('session_id,role,content')
-            .in('session_id',ids).eq('role','user').is('deleted_at',null)
-            .order('created_at',{ascending:false})
-            .range(messageOffset,messageOffset+499);
-          if(messageError)throw messageError;
-          const batch=Array.isArray(messages)?messages:[];
-          for(const message of batch){
-            const rawContent=String(message.content||'').trim();
-            if(excludedMessages.has(rawContent))continue;
-            const text=cleanSummary(rawContent).slice(0,50);
-            if(!text)continue;
-            playerMessageSessions.add(message.session_id);
-            if(!latestBySession.has(message.session_id))latestBySession.set(message.session_id,'你：'+text);
-          }
-          if(batch.length<500)break;
-          messageOffset+=500;
+        const {data:messages,error:messageError}=await client.from('chat_messages')
+          .select('session_id,role,content')
+          .in('session_id',ids).eq('role','user').is('deleted_at',null)
+          .order('created_at',{ascending:false}).limit(200);
+        if(messageError)throw messageError;
+        for(const message of messages||[]){
+          const rawContent=String(message.content||'').trim();
+          if(excludedMessages.has(rawContent))continue;
+          const text=cleanSummary(rawContent).slice(0,50);
+          if(!text)continue;
+          playerMessageSessions.add(message.session_id);
+          if(!latestBySession.has(message.session_id))latestBySession.set(message.session_id,'你：'+text);
         }
       }
       // Sessions are created when the Encounter opens; only show history after a real player message was persisted.
