@@ -155,6 +155,7 @@ Deno.test("content refusals do not switch providers", async () => {
     });
     assertEquals(call, 1);
     assertEquals(result.result, { kind: "content_rejected", reason: "provider_refusal" });
+    assertEquals(result.rawRefusalText, "blocked by provider policy");
   } finally {
     globalThis.fetch = originalFetch;
   }
