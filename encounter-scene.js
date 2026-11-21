@@ -171,7 +171,7 @@ body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between
   position:relative!important;display:flex!important;align-items:flex-start!important;flex-wrap:nowrap!important;gap:6px!important;
 }
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row.grow{
-  width:100%!important;max-width:100%!important;min-width:0!important;padding-right:142px!important;flex-wrap:nowrap!important;
+  width:100%!important;max-width:100%!important;min-width:0!important;padding-right:154px!important;flex-wrap:nowrap!important;
 }
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row:last-child{
   position:absolute!important;top:0!important;right:0!important;left:auto!important;width:auto!important;
@@ -181,6 +181,10 @@ body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip{
   width:calc(5.5em + 30px)!important;min-width:calc(5.5em + 30px)!important;max-width:calc(5.5em + 30px)!important;
   justify-content:center!important;gap:4px!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip .poyozz-affinity-ui{
+  width:calc(5.5em + 30px)!important;min-width:calc(5.5em + 30px)!important;max-width:calc(5.5em + 30px)!important;
+  padding:3px 5px!important;box-sizing:border-box!important;
 }
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip .poyozz-affinity-label{
   width:5.5em!important;min-width:5.5em!important;text-align:center!important;white-space:nowrap!important;
@@ -202,7 +206,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
   transform:translateY(-6px)!important;margin-bottom:2px!important;
 }
 @media(max-width:420px){
-  body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row.grow{padding-right:132px!important}
+  body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row.grow{padding-right:148px!important}
   body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-scene-label,
   body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip{
     width:calc(5em + 28px)!important;min-width:calc(5em + 28px)!important;max-width:calc(5em + 28px)!important;
