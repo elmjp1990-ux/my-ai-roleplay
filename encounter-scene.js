@@ -139,13 +139,14 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
 .encounter-scene .chat-heading>.row.between{align-items:flex-start!important;flex-wrap:wrap!important;gap:5px!important}
 .encounter-scene .chat-heading>.row.between>.row.grow{width:100%!important;max-width:100%!important;min-width:0!important;flex-wrap:nowrap!important;gap:7px!important}
 .encounter-scene .chat-heading .chat-name{max-width:none!important}
-.encounter-scene .chat-heading .encounter-affinity-chip{width:calc(4em + 18px)!important;min-width:calc(4em + 18px)!important;max-width:calc(4em + 18px)!important;justify-content:center!important;gap:4px!important;font-size:10px!important;line-height:1.15!important}
+.encounter-scene .chat-heading .encounter-affinity-chip{width:calc(4em + 28px)!important;min-width:calc(4em + 28px)!important;max-width:calc(4em + 28px)!important;justify-content:center!important;gap:4px!important;font-size:10px!important;line-height:1.15!important}
 .encounter-scene .chat-heading .encounter-affinity-chip .poyozz-affinity-label{width:4em!important;min-width:4em!important;text-align:center!important}
-.encounter-scene .chat-heading .encounter-scene-label{width:calc(4em + 18px)!important;min-width:calc(4em + 18px)!important;max-width:calc(4em + 18px)!important;justify-content:center!important;font-size:10px!important;line-height:1.15!important;padding:3px 4px!important;box-sizing:border-box!important}
+.encounter-scene .chat-heading .encounter-scene-label{width:calc(4em + 28px)!important;min-width:calc(4em + 28px)!important;max-width:calc(4em + 28px)!important;justify-content:center!important;font-size:10px!important;line-height:1.15!important;padding:3px 4px!important;box-sizing:border-box!important}
 .encounter-scene .chat-heading .row:not(.grow){align-items:center!important}
 .encounter-scene .chat-heading [data-action="chat-settings-menu"],.encounter-scene .chat-heading [data-action="chat-settings-menu"] .icon{display:inline-flex!important;visibility:visible!important;opacity:1!important}
 .encounter-scene .chat-heading>.row.between>.row:last-child{width:100%!important;justify-content:flex-end!important;gap:3px!important}
-.encounter-scene .chat-heading .chat-name{min-width:0!important;max-width:none!important;flex:1 1 auto!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+.encounter-scene .chat-heading .chat-name{min-width:0!important;max-width:none!important;flex:0 0 auto!important;white-space:normal!important;overflow:visible!important;text-overflow:clip!important}
+.encounter-scene .chat-heading .encounter-identity-stack{display:flex!important;flex-direction:column!important;align-items:flex-start!important;gap:3px!important;min-width:0!important;flex:1 1 auto!important}
 .encounter-scene .chat-heading .encounter-affinity-chip{max-width:none!important}
 .encounter-scene .chat-heading .encounter-mode-icon,.encounter-scene .chat-heading [data-encounter-mode-icon]{flex:0 0 auto!important}
 .encounter-scene .composer .composer-bottom-row{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:8px!important}
@@ -337,17 +338,21 @@ body.encounter-mode-active.chat-keyboard-open .encounter-scene .messages{bottom:
       if(title){
         let tag=title.querySelector('.encounter-scene-label');
         const identityRow=title.querySelector('.row.grow');
+        const controlsRow=title.querySelector('.row.between>.row:last-child');
         if(!tag){
           tag=document.createElement('span');tag.className='encounter-scene-label';tag.textContent='✦ 相遇模式';
           tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
-          if(identityRow)identityRow.appendChild(tag);else title.appendChild(tag);
         }
+        const modeIcon=title.querySelector('.encounter-mode-icon,[data-encounter-mode-icon]');
+        if(controlsRow){if(modeIcon&&!controlsRow.contains(modeIcon))controlsRow.appendChild(modeIcon);if(!controlsRow.contains(tag))controlsRow.appendChild(tag);}
         let affinityChip=title.querySelector('.encounter-affinity-chip');
-        if(!affinityChip){
-          affinityChip=document.createElement('span');
-          affinityChip.className='encounter-affinity-chip';
-          if(tag?.isConnected)tag.after(affinityChip);else if(identityRow)identityRow.appendChild(affinityChip);
-        }
+        if(!affinityChip){affinityChip=document.createElement('span');affinityChip.className='encounter-affinity-chip';}
+        const nameNode=identityRow?.querySelector('.chat-name');
+        if(identityRow&&nameNode){
+          let stack=identityRow.querySelector('.encounter-identity-stack');
+          if(!stack){stack=document.createElement('div');stack.className='encounter-identity-stack';nameNode.before(stack);stack.appendChild(nameNode);}
+          if(!stack.contains(affinityChip))stack.appendChild(affinityChip);
+        }else if(controlsRow&&!controlsRow.contains(affinityChip)){controlsRow.appendChild(affinityChip);}
         affinityChip.innerHTML=window.PoyozzAffinityUI?.render(session.encounterAffinity,session.encounterRelationshipStage||'first_meeting','encounter')||'';
         affinityChip.setAttribute('role','status');
         affinityChip.setAttribute('aria-label','目前關係：'+(window.PoyozzAffinityUI?.labels?.[session.encounterRelationshipStage]||'初次見面'));
