@@ -6,6 +6,7 @@ import { preparePrivateContext, findPrivateContextLeak } from "../_shared/privat
 import { releaseGenerationClaim } from "../_shared/chat-turn-claim.ts";
 import { recordChatModelUsage } from "../_shared/story-memory-summary.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { buildEncounterResponseGuidelines } from "../_shared/encounter-response-guidelines.ts";
 import { parseEncounterTurnOutput } from "../_shared/encounter-turn-output.mjs";
 
@@ -444,7 +445,24 @@ Deno.serve(async (request) => {
       requestedModel: POYOZZ_DEFAULT_CHAT_MODEL, providerResponse, requestStatus,
     });
   const providerResult = providerResponse.result;
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "encounter_chat", userId: user.id, characterId: session.character_id,
+    sessionId, turnId, model: providerResponse.model, provider: providerResponse.provider,
+    requestId: providerResponse.requestId, httpStatus: providerResponse.httpStatus,
+    finishReason: providerResponse.finishReason, responseContentType: providerResponse.responseContentType,
+    responseBodyLength: providerResponse.responseBodyLength, responseParsed: providerResponse.responseParsed,
+    rawOutputText: providerResponse.rawOutputText || (providerResult.kind === "generated" ? providerResult.text : ""),
+    refusalText: providerResponse.rawRefusalText, usage: providerResponse.usage,
+    status: providerResult.kind === "generated" ? "received" : "failed",
+    failureStage: providerResult.kind === "generated" ? null : "provider_response",
+    failureCode: providerResult.kind === "provider_error" ? providerResult.code :
+      providerResult.kind === "content_rejected" ? "provider_content_rejected" :
+      providerResult.kind === "empty_output" ? "empty_output" : null,
+  });
   if (providerResult.kind !== "generated") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response",
+      failureCode: providerResult.kind === "provider_error" ? providerResult.code :
+        providerResult.kind === "content_rejected" ? "provider_content_rejected" : "empty_output" });
     await recordUsage(null, "failed");
     const failureCode = providerResult.kind === "provider_error" ? providerResult.code :
       providerResult.kind === "content_rejected" ? "provider_content_rejected" : "empty_output";
@@ -470,6 +488,7 @@ Deno.serve(async (request) => {
   const parsedOutput = parseEncounterTurnOutput(providerResult.text);
   const replyText = parsedOutput?.reply || "";
   if (!parsedOutput || !replyText || findPrivateContextLeak(providerResult.text, context.protectedContext, context.priorAssistantOutputs)) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_screening", failureCode: replyText ? "private_context_output_blocked" : "invalid_encounter_ai_output", validationErrors: [replyText ? "private_context_output_blocked" : "invalid_encounter_ai_output"] });
     await recordUsage(null, "failed");
     const failureCode = replyText ? "private_context_output_blocked" : "invalid_encounter_ai_output";
     await admin.from("chat_turn_events").insert({
@@ -482,6 +501,7 @@ Deno.serve(async (request) => {
     } });
   }
 
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
   const assistantRow = {
     id: assistantMessageId, session_id: sessionId, role: "assistant",
     content: replyText, affinity_delta: parsedOutput.affinityDelta, suggested_replies: parsedOutput.suggestedReplies, created_at: new Date().toISOString(),
