@@ -7928,13 +7928,13 @@ async function loadEncounterMemoryPage(list,session,pager){
     const diaryBySession=new Map();
     if(sessionIds.length){
       const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
-        .select('id,event_type,summary,occurred_at,metadata')
+        .select('id,event_type,summary,occurred_at,session_id:metadata->>session_id')
         .eq('user_id',uid).eq('character_id',session.characterId)
         .in('metadata->>session_id',sessionIds)
         .order('occurred_at',{ascending:false}).limit(pageSize);
       if(diaryError)throw diaryError;
       for(const row of diaryRows||[]){
-        const rawId=row.metadata&&typeof row.metadata==='object'?row.metadata.session_id:null;
+        const rawId=row.session_id;
         if(!isUuid(rawId))continue;
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
@@ -7955,7 +7955,7 @@ async function loadEncounterMemoryPage(list,session,pager){
     let legacyCount=0;
     if(pager.legacyHasMore){
       const {data:legacyRows,error:legacyError}=await client.from('encounter_diary')
-        .select('id,summary,occurred_at,metadata')
+        .select('id,summary,occurred_at')
         .eq('user_id',uid).eq('character_id',session.characterId)
         .is('metadata->>session_id',null)
         .order('occurred_at',{ascending:false}).order('id',{ascending:false})
@@ -8047,7 +8047,7 @@ async function loadEncounterMemoryDetailOlder(){
     const cursor=pager.cursor;
     if(pager.source==='diary'){
       const {data:rows,error}=await client.from('encounter_diary')
-        .select('id,summary,occurred_at,metadata').eq('user_id',uid).eq('character_id',pager.characterId)
+        .select('id,summary,occurred_at').eq('user_id',uid).eq('character_id',pager.characterId)
         .eq('metadata->>session_id',pager.sessionId)
         .or('occurred_at.lt.'+cursor.occurred_at+',and(occurred_at.eq.'+cursor.occurred_at+',id.lt.'+cursor.id+')')
         .order('occurred_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
@@ -8120,7 +8120,7 @@ async function openEncounterMemoryDetail(button){
       renderEncounterMemoryDetailDialog();
       return;
     }
-    let query=client.from('encounter_diary').select('id,summary,occurred_at,metadata')
+    let query=client.from('encounter_diary').select('id,summary,occurred_at')
       .eq('user_id',uid).eq('character_id',session.characterId);
     if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
     else if(isUuid(memoryId))query=query.eq('id',memoryId);
