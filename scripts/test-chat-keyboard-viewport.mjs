@@ -168,7 +168,10 @@ assert.match(encounterScene, /composer-bottom-row\{display:flex!important;align-
 assert.match(encounterScene, /composer-icon-button,[\s\S]{0,150}visibility:visible!important/);
 assert.match(encounterScene, /chat-keyboard-open \.encounter-character-sprite\{height:78lvh!important/);
 assert.match(encounterScene, /composer-bottom-row\{position:sticky!important;bottom:0!important/);
-assert.match(encounterScene, /encounter-scene-label\{width:calc\(4em \+ 18px\)!important/);
+assert.match(encounterScene, /encounter-scene-label\{width:calc\(4em \+ 28px\)!important/);
+assert.match(encounterScene, /encounter-identity-stack/);
+assert.match(encounterScene, /controlsRow\.appendChild\(tag\)/);
+assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
 assert.match(html, /chat-identity-copy[\s\S]{0,180}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(hist, /playerMessageSessions\.has\(row\.id\)/);
