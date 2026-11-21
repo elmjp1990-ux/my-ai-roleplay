@@ -205,7 +205,9 @@ assert.match(endpoint, /suggested_replies: parsedOutput\.suggestedReplies/);
 assert.match(endpoint, /select\("id,content,role,affinity_delta,suggested_replies"\)/);
 assert.match(endpoint, /saved\.suggested_replies/);
 assert.match(scene, /const hasStarted=!!raw/);
-assert.match(frontend, /const encounterHasStarted = s\.encounterMode && \(\s*!!s\.initialOpeningMessage/);
+assert.match(frontend, /const encounterHasStarted = s\.encounterMode && \(s\.messages \|\| \[\]\)\.some\(message =>/);
+assert.match(frontend, /message\?\.role === 'user'/,
+  "An initial system opening must not count as a player turn for the first blank Encounter send.");
 assert.doesNotMatch(scene, /encounter-intro-card|encounter-intro-choice|encounter-start-button/);
 assert.match(scene, /留空發送，角色會繼續說下去/);
 assert.match(endpoint, /ENCOUNTER_DISCOVERY_SENTINEL/);
