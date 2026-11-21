@@ -163,6 +163,55 @@ body.encounter-mode-active .encounter-scene .composer-bottom-row .composer-icon-
 body.encounter-mode-active .encounter-scene .composer-bottom-row .composer-send{width:42px!important;height:42px!important;min-width:42px!important;min-height:42px!important}
 body.encounter-mode-active.chat-keyboard-open .encounter-scene .messages{bottom:calc(var(--poyozz-encounter-composer-height,190px) + 100lvh - var(--poyozz-chat-viewport-height,100dvh))!important;max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 65px)!important}
 `;
+
+  style.textContent += `
+/* Preview acceptance fixes: keep the header controls on the top-right, widen four-character labels,
+   keep the sprite anchored to the scene when the keyboard opens, and lift the composer controls. */
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between{
+  position:relative!important;display:flex!important;align-items:flex-start!important;flex-wrap:nowrap!important;gap:6px!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row.grow{
+  width:100%!important;max-width:100%!important;min-width:0!important;padding-right:142px!important;flex-wrap:nowrap!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row:last-child{
+  position:absolute!important;top:0!important;right:0!important;left:auto!important;width:auto!important;
+  display:flex!important;align-items:center!important;justify-content:flex-end!important;flex-wrap:nowrap!important;
+  gap:5px!important;margin:0!important;z-index:6!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip{
+  width:calc(5.5em + 30px)!important;min-width:calc(5.5em + 30px)!important;max-width:calc(5.5em + 30px)!important;
+  justify-content:center!important;gap:4px!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip .poyozz-affinity-label{
+  width:5.5em!important;min-width:5.5em!important;text-align:center!important;white-space:nowrap!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-scene-label{
+  width:calc(5.5em + 30px)!important;min-width:calc(5.5em + 30px)!important;max-width:calc(5.5em + 30px)!important;
+  box-sizing:border-box!important;justify-content:center!important;white-space:nowrap!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-mode-icon,
+body.encounter-mode-active .chat-main.encounter-scene .chat-heading [data-encounter-mode-icon]{
+  flex:0 0 auto!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-character-sprite,
+body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .encounter-character-sprite{
+  position:absolute!important;bottom:0!important;transform:none!important;top:auto!important;
+}
+body.encounter-mode-active .chat-main.encounter-scene .composer{padding-bottom:calc(15px + env(safe-area-inset-bottom))!important}
+body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
+  transform:translateY(-6px)!important;margin-bottom:2px!important;
+}
+@media(max-width:420px){
+  body.encounter-mode-active .chat-main.encounter-scene .chat-heading>.row.between>.row.grow{padding-right:132px!important}
+  body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-scene-label,
+  body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip{
+    width:calc(5em + 28px)!important;min-width:calc(5em + 28px)!important;max-width:calc(5em + 28px)!important;
+  }
+  body.encounter-mode-active .chat-main.encounter-scene .chat-heading .encounter-affinity-chip .poyozz-affinity-label{
+    width:5em!important;min-width:5em!important;
+  }
+}
+`;
   document.head.appendChild(style);
   const splitEncounterBeats=(value)=>{
     const source=String(value||'').replace(/\r\n?/g,'\n').replace(/[ \t]+\n/g,'\n').trim();
@@ -344,7 +393,11 @@ body.encounter-mode-active.chat-keyboard-open .encounter-scene .messages{bottom:
           tag.style.cssText='font-size:10px;letter-spacing:.04em;color:#f1f1f4;padding:3px 7px;border-radius:999px;background:rgba(225,226,232,.13);border:1px solid rgba(255,255,255,.18);white-space:nowrap';
         }
         const modeIcon=title.querySelector('.encounter-mode-icon,[data-encounter-mode-icon]');
-        if(controlsRow){if(modeIcon&&!controlsRow.contains(modeIcon))controlsRow.appendChild(modeIcon);if(!controlsRow.contains(tag))controlsRow.appendChild(tag);}
+        const menuButton=controlsRow?.querySelector('[data-action="chat-settings-menu"]');
+        if(controlsRow){
+          if(modeIcon)controlsRow.insertBefore(modeIcon,menuButton||null);
+          controlsRow.insertBefore(tag,menuButton||null);
+        }
         let affinityChip=title.querySelector('.encounter-affinity-chip');
         if(!affinityChip){affinityChip=document.createElement('span');affinityChip.className='encounter-affinity-chip';}
         const nameNode=identityRow?.querySelector('.chat-name');
