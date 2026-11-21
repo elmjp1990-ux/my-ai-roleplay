@@ -8,6 +8,7 @@ import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/s
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 
 const corsHeaders = {
@@ -513,6 +514,20 @@ Deno.serve(async (request) => {
   }
 
   const providerResult = providerResponse.result;
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "story_chat", userId: user.id, characterId: String(session.character_id || ""),
+    sessionId, turnId, model: providerResponse.model, provider: providerResponse.provider,
+    requestId: providerResponse.requestId, httpStatus: providerResponse.httpStatus,
+    finishReason: providerResponse.finishReason, responseContentType: providerResponse.responseContentType,
+    responseBodyLength: providerResponse.responseBodyLength, responseParsed: providerResponse.responseParsed,
+    rawOutputText: providerResponse.rawOutputText || (providerResult.kind === "generated" ? providerResult.text : ""),
+    refusalText: providerResponse.rawRefusalText, usage: providerResponse.usage,
+    status: providerResult.kind === "generated" ? "received" : "failed",
+    failureStage: providerResult.kind === "generated" ? null : "provider_response",
+    failureCode: providerResult.kind === "provider_error" ? providerResult.code :
+      providerResult.kind === "content_rejected" ? "provider_content_rejected" :
+      providerResult.kind === "empty_output" ? "empty_output" : null,
+  });
   const recordUsage = (messageId: string | null, requestStatus: "completed" | "failed") =>
     recordChatModelUsage(admin, {
       userId: user.id,
@@ -553,6 +568,7 @@ Deno.serve(async (request) => {
   if (providerResult.kind !== "generated") await recordUsage(null, "failed");
 
   if (providerResult.kind === "generated" && findPrivateContextLeak(providerResult.text, protectedContext, priorAssistantOutputs)) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_screening", failureCode: "private_context_verbatim_leak" });
     await recordUsage(null, "failed");
     // Never persist or return a response that reproduces author-only source material.
     // Record only a fixed reason code; never log the matched phrase or private text.
@@ -587,6 +603,7 @@ Deno.serve(async (request) => {
   }
 
   if (providerResult.kind === "content_rejected") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: "provider_content_rejected" });
     const { data: refunded, error: refundError } = await admin.rpc("refund_chat_turn", {
       p_user_id: user.id,
       p_turn_id: turnId,
@@ -618,6 +635,7 @@ Deno.serve(async (request) => {
   }
 
   if (providerResult.kind === "provider_error" || providerResult.kind === "empty_output") {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: providerResult.kind === "provider_error" ? providerResult.code : "empty_output" });
     const failureAction = classifyProviderFailure(providerResult, providerResponse.httpStatus);
 
     if (failureAction === "retry_same_turn") {
@@ -687,6 +705,7 @@ Deno.serve(async (request) => {
     characterName,
     currentStoryWorldState,
   });
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
   const assistantRow = {
     id: assistantMessageId,
     session_id: sessionId,
