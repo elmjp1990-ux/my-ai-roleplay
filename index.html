@@ -2885,7 +2885,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     }
 
     const ageValue = String(character.age ?? '').trim();
-    if (ageValue.length > 40) throw new Error('角色年齡描述最多 40 字。');
+    if (ageValue.length > 25) throw new Error('角色年齡描述最多 25 字。');
     // Character age is descriptive text (e.g.「28（實際 3000）」), not the
     // account-age eligibility value. Adult access is checked via profiles.birthdate.
     const age = ageValue || null;
@@ -6348,7 +6348,7 @@ function renderEditor() {
             ${[['male','男'],['female','女'],['ambiguous','模糊']].map(([v,t]) =>
               `<option value="${v}" ${c.gender === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select></label>
-          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="40" value="${e(c.age || '')}" placeholder="例如：28、28（實際 3000）"></label>
+          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}" placeholder="例如：28、28（實際 3000）"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
@@ -13612,7 +13612,7 @@ async function importCharacter(file) {
   const character = {
     id:id(),name,intro,opening,image,tags,
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
-    age:String(data.age ?? '').trim().slice(0,40),
+    age:String(data.age ?? '').trim().slice(0,25),
     race:String(data.race || '').slice(0,50),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
     authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
