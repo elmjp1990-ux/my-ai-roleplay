@@ -174,7 +174,7 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261121100000_character_age_as_text.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
-          DO $
+          DO $age_check$
           DECLARE
             v_age_type text;
           BEGIN
@@ -187,13 +187,13 @@ jobs:
               RAISE EXCEPTION 'characters.age must be text after migration; found %', v_age_type;
             END IF;
           END;
-          $;
+          $age_check$;
           CREATE TEMP TABLE character_age_conversion_fixture(age integer);
           INSERT INTO character_age_conversion_fixture(age) VALUES (28), (3000), (NULL);
           ALTER TABLE character_age_conversion_fixture
             ALTER COLUMN age TYPE text
             USING age::text;
-          DO $
+          DO $age_values$
           DECLARE
             v_values text[];
           BEGIN
@@ -203,7 +203,7 @@ jobs:
               RAISE EXCEPTION 'Integer-to-text age conversion did not preserve values: %', v_values;
             END IF;
           END;
-          $;
+          $age_values$;
           SQL
 
       - name: Replay and behavior-test per-turn Encounter affinity migration
