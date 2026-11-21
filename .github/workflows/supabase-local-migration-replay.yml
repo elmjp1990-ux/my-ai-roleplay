@@ -498,6 +498,44 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-relationship-greeting-pools.sql
 
+      - name: Verify AI diagnostics expiry and cleanup behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $expiry_default$
+          DECLARE
+            v_default text;
+          BEGIN
+            SELECT pg_catalog.pg_get_expr(d.adbin, d.adrelid)
+            INTO v_default
+            FROM pg_catalog.pg_attribute a
+            JOIN pg_catalog.pg_attrdef d
+              ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+            WHERE a.attrelid = 'public.ai_generation_diagnostics'::regclass
+              AND a.attname = 'expires_at';
+            IF v_default NOT ILIKE '%14 days%' THEN
+              RAISE EXCEPTION 'AI diagnostics expiry default must be 14 days; found %', v_default;
+            END IF;
+          END
+          $expiry_default$;
+          INSERT INTO public.ai_generation_diagnostics
+            (generation_type, status, expires_at, raw_output_text)
+          VALUES
+            ('story_chat', 'failed', pg_catalog.clock_timestamp() - interval '1 second', 'expired synthetic diagnostic');
+          SELECT public.purge_expired_ai_generation_diagnostics();
+          DO $expiry_cleanup$
+          BEGIN
+            IF EXISTS (
+              SELECT 1 FROM public.ai_generation_diagnostics
+              WHERE raw_output_text = 'expired synthetic diagnostic'
+            ) THEN
+              RAISE EXCEPTION 'Expired AI diagnostic row was not purged';
+            END IF;
+          END
+          $expiry_cleanup$;
+          SQL
+
       - name: Upload Encounter SQL replay diagnostics
         if: always()
         uses: actions/upload-artifact@v4
