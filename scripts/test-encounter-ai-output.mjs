@@ -22,7 +22,12 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".rep
 assert.equal(parseEncounterTurnOutput("not-json"), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify(["not", "an", "object"])), null);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: 123, suggested_replies: validSuggestions, affinity_delta: 0 })), null);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions })), null, "Affinity delta is required");
+const missingOptionalFields = parseEncounterTurnOutput(JSON.stringify({ reply: text }));
+assert.equal(missingOptionalFields.reply, text, "A complete AI reply must be saved when optional metadata is omitted");
+assert.equal(missingOptionalFields.affinityDelta, 0, "Missing affinity metadata defaults to neutral");
+assert.equal(missingOptionalFields.suggestedReplies.length, 3, "Missing suggestions receive three fallback choices");
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions })).affinityDelta, 0,
+  "Missing affinity metadata must not reject an otherwise valid response");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 4 })), null, "Affinity delta is bounded");
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 1, illustration_id: "invented-id" })).illustrationId, null);
 
