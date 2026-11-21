@@ -204,7 +204,7 @@ assert.match(endpoint, /generation_already_claimed/);
 assert.match(guidelines, /60～300 字元/);
 assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
 assert.match(frontend, /ENCOUNTER_DISCOVERY_SENTINEL/);
-assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
+assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : ENCOUNTER_CONTINUE_SENTINEL/);
 assert.doesNotMatch(frontend, /poyozz-encounter-opening-choice/);
 assert.doesNotMatch(scene, /encounter-first-turn-hint/);
 assert.match(scene, /先跟'\+characterName\+'打招呼/);
@@ -262,6 +262,7 @@ assert.match(replay, /the next schedule must make a fresh weather decision/);
 assert.match(pipeline, /encounter-default-scene\.webp/);
 assert.match(pipeline, /REFERENCES public\.character_illustrations\(id\)/);
 assert.match(endpoint, /illustration_id/);
+assert.match(endpoint, /"reply".*"affinity_delta".*"illustration_id".*"scene_background_id".*"suggested_replies"/s, "Required affinity and visual metadata must precede optional suggestions");
 assert.match(endpoint, /scene_background_id/);
 assert.match(scene, /session\?\.encounterVisuals/);
 assert.match(scene, /hydrateEncounterGalleryIllustration\(character\.id,selectedIllustrationId\|\|null\)/,
