@@ -3,6 +3,18 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
+const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
+assert.match(encounterHistory,/const PAGE_SIZE=10/);
+assert.match(encounterHistory,/\.range\(offset,offset\+PAGE_SIZE-1\)/,
+  'City Encounter history must fetch only ten sessions per page');
+assert.match(encounterHistory,/\.limit\(PAGE_SIZE\)/,
+  'City Encounter history preview hydration must be capped at ten messages');
+assert.match(encounterHistory,/observeEnd\(sentinel/ ,
+  'City Encounter history must load the next ten records when scrolled to the end');
+assert.match(encounterHistory,/encounterHistoryOffset=offset\+batch\.length/);
+assert.doesNotMatch(encounterHistory,/while\(true\)|\.limit\(200\)/,
+  'City Encounter history must not eagerly fetch every page or 200 message previews');
+
 
 assert.match(html, /<script src="\.\/city-map\.js"><\/script>/);
 assert.match(html, /session_encounter_temporarily_left_at:session_data->>encounterTemporarilyLeftAt/);
