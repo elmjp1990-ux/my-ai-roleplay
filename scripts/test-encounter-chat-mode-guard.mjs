@@ -23,8 +23,8 @@ assert.match(frontend, /const encounterHasStarted = s\.encounterMode && \(s\.mes
 assert.match(frontend, /message\?\.role === 'user'/);
 assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
 assert.match(frontend, /safeImage, characterAvatarMarkup, currentUser/);
-assert.match(cityMap, /characterAvatarMarkup\\(\\{\\.\\.\\.person,image,avatar_url:image\\}[^\\n]*imageClass:'city-location-person-image'/);
-assert.match(cityMap, /characterAvatarMarkup\\(\\{\\.\\.\\.person,image,avatar_url:image\\}[^\\n]*imageClass:'city-character-portrait'/);
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}[^\n]*imageClass:'city-location-person-image'/);
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}[^\n]*imageClass:'city-character-portrait'/);
 assert.match(cityMap, /image\.dataset\.characterAvatarId\)return/);
 assert.ok(frontend.includes('const sessionId = options.id || id();'));
 assert.ok(frontend.includes('state.sessions[sessionId] = session;'));
