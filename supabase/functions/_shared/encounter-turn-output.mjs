@@ -32,16 +32,15 @@ export function parseEncounterTurnOutput(raw) {
     // Some providers return a useful plain-text reply despite JSON mode. Recover
     // only ordinary text; malformed object/array output remains rejected.
     if (cleaned && !cleaned.startsWith("{") && !cleaned.startsWith("[") &&
-        Array.from(cleaned).length >= 60 && Array.from(cleaned).length <= 600) {
+        Array.from(cleaned).length >= 60 && Array.from(cleaned).length <= 300) {
       value = { reply: cleaned };
     }
   }
   if (!value) return null;
   const reply = typeof value.reply === "string" ? value.reply.trim() : "";
   const length = Array.from(reply).length;
-  // Prompt target is 150–300 characters, but allow shorter/longer valid output
-  // so an otherwise coherent reply is not refunded for minor model drift.
-  if (length < 60 || length > 600) return null;
+  // Enforce the agreed 60–300 character encounter reply contract.
+  if (length < 60 || length > 300) return null;
 
   const rawSuggestions = Array.isArray(value.suggested_replies ?? value.suggestedReplies)
     ? (value.suggested_replies ?? value.suggestedReplies) : [];
