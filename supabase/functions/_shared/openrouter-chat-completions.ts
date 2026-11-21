@@ -25,6 +25,7 @@ export type OpenRouterCompletionResult = {
   responseParsed: boolean;
   rawResponseBody: string;
   rawOutputText: string;
+  rawRefusalText: string;
   finishReason: string;
 };
 
@@ -112,12 +113,16 @@ async function requestFromProvider(
         return typeof item.text === "string" ? item.text : "";
       }).join("\\n") : "";
     const rawOutputText = rawContent || (typeof payload.output_text === "string" ? payload.output_text : "");
+    const rawRefusalText = asText(message.refusal) || (Array.isArray(message.annotations)
+      ? message.annotations.map((item) => asRow(item)).map((item) => asText(item.refusal || item.text)).filter(Boolean).join("\\n")
+      : "");
     const finishReason = asText(firstChoice.finish_reason || payload.finish_reason ||
       asRow(payload.incomplete_details).reason);
     return {
       result: normalizeAiProviderResult(payload),
       rawResponseBody: responseText.slice(0, 250000),
       rawOutputText,
+      rawRefusalText,
       finishReason,
       httpStatus: response.status,
       requestId: response.headers.get("x-request-id") || asText(payload.id),
