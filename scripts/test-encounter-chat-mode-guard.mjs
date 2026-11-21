@@ -470,7 +470,7 @@ assert.match(encounterPresentation, /processEncounterSpriteBackdrop/);
 assert.match(frontend, /const visibleHeight = Number\(viewport\?\.height\) \|\| layoutHeight;/);
 assert.match(frontend, /--poyozz-visual-viewport-top/);
 assert.match(frontend, /root\.style\.removeProperty\('--encounter-keyboard-offset'\)/);
-assert.match(encounterPresentation, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
+assert.doesNotMatch(encounterPresentation, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
 assert.doesNotMatch(frontend, /encounter-end','結束相遇/);
 assert.match(frontend, /data-action="encounter-end-prompt"/);
 assert.match(frontend, /data-action="encounter-end-confirm"/);
