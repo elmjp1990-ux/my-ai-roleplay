@@ -132,7 +132,12 @@ assert.match(sessionStateEdge, /encounter_state_metadata_persistence_failed/);
 assert.match(sessionStateEdge, /EdgeRuntime/);
 assert.match(sessionStateEdge, /sessionId: lifecycle\.session_id/);
 assert.match(sessionStateEdge, /encounter-evaluation-worker/);
-assert.match(sessionStateEdge, /session_data: \{ \.\.\.currentSessionData, archived: true, encounterEndedAt: Date\.now\(\) \}/, "Manual end must mark the session finished immediately, even if AI summary evaluation fails");
+const endMetadataMigration = fs.readFileSync("supabase/migrations/20261122100000_atomic_encounter_end_metadata.sql", "utf8");
+assert.match(endMetadataMigration, /FUNCTION public\.persist_encounter_session_end_metadata/);
+assert.match(endMetadataMigration, /COALESCE\(session_data, '\{\}'::jsonb\)/);
+assert.match(sessionStateEdge, /persist_encounter_session_end_metadata/);
+assert.doesNotMatch(sessionStateEdge, /select\("session_data"\)/,
+  "Manual end must persist metadata atomically without fetching the full session_data JSON");
 assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
   "A manual end must not enqueue or drain unrelated users' due sessions");
 
