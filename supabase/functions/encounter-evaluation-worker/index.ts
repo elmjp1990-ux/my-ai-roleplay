@@ -229,6 +229,7 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
     responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
     responseParsed: response.responseParsed,
     rawOutputText: response.rawOutputText || (response.result.kind === "generated" ? response.result.text : ""),
+    rawResponseBody: response.rawResponseBody,
     refusalText: response.rawRefusalText, usage: response.usage,
     status: response.result.kind === "generated" ? "received" : "failed",
     failureStage: response.result.kind === "generated" ? null : "provider_response",
