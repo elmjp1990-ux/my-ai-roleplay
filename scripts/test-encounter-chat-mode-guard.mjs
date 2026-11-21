@@ -517,7 +517,7 @@ const query = {
   is() { return this; },
   in(column,ids) { messageFetchIds.push(...ids); return this; },
   order() { return this; },
-  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:[{session_id:"session-0",role:"assistant",content:"顧言：門沒有鎖。",created_at:"2026-11-20T01:00:00Z",deleted_at:null},{session_id:"session-1",role:"user",content:"你在家嗎？",created_at:"2026-11-20T01:00:00Z",deleted_at:null}],error:null}); },
+  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:[{session_id:"session-1",role:"user",content:"你在家嗎？",created_at:"2026-11-20T01:00:00Z",deleted_at:null}],error:null}); },
   range(start, end) {
     rangeCalls.push([start, end]);
     return Promise.resolve({ data: start === 0 ? historyRows.slice(0, 50) : historyRows.slice(50), error: null });
