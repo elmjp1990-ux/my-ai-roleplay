@@ -12,7 +12,8 @@ assert.deepEqual(
   parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: validSuggestions, affinity_delta: 2, illustration_id: illustrationId, scene_background_id: sceneBackgroundId })),
   { reply: text, suggestedReplies: validSuggestions, affinityDelta: 2, illustrationId, sceneBackgroundId },
 );
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })), null);
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "太短了" })).reply, "太短了", "Short but usable replies must be retained");
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "" })), null, "Empty reply remains invalid");
 const shortValid = "相遇內容。".repeat(15);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: shortValid, suggested_replies: validSuggestions, affinity_delta: 0 })).reply, shortValid);
 const plainTextReply = "角色自然地接續這段相遇，讓對話繼續往前發展。".repeat(3);
@@ -34,7 +35,7 @@ assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_re
 const max = "相遇內容".repeat(75);
 assert.equal(Array.from(max).length, 300);
 assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: max, suggested_replies: validSuggestions, affinity_delta: -1 })).reply, max);
-assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })), null, "Replies over 300 characters must be rejected");
+assert.equal(parseEncounterTurnOutput(JSON.stringify({ reply: "相遇內容".repeat(76) })).reply, "相遇內容".repeat(76), "Longer-than-target replies must be retained, not refunded");
 const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的狀況，這裡還有其他地方需要一起檢查嗎？", "你膝蓋上沾了不少灰塵，需要我幫你拿毛巾，還是先讓你把手邊工作收尾？", "浴室的濾網換好之後，有沒有什麼日常清潔方式可以避免排水管再次堵塞？"];
 const fence = String.fromCharCode(96).repeat(3);
 const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, affinity_delta: -2, illustration_id: illustrationId }) + "\n" + fence);
@@ -191,7 +192,7 @@ assert.match(endpoint, /provider_generation_outcome_unknown/);
 assert.match(endpoint, /provider_request_refund/);
 assert.doesNotMatch(endpoint, /classifyProviderFailure/);
 assert.match(endpoint, /generation_already_claimed/);
-assert.match(guidelines, /150～300 字元/);
+assert.match(guidelines, /60～300 字元/);
 assert.match(guidelines, /buildRoleplayResponseGuidelines\(["']single["']\)/);
 assert.match(frontend, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(frontend, /text = s\.encounterMode && !encounterHasStarted \? ENCOUNTER_DISCOVERY_SENTINEL : GROUP_CONTINUE_SENTINEL/);
