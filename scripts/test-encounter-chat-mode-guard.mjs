@@ -519,7 +519,7 @@ const query = {
   is() { return this; },
   in(column,ids) { messageFetchIds.push(...ids); return this; },
   order() { return this; },
-  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:[{session_id:"session-0",role:"assistant",content:"[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]",created_at:"2026-11-20T01:00:00Z",deleted_at:null},{session_id:"session-1",role:"user",content:"你在家嗎？",created_at:"2026-11-20T01:00:00Z",deleted_at:null}],error:null}); },
+  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:Array.from({length:50},(_,index)=>({session_id:"session-"+(index+1),role:"user",content:index===0?"你在家嗎？":"玩家訊息 "+(index+1),created_at:"2026-11-20T01:00:00Z",deleted_at:null}))}); },
   range(start, end) {
     rangeCalls.push([start, end]);
     return Promise.resolve({ data: start === 0 ? historyRows.slice(0, 50) : historyRows.slice(50), error: null });
@@ -532,13 +532,13 @@ await historyApi.loadCloudHistory(
   { auth: { getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }) }, from: () => query },
 );
 assert.deepEqual(rangeCalls, [[0, 49], [50, 99]], "history must continue paging after the first 50 records");
-assert.equal(historyPerson.encounterHistoryCloud.length, 51, "older encounter records must not be silently dropped");
+assert.equal(historyPerson.encounterHistoryCloud.length, 50, "only sessions with a real player message are retained; the blank discovery-only session is excluded");
 assert.match(orFilter, /session_data->>encounterMode/, "legacy sessions marked in session_data must remain discoverable");
 const historyHtml = historyApi.renderHistory(historyPerson, historyPerson.encounterHistoryCloud, value => value, {});
 assert.match(historyHtml, /已結束/, "ended sessions may retain ended-only status");
 assert.doesNotMatch(historyHtml, /進行中|這次相遇仍在進行中/, "ongoing status is removed");
-assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview, /顧言：/, "character preview uses character prefix");
-assert.match(historyPerson.encounterHistoryCloud[1].lastMessagePreview, /你：/, "player preview uses you prefix");
+assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview, /你：/, "player preview uses you prefix");
+assert.match(historyPerson.encounterHistoryCloud[1].lastMessagePreview, /你：/, "all previews come from saved player messages");
 assert.equal(messageFetchIds.length,51,"preview fetch scoped to loaded history sessions");
-assert.match(historyHtml, /你選擇讓角色主動發現你/, "blank-send system events must be rendered as a human-readable summary");
+assert.doesNotMatch(historyHtml, /你選擇讓角色主動發現你/, "discovery-only blank sessions are excluded from history");
 assert.doesNotMatch(historyHtml, /POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
