@@ -13,6 +13,7 @@ assert.match(helper, /never change generation,[\s\S]*billing/);
 assert.match(migration, /raw_response_body text/);
 assert.match(migration, /raw_response_truncated boolean/);
 assert.match(migration, /interval '14 days'/);
+assert.match(migration, /user_id uuid REFERENCES auth\.users\(id\) ON DELETE CASCADE/);
 assert.match(migration, /ENABLE ROW LEVEL SECURITY/);
 assert.match(migration, /REVOKE ALL ON TABLE public\.ai_generation_diagnostics FROM PUBLIC, anon, authenticated/);
 assert.match(migration, /poyozz-ai-generation-diagnostics-purge/);
