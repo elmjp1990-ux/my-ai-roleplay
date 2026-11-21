@@ -4,6 +4,7 @@ import vm from "node:vm";
 
 const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
+const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
 const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
 const match = html.match(/<script id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/script>/);
 assert.ok(style, "keyboard viewport CSS must be present");
@@ -174,6 +175,6 @@ assert.match(encounterScene, /controlsRow\.appendChild\(tag\)/);
 assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
 assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
-assert.match(hist, /playerMessageSessions\.has\(row\.id\)/);
-assert.match(hist, /excludedMessages\.has\(rawContent\)/);
-assert.match(hist, /\.eq\('role','user'\)/);
+assert.match(encounterHistory, /playerMessageSessions\.has\(row\.id\)/);
+assert.match(encounterHistory, /excludedMessages\.has\(rawContent\)/);
+assert.match(encounterHistory, /\.eq\('role','user'\)/);
