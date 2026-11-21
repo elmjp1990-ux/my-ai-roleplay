@@ -4864,6 +4864,7 @@ function characterAvatarMarkup(character,options={}) {
   const imageClass=options.imageClass||'avatar';
   const fallbackClass=options.fallbackClass||'avatar avatar-fallback';
   const style=options.style||'';
+  const loading=options.loading==='eager'?'eager':'lazy';
   const characterId=String(character?.characterId||character?.id||'');
   const name=String(character?.name||character?.character_snapshot?.name||character?.characterSnapshot?.name||'角').trim();
   const initial=Array.from(name)[0]||'角';
@@ -4882,7 +4883,7 @@ function characterAvatarMarkup(character,options={}) {
     '" data-character-avatar-fallback-style="'+e(style)+'" data-character-avatar-image-class="'+e(imageClass)+'"';
   if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+
     identity+pathAttr+fallbackAttrs+'>'+e(initial)+'</span>';
-  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
+  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="'+loading+'" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
 }
 function normalizeCharacterTag(value) {
   // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
