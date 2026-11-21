@@ -22,6 +22,7 @@ export type AiGenerationDiagnosticInput = {
   responseBodyLength?: number | null;
   responseParsed?: boolean | null;
   rawOutputText?: string | null;
+  rawResponseBody?: string | null;
   refusalText?: string | null;
   failureStage?: string | null;
   failureCode?: string | null;
@@ -58,6 +59,7 @@ export async function recordAiGenerationDiagnostic(
       response_body_length: input.responseBodyLength ?? null,
       response_parsed: input.responseParsed ?? null,
       raw_output_text: input.rawOutputText ?? null,
+      raw_response_body: input.rawResponseBody ?? null,
       refusal_text: input.refusalText ?? null,
       failure_stage: input.failureStage || null,
       failure_code: input.failureCode || null,
