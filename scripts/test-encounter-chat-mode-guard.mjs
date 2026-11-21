@@ -448,7 +448,8 @@ assert.match(encounterHistory, /encounterSummary:cleanSummary\(data\.encounterSu
 assert.match(encounterHistory, /archived:data\.archived===true\|\|!!endedAt/);
 assert.match(encounterHistory, /本次相遇已結束，尚未產生文字摘要/);
 assert.doesNotMatch(encounterHistory, /limit\(2\)/);
-assert.doesNotMatch(encounterHistory, /chat_messages/);
+assert.match(encounterHistory, /chat_messages/, "speaker preview query is expected");
+assert.match(encounterHistory, /limit\(200\)/, "preview query must remain bounded");
 assert.match(encounterHistory, /正在讀取雲端相遇紀錄/);
 assert.match(encounterPresentation, /hasAnyPlayerTurn/);
 assert.match(encounterPresentation, /hasAssistantTurnReply/);
@@ -507,19 +508,22 @@ const historyRows = Array.from({ length: 51 }, (_, index) => ({
     : { archived: false, lastMessagePreview: "相遇片段 " + index },
 }));
 const rangeCalls = [];
+const messageFetchIds = [];
 let orFilter = "";
 const query = {
   select() { return this; },
   eq() { return this; },
   or(value) { orFilter = value; return this; },
   is() { return this; },
+  in(column,ids) { messageFetchIds.push(...ids); return this; },
   order() { return this; },
+  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:[{session_id:"session-0",role:"assistant",content:"顧言：門沒有鎖。",created_at:"2026-11-20T01:00:00Z",deleted_at:null},{session_id:"session-1",role:"user",content:"你在家嗎？",created_at:"2026-11-20T01:00:00Z",deleted_at:null}],error:null}); },
   range(start, end) {
     rangeCalls.push([start, end]);
     return Promise.resolve({ data: start === 0 ? historyRows.slice(0, 50) : historyRows.slice(50), error: null });
   },
 };
-const historyPerson = { id: "character-1" };
+const historyPerson = { id: "character-1", name: "顧言" };
 await historyApi.loadCloudHistory(
   historyPerson,
   () => ({ uid: "user-1" }),
@@ -529,6 +533,10 @@ assert.deepEqual(rangeCalls, [[0, 49], [50, 99]], "history must continue paging 
 assert.equal(historyPerson.encounterHistoryCloud.length, 51, "older encounter records must not be silently dropped");
 assert.match(orFilter, /session_data->>encounterMode/, "legacy sessions marked in session_data must remain discoverable");
 const historyHtml = historyApi.renderHistory(historyPerson, historyPerson.encounterHistoryCloud, value => value, {});
-assert.match(historyHtml, /已結束/, "ended sessions must have an explicit ended status");
+assert.match(historyHtml, /已結束/, "ended sessions may retain ended-only status");
+assert.doesNotMatch(historyHtml, /進行中|這次相遇仍在進行中/, "ongoing status is removed");
+assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview, /顧言：/, "character preview uses character prefix");
+assert.match(historyPerson.encounterHistoryCloud[1].lastMessagePreview, /你：/, "player preview uses you prefix");
+assert.equal(messageFetchIds.length,51,"preview fetch scoped to loaded history sessions");
 assert.match(historyHtml, /你選擇讓角色主動發現你/, "blank-send system events must be rendered as a human-readable summary");
 assert.doesNotMatch(historyHtml, /POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);

@@ -15,8 +15,8 @@
     return sessions.map(session=>{
       const when=new Date(Number(session.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
       const venue=placeNames[session.encounterPlace]||'城市相遇';
-      const preview=cleanSummary(session.lastMessagePreview||'').slice(0,50);
-      return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong></div>'+(preview?'<p>'+escapeHTML(preview)+'</p>':'')+'</article>';
+      const preview=cleanSummary(session.lastMessagePreview||session.encounterSummary||(session.archived?'本次相遇已結束，尚未產生文字摘要':'')).slice(0,50);
+      return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+escapeHTML(when)+' · '+escapeHTML(venue)+'</strong></div>'+(session.archived?'<span class="city-encounter-history-status">已結束</span>':'')+(preview?'<p>'+escapeHTML(preview)+'</p>':'')+'</article>';
     }).join('');
   };
   const loadCloudHistory=async(person,currentUser,client)=>{
@@ -67,7 +67,7 @@
           archived:data.archived===true||!!endedAt,encounterEndedAt:endedAt,
           startedAt:Number(data.startedAt)||Date.parse(row.created_at)||0,
           encounterPlace:data.encounterPlace||data.encounter?.locationKey||'',
-          encounterSummary:'',
+          encounterSummary:cleanSummary(data.encounterSummary||''),
           lastMessagePreview:latestBySession.get(row.id)||cleanSummary(data.lastMessagePreview||'').slice(0,50),
           messages:[]
         };
