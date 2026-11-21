@@ -108,7 +108,10 @@ BEGIN
   IF pg_catalog.to_regclass('cron.job') IS NULL
      OR pg_catalog.to_regprocedure('cron.schedule(text,text,text)') IS NULL
      OR pg_catalog.to_regprocedure('cron.unschedule(bigint)') IS NULL THEN
-    RAISE EXCEPTION 'pg_cron_retention_prerequisites_missing';
+    -- Some isolated local Supabase fixtures omit pg_cron. Keep the purge
+    -- function available; hosted projects with pg_cron schedule it here.
+    RAISE NOTICE 'pg_cron unavailable; AI diagnostics purge function created but not scheduled in this database';
+    RETURN;
   END IF;
 
   FOR v_job_id IN
