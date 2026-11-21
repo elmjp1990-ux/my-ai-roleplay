@@ -193,7 +193,7 @@ assert.match(groupEdge,/buildRoleplayResponseGuidelines\("group"\)/,"group chat 
 assert.match(sharedRoleplayGuidelines,/300～600 字元/,"the shared long-reply target must remain 300–600 characters");
 assert.match(sharedRoleplayGuidelines,/主動敘事與事件推進/,"the shared response contract must include proactive story progression");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
-assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(\)/,"all chat modes must share the approved no-data-collection provider restriction");
+assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(/,"all chat modes must share the approved no-training provider allowlist");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
 assert.match(groupEdge,/findPrivateContextLeak/,"group output must pass private-context leak screening");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group turns must call the shared provider request helper");
@@ -339,8 +339,8 @@ assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/encounter_archived!=='true'/,
-  "unfinished new Encounter sessions must remain hidden from the memory archive");
+assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
+  "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next ten sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,

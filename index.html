@@ -662,7 +662,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .suggestion-options { display:flex; align-items:center; gap:5px; padding:0 8px 5px; }
 .suggestion-light { width:10px; height:10px; min-width:10px; padding:0; border:0; border-radius:50%; background:var(--border); box-shadow:inset 0 0 0 1px var(--muted); }
 .suggestion-light[aria-pressed="true"] { background:#34d399; box-shadow:0 0 6px #34d399aa; }
-.suggestion-card { touch-action:pan-y; -webkit-user-select:none; user-select:none; display:none; width:100%; min-width:0; max-height:120px; overflow:hidden; padding:6px 9px; border:1px solid var(--border); border-radius:8px; background:var(--card); color:var(--text); text-align:left; font:inherit; white-space:normal; line-height:1.35; }
+.suggestion-card { display:none; }
 .suggestion-card.active { display:block; }
 .suggestion-card:active { transform:scale(.995); }
 .suggestion-card-title { display:block; margin-bottom:3px; font-size:12px; font-weight:700; }
@@ -937,6 +937,12 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-stage.is-loading .city-map-world{visibility:hidden}
 .city-map-world{position:absolute;left:0;top:0;width:100%;height:100%;transform-origin:center;will-change:transform;background-image:none;background-position:center;background-size:100% 100%;background-repeat:no-repeat;overflow:visible}
 .city-map-world:before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,#18253e12,transparent 30%,#18253e18);pointer-events:none}
+.city-map-stage.is-raining .city-map-world{filter:grayscale(.58) brightness(.76) saturate(.72)}
+.city-map-stage.is-raining:before{content:"";position:absolute;inset:0;z-index:4;background:rgba(15,22,38,.13);pointer-events:none}
+.city-map-stage.is-raining:after{content:"";position:absolute;inset:-8%;z-index:4;opacity:.38;pointer-events:none;background-image:repeating-linear-gradient(105deg,transparent 0 15px,rgba(236,243,255,.22) 16px,transparent 18px 31px);animation:poyozz-city-rain .8s linear infinite}
+.city-map-stage.is-raining.low-performance:after{animation:none;opacity:.18}
+@keyframes poyozz-city-rain{from{background-position:0 -34px}to{background-position:0 34px}}
+@media(prefers-reduced-motion:reduce){.city-map-stage.is-raining:after{animation:none;opacity:.18}}
 .city-map-river{display:none!important;position:absolute;left:-5%;top:28%;width:112%;height:18%;background:#8fc8df;border:12px solid #d6e6d7;border-radius:50%;transform:rotate(-12deg);box-shadow:0 0 0 8px #b4d8bf}
 .city-map-road{display:none!important;position:absolute;background:#f3e8cf;border:5px solid #fff8e8;border-radius:30px;box-shadow:0 2px 0 #8ba994}
 .city-map-road.r1{left:-8%;top:50%;width:120%;height:8%;transform:rotate(15deg)}
@@ -953,7 +959,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-place-marker{pointer-events:all!important;cursor:pointer;transform-box:fill-box;transform-origin:center;animation:city-marker-float 3.1s ease-in-out infinite;outline:none}
 .city-place-marker:nth-of-type(even){animation-delay:-1.45s}
 .city-marker-glass{fill:rgba(78,83,98,.58);stroke:rgba(244,241,255,.78);stroke-width:1.5;vector-effect:non-scaling-stroke;filter:drop-shadow(0 3px 5px rgba(13,17,27,.28)) drop-shadow(0 0 5px rgba(226,222,246,.2));backdrop-filter:blur(8px)}
-.city-marker-glyph{fill:none;stroke:rgba(250,248,255,.96);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}
+.city-marker-glyph{fill:none;stroke:rgba(250,248,255,.96);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke;pointer-events:none}.city-marker-emoji{fill:#fff;stroke:none}
 .city-place-marker:hover .city-marker-glass,.city-place-marker:focus-visible .city-marker-glass{fill:rgba(108,103,132,.78);stroke:rgba(255,255,255,.98);stroke-width:2;filter:drop-shadow(0 3px 6px rgba(13,17,27,.3)) drop-shadow(0 0 8px rgba(231,225,255,.45))}
 .city-place-marker:focus-visible{outline:none}
 @keyframes city-marker-float{0%,100%{translate:0 0}50%{translate:0 -5px}}
@@ -1101,22 +1107,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 }
 </style>
 
-<style id="poyozz-encounter-visual-novel">
-.chat-main.encounter-scene{isolation:isolate!important;background:transparent!important}
-.chat-main.encounter-scene:before{position:absolute!important;inset:-1px!important;z-index:0!important}
-.chat-main.encounter-scene>.chat-heading{position:absolute!important;inset:0 0 auto 0!important;background:rgba(13,14,20,.30)!important;border:0!important;box-shadow:none!important;backdrop-filter:blur(16px)!important;-webkit-backdrop-filter:blur(16px)!important}
-.chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(18,19,27,.10),rgba(18,19,27,.42))!important;border-top:1px solid rgba(255,255,255,.14)!important;border-radius:0!important;backdrop-filter:blur(18px)!important;-webkit-backdrop-filter:blur(18px)!important}
-.chat-main.encounter-scene .messages{bottom:clamp(245px,31dvh,310px)!important;max-height:30dvh!important;overflow:visible!important;padding:12px 16px!important}
-.chat-main.encounter-scene .encounter-dialogue-beat{display:flex;width:100%;min-height:78px;flex-direction:column;justify-content:space-between;gap:12px;text-align:left;padding:13px 15px;border-radius:15px;border:1px solid rgba(255,255,255,.22);background:rgba(22,23,31,.40);color:#fff;box-shadow:0 10px 26px rgba(0,0,0,.16),inset 0 1px rgba(255,255,255,.10);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);cursor:pointer}
-.chat-main.encounter-scene .encounter-dialogue-text{font-size:clamp(13px,3.5vw,16px);line-height:1.55;text-shadow:0 1px 5px #0009}
-.chat-main.encounter-scene .encounter-dialogue-hint{align-self:flex-end;font-size:10px;letter-spacing:.04em;color:rgba(255,255,255,.72)}
-.chat-main.encounter-scene .composer .suggestions[hidden]{display:none!important}
-.chat-main.encounter-scene .suggestion-card{display:none!important}
-.chat-main.encounter-scene .suggestion-card.active{display:block!important;max-width:100%!important;width:100%!important;max-height:58px!important;padding:6px 9px!important;background:rgba(225,228,237,.12)!important;border-color:rgba(255,255,255,.20)!important;backdrop-filter:blur(16px)!important}
-.chat-main.encounter-scene .suggestion-options{justify-content:center!important}
-.chat-main.encounter-scene .composer-input-row{margin-top:4px!important}
-.chat-main.encounter-scene #messageInput{background:rgba(225,228,237,.12)!important;border-color:rgba(255,255,255,.20)!important;backdrop-filter:blur(16px)!important}
-</style>
+
 </head>
 
 <body>
@@ -1160,6 +1151,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./signed-url-manager.js"></script>
 <script src="./core-utils.js"></script>
 <script src="./city-map.js"></script>
+<script src="./encounter-history.js"></script>
 <script src="./followed-authors.js"></script>
 <script src="./author-profile.js"></script>
 <script src="./comment-renderer.js"></script>
@@ -1860,7 +1852,9 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           id: row.id,
           name: row.name || local.name || '未命名角色',
           gender: row.gender || local.gender || 'ambiguous',
-          age: row.age == null ? (local.age || '') : String(row.age),
+          // Cloud age is authoritative; never resurrect a stale local age when the
+          // database value is intentionally empty.
+          age: row.age == null ? '' : String(row.age),
           image: ownerPrimaryIllustrations.get(row.id)?.primary?.src || row.avatar_url || local.image || '',
           primaryIllustrationPath:ownerPrimaryIllustrations.get(row.id)?.primary?.path || local.primaryIllustrationPath || '',
           galleryIllustrations:local.galleryIllustrations || [],
@@ -2089,42 +2083,48 @@ async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)
 // Do not sign the primary image or every unused gallery item just to render one sprite.
 const encounterGalleryIllustrationCache = new Map();
 const encounterGalleryIllustrationInflight = new Map();
-function applyEncounterGalleryIllustration(characterId,asset) {
+function applyEncounterGalleryIllustration(characterId,asset,replaceSelected=false) {
   if(!asset)return;
   let changed=false;
+  const apply=target=>{
+    if(!target)return;
+    const current=Array.isArray(target.galleryIllustrations)?target.galleryIllustrations:[];
+    const exists=current.some(item=>item?.id===asset.id);
+    if(replaceSelected){
+      if(current.length!==1||current[0]?.id!==asset.id){target.galleryIllustrations=[asset];changed=true;}
+    }else if(!exists&&!current.length){
+      target.galleryIllustrations=[asset];changed=true;
+    }
+  };
   const current=state.characters.find(character=>character.id===characterId);
-  if(current&&(!Array.isArray(current.galleryIllustrations)||!current.galleryIllustrations.length)){
-    current.galleryIllustrations=[asset];changed=true;
-  }
+  apply(current);
   const session=currentSession();
-  if(session?.characterId===characterId&&session.cloudCharacterSnapshot&&
-     (!Array.isArray(session.cloudCharacterSnapshot.galleryIllustrations)||!session.cloudCharacterSnapshot.galleryIllustrations.length)){
-    session.cloudCharacterSnapshot.galleryIllustrations=[asset];changed=true;
-  }
+  if(session?.characterId===characterId)apply(session.cloudCharacterSnapshot);
   if(changed)persist();
 }
-async function hydrateEncounterGalleryIllustration(characterId) {
+async function hydrateEncounterGalleryIllustration(characterId,illustrationId=null) {
   const client=window.mySupabase;
   if(!client||!characterId)return null;
   const requestUid=currentUser()?.uid||null;
-  const key=(requestUid||'public')+':'+characterId;
+  const selectedId=isUuid(illustrationId)?illustrationId:null;
+  const key=(requestUid||'public')+':'+characterId+':'+(selectedId||'first');
   const cached=encounterGalleryIllustrationCache.get(key);
   if(cached?.asset){
     const src=await getCharacterIllustrationSignedUrl(cached.asset.path);
     const asset={...cached.asset,src};
-    applyEncounterGalleryIllustration(characterId,asset);
+    applyEncounterGalleryIllustration(characterId,asset,!!selectedId);
     return asset;
   }
   if(cached&&!cached.asset&&cached.checkedAt>Date.now()-30000)return null;
   if(encounterGalleryIllustrationInflight.has(key))return encounterGalleryIllustrationInflight.get(key);
   const request=(async()=>{
-    const {data:row,error}=await client.from('character_illustrations')
+    let query=client.from('character_illustrations')
       .select('id,character_id,storage_path,sort_order,display_name')
       .eq('character_id',characterId)
-      .eq('asset_type','gallery')
-      .order('sort_order',{ascending:true})
-      .limit(1)
-      .maybeSingle();
+      .eq('asset_type','gallery');
+    if(selectedId)query=query.eq('id',selectedId);
+    else query=query.order('sort_order',{ascending:true});
+    const {data:row,error}=await query.limit(1).maybeSingle();
     if(error)throw new Error('讀取相遇立繪資料失敗：'+error.message);
     if((currentUser()?.uid||null)!==requestUid)return null;
     if(!row){
@@ -2135,7 +2135,7 @@ async function hydrateEncounterGalleryIllustration(characterId) {
     if((currentUser()?.uid||null)!==requestUid)return null;
     const asset={id:row.id,path:row.storage_path,src,sortOrder:row.sort_order,name:row.display_name||''};
     encounterGalleryIllustrationCache.set(key,{asset:{...asset,src:''},checkedAt:Date.now()});
-    applyEncounterGalleryIllustration(characterId,asset);
+    applyEncounterGalleryIllustration(characterId,asset,!!selectedId);
     return asset;
   })();
   encounterGalleryIllustrationInflight.set(key,request);
@@ -2809,7 +2809,7 @@ window.addEventListener('pageshow',()=>{
 });
 function normalizePersonalityProfile(value) {
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-  const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300};
+  const limits={coreTraits:500,values:500,speechStyle:500,behaviorRules:700,likes:300,dislikes:300,boundaries:500,relationshipPacing:300,occupation:500};
   return {...Object.fromEntries(Object.entries(limits).map(([key,max])=>[key,String(source[key]??'').trim().slice(0,max)])),primaryIllustrationName:String(source.primaryIllustrationName??'').trim().slice(0,40)};
 }
 
@@ -2886,9 +2886,10 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     }
 
     const ageValue = String(character.age ?? '').trim();
-    const age = ageValue && Number.isFinite(Number(ageValue))
-      ? Number.parseInt(ageValue, 10)
-      : null;
+    if (ageValue.length > 25) throw new Error('角色年齡描述最多 25 字。');
+    // Character age is descriptive text (e.g.「28（實際 3000）」), not the
+    // account-age eligibility value. Adult access is checked via profiles.birthdate.
+    const age = ageValue || null;
 
     const nextVisibility = character.visibility === 'public' ? 'public' : 'private';
     // 公開必須由創作者明確勾選權利確認；私密草稿不會自動視為已確認。
@@ -2921,73 +2922,10 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       throw new Error('讀取角色舊版隱藏設定失敗：' + existingPrivateProfileError.message);
     }
 
-    const stableCharacterValue = value => {
-      if (Array.isArray(value)) return value.map(stableCharacterValue);
-      if (value && typeof value === 'object') {
-        return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableCharacterValue(value[key])]));
-      }
-      return value ?? null;
-    };
-    const characterValueChanged = (before, after) =>
-      JSON.stringify(stableCharacterValue(before)) !== JSON.stringify(stableCharacterValue(after));
-    const previousProfile = normalizePersonalityProfile(existingPrivateProfile?.personality_profile || {});
-    const nextProfile = normalizePersonalityProfile(character.personalityProfile || {});
-    const aiRelevantChanges = [];
-    const runtimeAiChanges = [];
-    const nonAiChanges = [];
-
-    const compareCharacterField = (target, key, label, before, after) => {
-      if (!characterValueChanged(before, after)) return;
-      target.push({ key, label });
-    };
-
-    // 角色名稱是提示詞中的即時識別資料；改名不改變角色個性，不需重建衍生資料。
-    compareCharacterField(nonAiChanges, 'name', '角色名稱', existingCharacter?.name, String(character.name || '').trim());
-
-    // 只有會改變角色理解、個性或行為的原始設定才需要重新評估衍生資料。
-    compareCharacterField(aiRelevantChanges, 'intro', '角色介紹／背景', existingCharacter?.intro, character.intro || '');
-    compareCharacterField(aiRelevantChanges, 'race', '種族／世界觀', existingCharacter?.race, character.race || '');
-    compareCharacterField(aiRelevantChanges, 'style', '角色風格', existingCharacter?.style, character.style || '');
-    compareCharacterField(aiRelevantChanges, 'private_info', '作者私密設定', existingPrivateProfile?.private_info || '', String(character.privateInfo || '').slice(0, 10000));
-
-    // 個性欄位逐項比較，避免主要立繪名稱等純展示資料誤觸發 AI 整理。
-    const aiProfileFields = {
-      coreTraits: '核心特質',
-      values: '價值觀',
-      speechStyle: '說話方式',
-      behaviorRules: '行為規則',
-      likes: '喜好',
-      dislikes: '厭惡',
-      boundaries: '互動界線',
-      relationshipPacing: '關係進展節奏'
-    };
-    for (const [key, label] of Object.entries(aiProfileFields)) {
-      compareCharacterField(aiRelevantChanges, 'personality_profile.' + key, label, previousProfile[key], nextProfile[key]);
-    }
-    compareCharacterField(nonAiChanges, 'personality_profile.primaryIllustrationName', '主要立繪名稱', previousProfile.primaryIllustrationName, nextProfile.primaryIllustrationName);
-
-    // 手機通知指示會直接影響每回合生成，但由對話流程即時讀取，不必重做角色摘要。
-    compareCharacterField(runtimeAiChanges, 'phone_settings', '手機通知生成設定', existingCharacter?.phone_settings || {}, rowPhoneSettingsForDiff(character.phoneSettings));
-
-    // 標籤與媒體只影響展示／搜尋；不觸發角色衍生資料整理。
-    compareCharacterField(nonAiChanges, 'tags', '角色標籤', existingCharacter?.tags || [], character.tags || []);
-
-    const isNewCharacter = !existingCharacter;
-    const requiresDerivedRefresh = aiRelevantChanges.length > 0;
-    const aiOrganizationDecision = {
-      version: 3,
-      status: requiresDerivedRefresh ? 'needs_review' : 'not_needed',
-      reason: requiresDerivedRefresh
-        ? (isNewCharacter ? 'new_character_ai_source_present' : 'ai_source_fields_changed')
-        : (isNewCharacter ? 'new_character_source_fields_available' : 'no_ai_relevant_change'),
-      model: 'deepseek/deepseek-v4-flash-20260423',
-      changedFields: aiRelevantChanges.map(item => item.key),
-      changedFieldLabels: aiRelevantChanges.map(item => item.label),
-      runtimeAiChangedFields: runtimeAiChanges.map(item => item.key),
-      nonAiChangedFields: nonAiChanges.map(item => item.key),
-      requiresDerivedRefresh,
-      shouldCallModel: false
-    };
+    const aiOrganizationDecision = window.PoyozzCoreUtils.classifyCharacterProfileChanges({
+      existingCharacter, existingPrivateProfile, character,
+      normalizePersonalityProfile, rowPhoneSettingsForDiff
+    });
 
     const firstPublishedAt = existingCharacter?.first_published_at ||
       (nextVisibility === 'public' ? new Date().toISOString() : null);
@@ -3054,7 +2992,7 @@ if (characterError) {
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
+      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -3062,6 +3000,9 @@ if (characterError) {
     if (!savedCharacter) throw new Error('角色寫入後查不到資料，請檢查 Supabase 權限設定。');
     if (savedCharacter.visibility !== nextVisibility) {
       throw new Error('資料庫中的角色狀態仍是「' + savedCharacter.visibility + '」，沒有成功改成「' + nextVisibility + '」。請檢查 Supabase RLS 政策或資料庫 trigger。');
+    }
+    if (String(savedCharacter.age ?? '') !== ageValue) {
+      throw new Error('角色年齡回讀結果與送出內容不一致，為避免年齡資料遺失，本次請重新儲存。');
     }
     if (nextVisibility === 'public' && savedCharacter.rights_confirmed !== true) {
       throw new Error('資料庫尚未記錄權利確認，角色不能公開。');
@@ -3075,21 +3016,22 @@ if (characterError) {
       throw new Error('手機設定回讀結果與送出內容不一致，請重新儲存。');
     }
 
-    // 只有 AI 來源欄位確實變更時才排隊；enqueue 失敗不回滾已成功保存的作者原始資料。
+    // Every save performs an idempotent freshness check. The database queues work only when
+    // source content changed, the previous job failed, or the saved profile schema is outdated.
+    // A current profile is reused; this RPC does not itself call an AI model.
     let profileQueueError = null;
-    if (aiOrganizationDecision.requiresDerivedRefresh === true) {
-      try {
-        const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
-          p_character_id: character.id
-        });
-        if (enqueueError) {
-          profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
-          console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
-        }
-      } catch (enqueueError) {
-        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
-        console.warn('character_profile_enqueue_failed');
+    try {
+      const { error: enqueueError } = await client.rpc('enqueue_character_profile_organization', {
+        p_character_id: character.id,
+        p_source_changed: aiOrganizationDecision.requiresDerivedRefresh === true
+      });
+      if (enqueueError) {
+        profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列：' + enqueueError.message;
+        console.warn('character_profile_enqueue_failed', { code: enqueueError.code || 'enqueue_failed' });
       }
+    } catch (enqueueError) {
+      profileQueueError = '角色已儲存，但 AI 角色資料整理尚未排入佇列。';
+      console.warn('character_profile_enqueue_failed');
     }
 
     // 每個角色先沿用最新的一筆故事；沒有故事時才新增，避免每次編輯都重複建立。
@@ -3535,6 +3477,7 @@ let pendingDeletionWalletSyncUid =
     : null;
 let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
+const ENCOUNTER_DISCOVERY_SENTINEL = '[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]';
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupPinnedHasMore:null,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
@@ -3760,11 +3703,18 @@ function chatSessionData(s) {
     encounterMode:s.encounterMode === true, storyMode:s.storyMode === true,
     encounterPlace:typeof s.encounterPlace === 'string' ? s.encounterPlace : null,
     encounterDay:s.encounterDay || (s.startedAt ? new Date(s.startedAt).toLocaleDateString('en-CA') : null),
+    encounterSummary:typeof s.encounterSummary==='string'?s.encounterSummary.slice(0,360):'',
+    encounterEndedAt:Number(s.encounterEndedAt)||null,
     openingMessage:initialOpening && String(initialOpening.text || '').trim()
       ? {text:String(initialOpening.text),at:Number(initialOpening.at) || Date.now()} : null,
+    encounterVisuals:s.encounterVisuals&&typeof s.encounterVisuals==='object'?{
+      illustrationId:isUuid(s.encounterVisuals.illustrationId)?s.encounterVisuals.illustrationId:null,
+      sceneBackgroundId:isUuid(s.encounterVisuals.sceneBackgroundId)?s.encounterVisuals.sceneBackgroundId:null,
+      sceneBackgroundPath:typeof s.encounterVisuals.sceneBackgroundPath==='string'&&/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(s.encounterVisuals.sceneBackgroundPath)&&!s.encounterVisuals.sceneBackgroundPath.includes('..')?s.encounterVisuals.sceneBackgroundPath:'./encounter-default-scene.webp'
+    }:null,
     pinned:!!s.pinned, persona:s.persona || '', personaCustom:s.personaCustom === true || (s.personaCustom !== false && !!s.persona),
     suggestions:s.suggestions !== false,
-    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80) : [],
+    suggestedReplies:Array.isArray(s.suggestedReplies) ? s.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90) : [],
     background:s.background || 'avatar',
     startedAt:s.startedAt || Date.now(), archivedAt:s.archivedAt || null,
     hasUserMessage:s.cloudHasUserMessage===true ||
@@ -3853,7 +3803,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
-      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
+      s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
         ? {turnId:savedData.pendingTurn.turnId,userMessageId:savedData.pendingTurn.userMessageId,assistantMessageId:savedData.pendingTurn.assistantMessageId,createdAt:Number(savedData.pendingTurn.createdAt)||Date.now()}
@@ -3919,7 +3869,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       const existingData=existing.data.session_data&&typeof existing.data.session_data==='object'?existing.data.session_data:{};
       s.memories=Array.isArray(existingData.memories)?existingData.memories:[];
       s.album=Array.isArray(existingData.album)?existingData.album:[];
-      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=80):[];
+      s.suggestedReplies=Array.isArray(existingData.suggestedReplies)?existingData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=existingData.roleplayMeta&&typeof existingData.roleplayMeta==='object'?existingData.roleplayMeta:{};
       s.encounterMode=existing.data.chat_mode==='encounter'||s.encounterMode===true;
       s.storyMode=existingData.storyMode===true||s.storyMode===true;
@@ -3927,6 +3877,7 @@ async function saveChatSessionToCloud(s, options = {}) {
       if(!s.name&&existingData.name)s.name=existingData.name;
       if(!s.persona&&existingData.persona)s.persona=existingData.persona;
       if(!s.encounterPlace&&existingData.encounterPlace)s.encounterPlace=existingData.encounterPlace;
+      if(!s.encounterVisuals&&existingData.encounterVisuals)s.encounterVisuals=existingData.encounterVisuals;
       if(!s.encounterDay&&existingData.encounterDay)s.encounterDay=existingData.encounterDay;
       if(typeof existingData.hasUserMessage==='boolean')s.cloudHasUserMessage=existingData.hasUserMessage;
       s.pendingTurn=existingData.pendingTurn&&isUuid(existingData.pendingTurn.turnId)&&isUuid(existingData.pendingTurn.userMessageId)&&isUuid(existingData.pendingTurn.assistantMessageId)
@@ -4067,9 +4018,10 @@ async function loadCloudChatSessions(user, options = {}) {
       'session_hidden:session_data->>hidden','session_pinned:session_data->>pinned',
       'session_archived_at:session_data->>archivedAt',
       'session_started_at:session_data->>startedAt','session_encounter_mode:session_data->>encounterMode',
-      'session_encounter_metadata:session_data->encounter',
+      'session_encounter_metadata:session_data->encounter','session_encounter_visuals:session_data->encounterVisuals',
       'session_story_mode:session_data->>storyMode','session_encounter_place:session_data->>encounterPlace',
-      'session_encounter_day:session_data->>encounterDay','session_persona:session_data->>persona',
+      'session_encounter_day:session_data->>encounterDay','session_encounter_summary:session_data->>encounterSummary','session_encounter_temporarily_left_at:session_data->>encounterTemporarilyLeftAt',
+      'session_encounter_ended_at:session_data->>encounterEndedAt','session_persona:session_data->>persona',
       'session_persona_custom:session_data->>personaCustom','session_suggestions:session_data->>suggestions',
       'session_background:session_data->>background','session_has_user_message:session_data->>hasUserMessage',
       'session_last_message_preview:session_data->>lastMessagePreview','session_last_message_at:session_data->>lastMessageAt',
@@ -4221,7 +4173,11 @@ async function loadCloudChatSessions(user, options = {}) {
           : parseBool(row.session_story_mode)||existing?.storyMode===true,
         storyWorldState:row.session_story_world_state&&typeof row.session_story_world_state==='object'?row.session_story_world_state:existing?.storyWorldState||null,
         encounterPlace:row.session_encounter_place || existing?.encounterPlace || null,
+        encounterVisuals:row.session_encounter_visuals&&typeof row.session_encounter_visuals==='object'?row.session_encounter_visuals:existing?.encounterVisuals||null,
         encounterDay:row.session_encounter_day || existing?.encounterDay || null,
+        encounterSummary:row.session_encounter_summary || existing?.encounterSummary || '',
+        encounterEndedAt:row.session_encounter_ended_at ? Date.parse(row.session_encounter_ended_at)||Number(row.session_encounter_ended_at)||null : existing?.encounterEndedAt||null,
+        encounterTemporarilyLeftAt:Number(row.session_encounter_temporarily_left_at)||existing?.encounterTemporarilyLeftAt||null,
         hidden:parseBool(row.session_hidden), pinned:parseBool(row.session_pinned),
         startedAt:Number(row.session_started_at) || (existing?.startedAt || (row.created_at ? new Date(row.created_at).getTime() : Date.now())),
         updatedAt:row.updated_at ? new Date(row.updated_at).getTime() : Number(existing?.updatedAt || 0),
@@ -4406,8 +4362,8 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
       const normalized={id:message.id,role:message.role==='user'?'user':'assistant',text:message.content||'',at:message.created_at?new Date(message.created_at).getTime():Date.now(),cloudSynced:true};
       const persistedSuggestions=Array.isArray(message.suggested_replies)?message.suggested_replies.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3):[];
       const metadata=roleplayMeta[message.id];if(metadata&&typeof metadata==='object')Object.assign(normalized,metadata);
-      // The per-message database column is authoritative; stale session metadata
-      // must never overwrite a complete persisted suggestion set during reload.
+      // The per-message database column is authoritative, including an empty array
+      // after the player removes every suggestion; stale metadata must never restore them.
       if(persistedSuggestions.length===3)normalized.suggestedReplies=persistedSuggestions;
       return normalized;
     });
@@ -4783,16 +4739,29 @@ async function executePendingChatTurn(s) {
     return;
   }
 
+  if(result.encounter?.visuals&&s.encounterMode===true){
+    const visual=result.encounter.visuals;
+    s.encounterVisuals={
+      illustrationId:isUuid(visual.illustrationId)?visual.illustrationId:null,
+      sceneBackgroundId:isUuid(visual.sceneBackgroundId)?visual.sceneBackgroundId:null,
+      sceneBackgroundPath:typeof visual.sceneBackgroundPath==='string'&&/^(\.\/|\/)[A-Za-z0-9_./-]+$/.test(visual.sceneBackgroundPath)&&!visual.sceneBackgroundPath.includes('..')
+        ?visual.sceneBackgroundPath:'./encounter-default-scene.webp'
+    };
+    if(s.encounterVisuals.illustrationId){
+      try{await hydrateEncounterGalleryIllustration(s.characterId,s.encounterVisuals.illustrationId);}
+      catch(error){console.warn('AI 選定立繪同步失敗：',error?.message||error);}
+    }
+  }
+  if(s.encounterMode===true&&result.encounter?.affinity){
+    const affinityResult=result.encounter.affinity;
+    if(Number.isInteger(affinityResult.affinity)&&affinityResult.affinity>=-100&&affinityResult.affinity<=100)s.encounterAffinity=affinityResult.affinity;
+    if(typeof affinityResult.relationship_stage==='string')s.encounterRelationshipStage=affinityResult.relationship_stage;
+  }
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
-  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>value.length>0).slice(0,3);
-  // The server normally supplies three validated, contextual options. Keep the UI usable
-  // if an older Edge Function version or a malformed response omits them.
-  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[
-    "*我稍微停下動作，認真看向你*你剛才提到的事，我還想再聽你多說一點，可以嗎？",
-    "*我輕輕點頭，語氣放緩一些*那我們先把眼前這件事處理好，之後再慢慢聊。",
-    "*我看了看四周，再把目光移回你身上*如果你願意，我想陪你一起確認接下來的安排。"
-  ];
+  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90).slice(0,3);
+  // Never substitute unrelated generic replies when contextual suggestions are absent.
+  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[];
   if (replyWasAdded) {
     const assistantAt=Date.now();
     s.messages.push({
@@ -4896,6 +4865,7 @@ function characterAvatarMarkup(character,options={}) {
   const imageClass=options.imageClass||'avatar';
   const fallbackClass=options.fallbackClass||'avatar avatar-fallback';
   const style=options.style||'';
+  const loading=options.loading==='eager'?'eager':'lazy';
   const characterId=String(character?.characterId||character?.id||'');
   const name=String(character?.name||character?.character_snapshot?.name||character?.characterSnapshot?.name||'角').trim();
   const initial=Array.from(name)[0]||'角';
@@ -4914,7 +4884,7 @@ function characterAvatarMarkup(character,options={}) {
     '" data-character-avatar-fallback-style="'+e(style)+'" data-character-avatar-image-class="'+e(imageClass)+'"';
   if(!image)return '<span class="'+e(fallbackClass)+'" aria-hidden="true"'+(style?' style="'+e(style)+'"':'')+
     identity+pathAttr+fallbackAttrs+'>'+e(initial)+'</span>';
-  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="lazy" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
+  return '<img class="'+e(imageClass)+'" src="'+e(image)+'" alt="" loading="'+loading+'" decoding="async"'+identity+pathAttr+fallbackAttrs+'>';
 }
 function normalizeCharacterTag(value) {
   // UI 會自動加上 #，因此不把作者輸入的前綴存入資料庫。
@@ -5100,7 +5070,7 @@ function showDialog(title,content) {
   const pendingDeletionDialog = route?.overlay?.name === 'account-deletion-pending' && title === '帳號正在等待刪除';
   const deleteConfirmDialog = title === '刪除';
   const encounterLeaveDialog = title === '離開相遇';
-  const encounterMemoryDialog = title === '相遇回憶';
+  const encounterMemoryDialog = title === '相遇日記';
   const walletDialog = title === '我的資源' || title === '銀幣或鑽石不足' || title === '廣告功能尚未串接';
   const storyStartDialog = title === '選擇故事開始方式';
   modal.dataset.walletDialog = walletDialog ? 'true' : 'false';
@@ -6380,7 +6350,7 @@ function renderEditor() {
             ${[['male','男'],['female','女'],['ambiguous','模糊']].map(([v,t]) =>
               `<option value="${v}" ${c.gender === v ? 'selected' : ''}>${t}</option>`).join('')}
           </select></label>
-          <label class="field"><span>年齡</span><input name="age" maxlength="20" value="${e(c.age || '')}"></label>
+          <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
@@ -6659,8 +6629,12 @@ async function createEncounterSession(character) {
     suggestions: true,
     background: 'avatar',
     encounterMode: true,
+    cloudHasUserMessage: false,
     encounterPlace: typeof encounterPlace === 'string' ? encounterPlace : null,
     encounterDay: new Date().toLocaleDateString('en-CA'),
+    encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
+    encounterAffinity: Number.isInteger(data.session.session_data?.encounter?.affinity)?data.session.session_data.encounter.affinity:0,
+    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'first_meeting',
     messages: [],
     memories: [],
     album: [],
@@ -6676,20 +6650,8 @@ async function createEncounterSession(character) {
 }
 
 // 暫時離開後，只有同一位角色、同一地標、同一個台灣本地日期的未結束相遇可續談。
-function findResumableEncounterSession(characterId, placeKey) {
-  const uid=currentUser()?.uid;
-  if(!uid)return null;
-  const today=new Date().toLocaleDateString('en-CA');
-  return Object.values(state.sessions).filter(item=>
-    item.encounterMode===true && item.archived!==true &&
-    item.characterId===characterId && item.encounterPlace===placeKey &&
-    item.cloudOwned===true && item.cloudOwnerUid===uid &&
-    (item.encounterDay || (item.startedAt?new Date(item.startedAt).toLocaleDateString('en-CA'):''))===today
-  ).sort((a,b)=>(b.messages?.at(-1)?.at||b.startedAt||0)-(a.messages?.at(-1)?.at||a.startedAt||0))[0]||null;
-}
-
 async function setEncounterLifecycleState(sessionId, action) {
-  if (!isUuid(sessionId) || !['pause','resume'].includes(action)) {
+  if (!isUuid(sessionId) || !['pause','resume','end'].includes(action)) {
     throw new Error('相遇狀態資料無效，請重新整理後再試。');
   }
   const client = window.mySupabase;
@@ -6718,31 +6680,21 @@ async function setEncounterLifecycleState(sessionId, action) {
 function showEncounterLeaveDialog(session) {
   if(!session?.encounterMode)return;
   showDialog('離開相遇',
-    '<p class="small muted">你想暫時離開，還是結束這次相遇？</p>'+ 
+    '<p class="small muted">選擇暫時離開，或結束這次相遇並整理相遇日記。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
-    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>這次對話會保留；今天同一地標仍能遇見他時，可以接著聊。</small></span><span>›</span></button>'+
-    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>將這次相遇整理並保存到相遇回憶，之後不再接續本次對話。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>保留今天同一地標的相遇，稍後可以接續。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-prompt" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
     '</div>');
 }
 
 async function openNewStoryDialog(characterId, latest = null) {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) return toast('此角色目前無法開啟新故事。');
-  const stageLabels = {
-    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
-    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
-  };
-  showDialog('選擇故事開始方式',
-    '<p class="small muted">你曾與這個角色相遇。可以延續當時累積的關係，或重新展開一段故事；兩者都會建立獨立聊天室，不會覆蓋相遇紀錄。</p>'+
-    '<div class="stack" style="gap:10px;margin-top:14px">'+
-    (latest?.session_id
-      ? '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="encounter_snapshot" data-source-encounter-session-id="'+e(latest.session_id)+'"><span><strong>代入相遇好感度</strong><small>承接最近一次相遇：'+e(stageLabels[latest.relationship_stage]||'相遇回憶')+'，並帶入已保存的關係記憶。</small></span><span>›</span></button>'
-      : '<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>代入相遇好感度</strong><small>目前沒有已結算的相遇紀錄，暫時無法代入。</small></span><span>—</span></div>')+
-    '<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="fresh_story"><span><strong>開啟全新故事</strong><small>從初次見面開始，好感度為 0。</small></span><span>›</span></button>'+
-    '</div>');
+  const choices = (originMode, sourceId, label, note) => '<div class="stack" style="gap:6px"><div class="small muted">'+note+'</div>'+['shared','independent'].map(sync=>'<button type="button" class="profile-setting" data-action="story-start-mode" data-id="'+e(characterId)+'" data-value="'+originMode+'" data-source-encounter-session-id="'+e(sourceId||'')+'" data-affinity-mode="'+sync+'"><span><strong>'+label+'｜'+(sync==='shared'?'同步相遇好感度':'獨立故事好感度')+'</strong><small>'+(sync==='shared'?'與相遇共用累積；故事每回合也會更新相遇關係。':'只在此故事聊天室累積，不影響相遇或其他故事。')+'</small></span><span>›</span></button>').join('')+'</div>';
+  showDialog('選擇故事開始方式', '<p class="small muted">新故事會建立獨立聊天室。好感度可預設與相遇共用，或選擇只在本故事累積。</p><div class="stack" style="gap:12px;margin-top:14px">'+(latest?.session_id?choices('encounter_snapshot',latest.session_id,'承接相遇','承接最近一次相遇：'+e(window.PoyozzAffinityUI?.labels?.[latest.relationship_stage]||'相遇日記')+'，並帶入已保存的關係記憶。'):'<div class="profile-setting" aria-disabled="true" style="opacity:.55;cursor:not-allowed"><span><strong>承接相遇</strong><small>目前沒有已結算的相遇紀錄，暫時無法承接。</small></span><span>—</span></div>')+choices('fresh_story',null,'開啟全新故事','從初次見面開始，初始好感度為 0。')+'</div>');
 }
 
-async function createStorySession(characterId, originMode, sourceEncounterSessionId = null) {
+async function createStorySession(characterId, originMode, sourceEncounterSessionId = null, affinityMode = 'shared') {
   const character = state.characters.find(item => item.id === characterId);
   if (!accessible(character)) throw new Error('此角色目前無法開啟新故事。');
   const client = window.mySupabase;
@@ -6756,7 +6708,8 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
       characterId,
       sessionId,
       originMode,
-      sourceEncounterSessionId
+      sourceEncounterSessionId,
+      affinityMode
     }
   });
   let payload = data;
@@ -6793,6 +6746,7 @@ async function createStorySession(characterId, originMode, sourceEncounterSessio
     initialOpeningMessage:openingText ? {text:openingText,at:openingAt} : null,
     cloudUpdatedAt:payload.session.updated_at || null,
     storyMode:true,
+    storyAffinityMode:affinityMode,
     storyOriginMode:relationship.origin_mode,
     storySourceEncounterSessionId:relationship.source_encounter_session_id || null,
     storyAffinity:Number(relationship.affinity || 0),
@@ -7937,7 +7891,7 @@ function loadEncounterMemoryList(panel,session){
   if(!list||!session?.encounterMode)return;
   const client=window.mySupabase;
   const uid=currentUser()?.uid;
-  if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇回憶。</div>';return;}
+  if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇日記。</div>';return;}
   const pager=window.PoyozzListPagination.createState('encounterMemories');
   list._encounterPager=pager;
   if(!list.dataset.paginationBound){
@@ -7947,7 +7901,7 @@ function loadEncounterMemoryList(panel,session){
       if(retry&&list._encounterPager)void loadEncounterMemoryPage(list,session,list._encounterPager);
     });
   }
-  list.innerHTML='<div class="empty">正在整理你們的相遇回憶…</div>';
+  list.innerHTML='<div class="empty">正在整理你們的相遇日記…</div>';
   void loadEncounterMemoryPage(list,session,pager);
 }
 async function loadEncounterMemoryPage(list,session,pager){
@@ -7957,11 +7911,11 @@ async function loadEncounterMemoryPage(list,session,pager){
   pager.loading=true;
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
-    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇回憶。');
+    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇日記。');
     const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
     const pageStart=pager.offset;
     let sessionQuery=client.from('chat_sessions')
-      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,last_message_preview:session_data->>lastMessagePreview')
+      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,encounter_summary:session_data->>encounterSummary,last_message_preview:session_data->>lastMessagePreview')
       .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
       .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
       .order('updated_at',{ascending:false}).order('id',{ascending:false})
@@ -7970,12 +7924,14 @@ async function loadEncounterMemoryPage(list,session,pager){
     if(sessionError)throw sessionError;
     if(!list.isConnected||currentUser()?.uid!==uid)return;
     const rows=sessionRows||[];
-    const completedSessions=rows.filter(row=>
-      !(typeof row.encounter_day==='string'&&row.encounter_archived!=='true')
-    );
-    const sessionIds=completedSessions.map(row=>row.id).filter(isUuid);
+    const sessionIds=rows.map(row=>row.id).filter(isUuid);
     const diaryBySession=new Map();
+    const sessionsWithAssistantReply=new Set();
     if(sessionIds.length){
+      const {data:replyRows,error:replyError}=await client.from('chat_messages')
+        .select('session_id').in('session_id',sessionIds).eq('role','assistant').is('deleted_at',null).limit(200);
+      if(replyError)throw replyError;
+      for(const row of replyRows||[])if(isUuid(row.session_id))sessionsWithAssistantReply.add(row.session_id);
       const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
         .select('id,event_type,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
@@ -7988,11 +7944,12 @@ async function loadEncounterMemoryPage(list,session,pager){
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
+    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id)||sessionsWithAssistantReply.has(row.id));
     const cards=[];
-    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+    const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
       const newest=diaryBySession.get(sessionRow.id);
-      const preview=String(newest?.summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
+      const preview=String(newest?.summary||sessionRow.encounter_summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
       const at=newest?.occurred_at||sessionRow.updated_at;
       const date=new Date(at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
       const rawPlace=typeof sessionRow.encounter_place==='string'?sessionRow.encounter_place:'';
@@ -8040,13 +7997,13 @@ async function loadEncounterMemoryPage(list,session,pager){
       pager.observer=window.PoyozzListPagination.observeEnd(sentinel,()=>void loadEncounterMemoryPage(list,session,pager));
     }
     if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore&&!pager.buffer.length){
-      list.innerHTML='<div class="empty"><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶摘要。每段相遇都會獨立整理，不會混入故事模式。</p></div>';
+      list.innerHTML='<div class="empty"><p>這裡收藏你與'+e(sessionCharacter(session)?.name||'角色')+'的過往相遇</p><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶。</p></div>';
     }
   }catch(error){
-    console.error('載入相遇回憶失敗：',error);
+    console.error('載入相遇日記失敗：',error);
     if(list.isConnected){
       list.querySelector('[data-encounter-memory-sentinel]')?.remove();
-      list.insertAdjacentHTML('beforeend','<div class="empty">'+e(error?.message||'相遇回憶載入失敗，請稍後重試。')+'<div style="margin-top:10px"><button type="button" data-action="encounter-memory-retry">重試</button></div></div>');
+      list.insertAdjacentHTML('beforeend','<div class="empty">'+e(error?.message||'相遇日記載入失敗，請稍後重試。')+'<div style="margin-top:10px"><button type="button" data-action="encounter-memory-retry">重試</button></div></div>');
     }
   }finally{
     pager.loading=false;
@@ -8064,7 +8021,7 @@ function renderEncounterMemoryDetailDialog(){
   const loadMore=pager.hasMore
     ?'<button type="button" class="ghost" data-action="encounter-memory-load-older" '+(pager.loading?'disabled':'')+'>'+ (pager.loading?'正在載入…':'載入更早的 5 則訊息')+'</button>'
     :'';
-  showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
+  showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
 }
 async function loadEncounterMemoryDetailOlder(){
   const pager=encounterMemoryDetailPager;
@@ -8079,7 +8036,7 @@ async function loadEncounterMemoryDetailOlder(){
       .eq('user_id',uid).eq('character_id',pager.characterId)
       .eq('chat_mode','encounter').maybeSingle();
     if(sessionError)throw sessionError;
-    if(!ownedSession)throw new Error('無法讀取這段相遇回憶。');
+    if(!ownedSession)throw new Error('無法讀取這段相遇日記。');
     const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
     const cursor=pager.cursor;
     const {data:rows,error}=await client.from('chat_messages')
@@ -8095,8 +8052,8 @@ async function loadEncounterMemoryDetailOlder(){
     pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
     pager.hasMore=descendingRows.length===pageSize;
   }catch(error){
-    console.error('載入更早的相遇回憶失敗：',error);
-    toast(error?.message||'載入更早的相遇回憶失敗，請稍後重試。');
+    console.error('載入更早的相遇日記失敗：',error);
+    toast(error?.message||'載入更早的相遇日記失敗，請稍後重試。');
   }finally{
     pager.loading=false;
     if(encounterMemoryDetailPager===pager&&currentSession()?.id===pager.sessionId)renderEncounterMemoryDetailDialog();
@@ -8151,10 +8108,10 @@ async function openEncounterMemoryDetail(button){
     if(diaryError)throw diaryError;
     const body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
     encounterMemoryDetailPager=null;
-    showDialog('相遇回憶','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
+    showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
   }catch(error){
-    console.error('讀取相遇回憶詳細內容失敗：',error);
-    toast(error?.message||'相遇回憶詳細內容載入失敗，請稍後重試。');
+    console.error('讀取相遇日記詳細內容失敗：',error);
+    toast(error?.message||'相遇日記詳細內容載入失敗，請稍後重試。');
   }
 }
 function renderChatSettingsOverlay(panel,isGroup,kind){
@@ -8167,7 +8124,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
     if(ctx.isGroup)return;
     const isEncounter=!!ctx.session.encounterMode;
     if(isEncounter){
-      panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="相遇回憶"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>相遇回憶</h2></div><p class="small muted">這裡收藏你與 '+e(sessionCharacter(ctx.session)?.name||'角色')+' 的過往相遇。每段相遇依時間整理，點選摘要即可閱讀完整對話；內容只屬於你，不會與故事模式記憶混合。</p><div id="encounterMemoryList" class="stack encounter-memory-list"><div class="empty">正在整理你們的相遇回憶…</div></div></section>');
+      panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="相遇日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回聊天功能" title="返回聊天功能">'+ICON.back+'</button><h2>相遇日記</h2></div><p class="small muted">這裡收藏你與 '+e(sessionCharacter(ctx.session)?.name||'角色')+' 的過往相遇。每段相遇依時間整理，點選摘要即可閱讀完整對話；內容只屬於你，不會與故事模式記憶混合。</p><div id="encounterMemoryList" class="stack encounter-memory-list"><div class="empty">正在整理你們的相遇日記…</div></div></section>');
       void loadEncounterMemoryList(panel,ctx.session);
       return;
     }
@@ -8182,7 +8139,7 @@ function renderChatSettingsOverlay(panel,isGroup,kind){
   if(kind==='settings'){
     const encounterMode=!isGroup&&!!ctx.session.encounterMode;
     const items=encounterMode
-      ?[['encounter-record','相遇回憶','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],['encounter-end','結束相遇','結束本次相遇，期待下次與您相遇']]
+      ?[['encounter-record','相遇日記','查看這個角色過往的相遇摘要，點選即可閱讀完整內容'],['persona','人設管理','設定此角色所有相遇共用的人設'],['encounter-dialogues','本次對話','查看目前這次相遇的完整對話'],]
       :[...(isGroup?[['group-info','群組資訊','群組成員、世界背景與場景']]:[]),['diary','甜蜜日記','回憶摘要與長期保存'],['background','聊天背景','無背景、角色圖片或回憶相片'],[isGroup?'group-persona':'persona','人設管理',isGroup?'管理並套用這個群組的玩家人設':'管理目前聊天使用的人設'],...(!isGroup?[['manage-conversation','管理對話','開始新對話或切換舊的回憶']]:[]),['delete','刪除對話','刪除這段對話與回憶']];
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="聊天功能選單"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-close" aria-label="返回聊天" title="返回聊天">'+ICON.back+'</button><h2>聊天功能</h2></div><div class="stack chat-settings-options">'+items.map(([action,title,desc])=>'<button type="button" class="profile-setting" data-action="chat-settings-option" data-option="'+e(action)+'"><span><strong>'+e(title)+'</strong><small>'+e(desc)+'</small></span><span>›</span></button>').join('')+'</div></section>');
     return;
@@ -8677,6 +8634,7 @@ async function groupSendTurn() {
     if(g.active!==activeGroup||g.active?.id!==activeGroupId||g.ownerUid!==requestUid||currentUser()?.uid!==requestUid) return;
     if(!rows?.length) throw new Error('群組回合已保存，但暫時讀取不到訊息。請稍後重新開啟群組確認。');
     const members=g.active.members||[], scenes=g.active.scenes||[];
+    g.active.suggestionTurnId=turnId;
     g.active.suggestedReplies=Array.isArray(turnResult.suggested_replies)?turnResult.suggested_replies.slice(0,3):[];
     if(turnResult.story_world_state&&typeof turnResult.story_world_state==='object'){
       g.active.storyWorldState={
@@ -8924,14 +8882,21 @@ function chatSidebarToggleButton(mobileAction) {
   const icon=isMobile?ICON.back:(hideList?ICON.forward:ICON.back);
   return `<button class="ghost" data-action="chat-sidebar-toggle" data-mobile-action="${mobileAction}" aria-label="${label}" title="${label}" aria-expanded="${hideList?'false':'true'}">${icon}</button>`;
 }
+window.PoyozzAffinityUI = window.PoyozzAffinityUI || {
+  labels:{hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'},
+  render(affinity,stage,variant='compact'){
+    const label=this.labels[stage];
+    const score=Number(affinity);
+    const tone=Number.isFinite(score)&&score<0?'is-negative':Number.isFinite(score)&&score>0?'is-positive':'is-neutral';
+    const heartColor=tone==='is-negative'?'#b9a3d2':tone==='is-positive'?'#f4b9df':'#d8cde4';
+    if(!label)return '<span class="poyozz-affinity-empty"><span class="poyozz-affinity-heart" aria-hidden="true" style="color:'+heartColor+'">♥</span><span>陌生人</span></span>';
+    return '<span class="poyozz-affinity-ui '+variant+' '+tone+'" role="status" aria-label="好感度關係：'+label+'"><span class="poyozz-affinity-heart" aria-hidden="true">♥</span><span class="poyozz-affinity-label">'+label+'</span></span>';
+  }
+};
 async function loadStoryRelationshipState(session) {
   if (!session?.storyMode || !isUuid(session.id) || !window.mySupabase) return;
   const target = document.getElementById('storyRelationshipLabel');
   if (!target) return;
-  const labels = {
-    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
-    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
-  };
   try {
     const { data, error } = await window.mySupabase.rpc('get_story_relationship_state', {
       p_session_id: session.id
@@ -8940,7 +8905,7 @@ async function loadStoryRelationshipState(session) {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) { target.remove(); return; }
     const affinity = Number(row.affinity);
-    const label = labels[row.relationship_stage];
+    const label = window.PoyozzAffinityUI?.labels?.[row.relationship_stage];
     if (!Number.isInteger(affinity) || affinity < -100 || affinity > 100 || !label) {
       target.textContent = '關係資料待確認';
       return;
@@ -8948,9 +8913,7 @@ async function loadStoryRelationshipState(session) {
     session.storyAffinity = affinity;
     session.storyRelationshipStage = row.relationship_stage;
     persist();
-    const progress = Math.round((affinity + 100) / 2);
-    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
-    target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
+    target.innerHTML = window.PoyozzAffinityUI.render(affinity,row.relationship_stage,'story');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
     target.textContent = '關係資料暫時無法載入';
@@ -8966,10 +8929,10 @@ function conversationSuggestionsHTML(s) {
   const replies=Array.isArray(latestAssistantSuggestions)?latestAssistantSuggestions.slice(0,3)
     :(Array.isArray(s.suggestedReplies)?s.suggestedReplies.slice(0,3):[]);
   return `<div class="suggestions">
-    <details class="suggestions-panel" open>
+    <details class="suggestions-panel">
       <summary>建議回覆 <span class="suggestions-count" data-collapsed="點擊可展開" data-expanded="滑動或點選燈號可切換">滑動或點選燈號可切換</span></summary>
-      ${!hasPlayerMessage||replies.length===0
-        ? '<p class="suggestion-first-message-hint">本回合暫時沒有可用的建議回覆。</p>'
+      ${(!hasPlayerMessage&&s.encounterMode!==true)||replies.length===0
+        ? '<p class="suggestion-first-message-hint">本回合沒有建議回覆。</p>'
         : `<div class="suggestion-options" aria-label="選擇建議回覆">
             ${replies.map((_,index)=>`<button type="button" class="suggestion-light" data-action="suggestion-select" data-index="${index}" aria-label="第 ${index+1} 則建議" aria-pressed="${index===0?'true':'false'}"></button>`).join('')}
           </div>
@@ -9028,11 +8991,11 @@ function renderConversation() {
                   <span class="character-status-dot" title="${characterIsOffline(c) ? '角色離線／已下架' : '角色公開中'}"></span>
                 </span>
               </button>
-              <span class="chat-name ellipsis">${e(s.name || c.name)}</span>
-              <span class="character-status-label" title="${characterIsOffline(c) ? '角色離線或已下架' : '角色公開中'}">
-                <span class="character-status-dot" style="position:static;background:${characterIsOffline(c) ? '#8993a4' : '#22c55e'}"></span>
-                ${characterIsOffline(c) ? '離線／已下架' : '公開中'}
-              </span>
+              <div class="chat-identity-copy" style="display:flex;flex-direction:column;align-items:flex-start;min-width:0;gap:3px">
+                <span class="chat-name ellipsis">${e(s.name || c.name)}</span>
+                ${s.storyMode ? '<div id="storyRelationshipLabel" role="status">關係載入中</div>' : ''}
+              </div>
+
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
@@ -9041,7 +9004,6 @@ function renderConversation() {
               <button class="ghost" data-action="chat-settings-menu" aria-label="聊天功能選單" title="聊天功能選單">${ICON.menu}</button>
             </div>
           </div>
-          ${s.storyMode ? '<div class="story-relationship-chip" id="storyRelationshipLabel" role="status">關係載入中</div>' : ''}
         </div>
         <div class="messages" id="messages"></div>
         <form class="composer" data-form="message">
@@ -9288,7 +9250,7 @@ function renderMessages(scroll = true) {
       :s.cloudMessagesError?'<div class="small muted" style="text-align:center;padding:10px"><span>'+e(s.cloudMessagesError)+'</span> <button type="button" data-chat-history-action="'+(s.cloudMessagesErrorOlder?'older':'retry')+'">'+(s.cloudMessagesErrorOlder?'重試載入較早訊息':'重新載入')+'</button></div>'
       :s.cloudHasMoreMessages?'<div data-history-top-control hidden style="text-align:center;padding:10px"><button type="button" data-chat-history-action="older">載入更早的訊息</button></div>':''))
     :'';
-  $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && String(m.text||'').trim() === GROUP_CONTINUE_SENTINEL)).map(m => {
+  $('messages').innerHTML = historyControl + s.messages.filter(m => !(m.role === 'user' && [GROUP_CONTINUE_SENTINEL, ENCOUNTER_DISCOVERY_SENTINEL].includes(String(m.text||'').trim()))).map(m => {
     const user = m.role === 'user';
     const roles = [{id:c.id,name:c.name,image:c.image || c.avatar_url}];
     // Role prefixes can appear in AI replies as well as player-authored text.
@@ -9419,7 +9381,7 @@ async function runChatMessageSearch(query,append=false){
       if(ctx.kind==='single'){
         if(!ctx.session.cloudOwned||ctx.session.cloudOwnerUid!==uid||ctx.session.hidden||readDeletedChatTombstones(uid).sessions[ctx.id])throw Error('目前聊天室不可搜尋，請重新開啟後再試。');
         const {data,error}=await client.from('chat_messages').select('id,session_id,role,content,created_at')
-          .eq('session_id',ctx.id).is('deleted_at',null).ilike('content',pattern)
+          .eq('session_id',ctx.id).is('deleted_at',null).neq('content',ENCOUNTER_DISCOVERY_SENTINEL).neq('content',GROUP_CONTINUE_SENTINEL).ilike('content',pattern)
           .order('created_at',{ascending:false}).order('id',{ascending:false}).range(offset,offset+CHAT_SEARCH_PAGE_SIZE-1);
         if(error)throw error;
         rows=(data||[]).map(r=>({...r,query:q,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
@@ -9432,7 +9394,7 @@ async function runChatMessageSearch(query,append=false){
         rows=(data||[]).map(r=>({...r,query:q,speaker:r.speaker_type==='user'?'你':r.speaker_type==='system'?'系統':r.speaker_snapshot?.name||'角色',stamp:new Date(r.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
       }
     }else if(ctx.kind==='single'){
-      rows=(ctx.session.messages||[]).filter(r=>String(r.text||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
+      rows=(ctx.session.messages||[]).filter(r=>![GROUP_CONTINUE_SENTINEL,ENCOUNTER_DISCOVERY_SENTINEL].includes(String(r.text||'').trim())&&String(r.text||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
         .map(r=>({id:r.id,query:q,content:r.text,speaker:r.role==='user'?'你':sessionCharacter(ctx.session)?.name||'角色',stamp:new Date(Number(r.at)||Date.now()).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})}));
     }else{
       rows=(groupPrototype.messages||[]).filter(r=>String(r.content||'').toLocaleLowerCase().includes(q.toLocaleLowerCase())).slice().reverse().slice(offset,offset+CHAT_SEARCH_PAGE_SIZE)
@@ -9915,7 +9877,8 @@ function renderChatOverlay(kind) {
           <button type="button" data-action="clear-chat-test-data" ${canTestCloudData ? '' : 'disabled'}>清除測試資料</button>
         </div>
         <p class="small muted">測試模式：不呼叫 AI、不生圖、不扣鑽石或銀幣。這些按鈕只測試同步，不是下方相機圖示的產圖功能。</p>
-      </section>`
+      </section>
+`
     : '';
   const content = kind === 'search'
     ? `<label class="field"><span>搜尋目前聊天室的訊息</span><input id="chatMessageSearchInput" type="search" placeholder="輸入訊息關鍵字（至少 2 字）…" autocomplete="off"></label>
@@ -9939,6 +9902,382 @@ function renderChatOverlay(kind) {
     </section>`);
   if(kind==='diary'&&s.storyMode)void loadStoryMemorySummary(s);
 }
+
+
+function compactEncounterScheduleDescription(value){
+  const original=String(value||'').trim();
+  const count=text=>Array.from(text).length;
+  if(count(original)>=10&&count(original)<=30)return original;
+  const clauses=original.split(/[，,。；;：:]/).map(part=>part.trim()).filter(Boolean);
+  let compact='';
+  for(const clause of clauses){
+    const candidate=compact?compact+'，'+clause:clause;
+    if(count(candidate)>30)break;
+    compact=candidate;
+    if(count(compact)>=10)break;
+  }
+  if(count(compact)>=10){
+    if(count(compact)<30&&!/[。！？!?]$/.test(compact))compact+='。';
+    return compact;
+  }
+  const sliced=Array.from(original).slice(0,29).join('').replace(/[，,。；;：:]$/,'');
+  return count(sliced)>=10?sliced+'。':original;
+}
+
+function classifyEncounterRepairSpace(activityValue,locationValue,requestedOutdoor){
+  const activity=String(activityValue||'').normalize('NFKC');
+  const location=String(locationValue||'').normalize('NFKC');
+  if(/計程車|車內|車上|車廂|車裡|車中|搭車|乘車|駕車|開車|副駕|後座/.test(activity))return 'vehicle';
+  if(/陽台/.test(activity)&&/抽菸|吸菸|抽煙/.test(activity))return 'indoor';
+  if(/室內|家中|家裡|公寓裡|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity))return 'indoor';
+  if(/站在騎樓下|餐廳門口|店外|門外|外面等車|在門口|在街頭|街頭道別|街道上|站在路邊|在路邊|在街上|公園步道|戶外|沿著.{0,8}步道|下車後|走出車外|走出車門|下車道別|在路上散步/.test(activity))return 'outdoor';
+  if(/^(客戶家|客戶住處|住所|住家|公寓|餐廳|餐館|小吃店|超商|便利商店|代辦所|公司|辦公室|咖啡廳|書店|百貨公司)$/i.test(location))return 'indoor';
+  return requestedOutdoor?'outdoor':'indoor';
+}
+
+function autoCorrectEncounterScheduleOutput(rawText){
+  const parsed=JSON.parse(String(rawText||''));
+  if(!parsed||!Array.isArray(parsed.characters))throw new Error('行程 JSON 格式不正確');
+  const fallbackLocations=new Set(['機場','公司','酒吧','Live House','住所','百貨公司','書店','咖啡廳']);
+  let changed=0;
+  for(const character of parsed.characters){
+    for(const dayType of ['weekday','holiday']){
+      const blocks=character&&character.variants&&character.variants[dayType];
+      if(!Array.isArray(blocks))continue;
+      for(const block of blocks){
+        for(const option of (Array.isArray(block&&block.options)?block.options:[])){
+          const activity=String(option.activity||'').trim();
+          const space=classifyEncounterRepairSpace(activity,option.location,option.is_outdoor===true);
+          if(space==='vehicle'){
+            if(/餐廳|小吃店/.test(String(option.location||''))){option.location='街頭';changed++;}
+            const vehicleActivity='在計程車內送客戶回家，鬆開領口休息。';
+            if(option.activity!==vehicleActivity){option.activity=vehicleActivity;changed++;}
+          }else if(/客戶家|客戶住處/.test(String(option.location||''))&&/修理|組裝|搬家|打包|除蟲|清理/.test(activity)){
+            const homeActivity=/搬家|打包/.test(activity)?'在客戶家協助搬家打包，整理物品。':/除蟲|清理/.test(activity)?'在客戶家協助除蟲並清理雜物。':'在客戶家修理電燈或組裝家具。';
+            if(option.activity!==homeActivity){option.activity=homeActivity;changed++;}
+          }else{
+            const compactActivity=compactEncounterScheduleDescription(activity);
+            if(compactActivity!==activity){option.activity=compactActivity;changed++;}
+          }
+          const shouldBeOutdoor=space==='outdoor';
+          if(option.is_outdoor!==shouldBeOutdoor){option.is_outdoor=shouldBeOutdoor;changed++;}
+          if(!shouldBeOutdoor){
+            if(option.rain_fallback_location!==null||option.rain_fallback_activity!==null)changed++;
+            option.rain_fallback_location=null;
+            option.rain_fallback_activity=null;
+          }else{
+            const fallbackLocation=String(option.rain_fallback_location||'').trim();
+            const originalFallback=String(option.rain_fallback_activity||'');
+            const fallbackActivity=compactEncounterScheduleDescription(originalFallback);
+            if(!fallbackLocations.has(fallbackLocation)||Array.from(originalFallback).length<10||Array.from(originalFallback).length>30){
+              option.rain_fallback_location='咖啡廳';
+              option.rain_fallback_activity='改到咖啡廳內等雨停，喝杯熱飲休息。';
+              changed++;
+            }else if(fallbackActivity!==originalFallback){
+              option.rain_fallback_activity=fallbackActivity;changed++;
+            }
+          }
+        }
+      }
+    }
+  }
+  return {text:JSON.stringify(parsed,null,2),changed};
+}
+
+async function loadEncounterScheduleRepairOutputs(){
+  const container=document.getElementById('encounterScheduleRepairOutputs');
+  if(!container)return;
+  container.textContent='正在讀取保留的 AI 原始回覆…';
+  try{
+    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_list'}});
+    if(error)throw error;
+    const outputs=Array.isArray(data?.outputs)?data.outputs:[];
+    if(!outputs.length){
+      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
+      return;
+    }
+    container.innerHTML=outputs.map(item=>{
+      const outputId=e(item.id||'');
+      const raw=e(item.raw_response_text||'');
+      const errors=Array.isArray(item.validation_errors)?item.validation_errors.join('、'):'';
+      const finish=e(item.finish_reason||'未提供');
+      const model=e(item.response_model||item.requested_model||'未知模型');
+      const status=e(item.failure_code||item.status||'待檢查');
+      const created=item.created_at?new Date(item.created_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'';
+      const truncation=item.raw_output_truncated||item.response_body_truncated?'（原始內容有截斷，請先確認內容是否完整）':'';
+      return '<article class="panel stack" style="padding:12px">'+
+        '<strong>'+e(item.character_name||'角色')+' · '+status+'</strong>'+
+        '<p class="small muted">'+model+'｜finish_reason：'+finish+'｜HTTP '+Number(item.http_status||0)+'｜'+e(created)+truncation+'</p>'+
+        (errors?'<p class="small muted">驗證問題：'+e(errors)+'</p>':'')+
+        '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+raw+'</textarea>'+
+        '<div class="row wrap"><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正並發布（不呼叫 AI）</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
+      '</article>';
+    }).join('');
+  }catch(error){
+    container.textContent='目前無法讀取失敗回覆；請確認測試環境資料庫 migration 已套用。';
+    console.warn('Encounter schedule repair list failed:',error?.message||error);
+  }
+}
+
+async function loadEncounterScheduleTestTools(){
+  const section=document.getElementById('encounterScheduleTestTools');
+  if(!section)return;
+  section.hidden=false;
+  const status=section.querySelector('#encounterScheduleTestStatus');
+  const button=section.querySelector('[data-action="organize-encounter-schedules"]');
+  if(button){button.disabled=true;button.dataset.aiEnabled='false';}
+  const client=window.mySupabase;
+  if(!client){
+    if(status)status.textContent='目前無法連線至測試服務。';
+    return;
+  }
+  try{
+    const {data,error}=await client.functions.invoke('encounter-schedule-organizer',{body:{mode:'status'}});
+    if(!error&&data?.test_mode!==true){
+      section.hidden=true;
+      return;
+    }
+    section.hidden=false;
+    if(error||data?.enabled!==true){
+      if(status)status.textContent=currentUser()?.uid
+        ?'測試模式已啟用，但目前無法確認帳號登入狀態；請重新登入後重試。'
+        :'請先登入測試帳號；目前不會發出 AI 呼叫。';
+      return;
+    }
+    const pending=Number(data.pending_character_count||0);
+    const processing=Number(data.processing_character_count||0);
+    const failed=Number(data.failed_character_count||0);
+    const reconciliation=Number(data.needs_reconciliation_count||0);
+    const needsReview=Number(data.needs_review_character_count||0);
+    const blocked=processing>0||reconciliation>0;
+    const canRun=pending>0&&!blocked;
+    const lastRun=data.last_batch_completed_at?new Date(data.last_batch_completed_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'尚未執行';
+    const queueHint=blocked
+      ?'目前暫停生成，請先確認處理中工作或待核對結果。'
+      :pending>0
+        ?'本次只處理待處理佇列中的下一位角色，每次一位。'+(failed>0?'；另有 '+failed+' 位失敗紀錄保留，不會自動重試。':'')
+        :failed>0
+          ?'目前沒有待處理角色；'+failed+' 位失敗紀錄已保留，不會自動重試。'
+          :'目前沒有待處理角色。';
+    if(status)status.textContent=data.status_available===false
+      ?'測試環境已確認；目前無法讀取佇列狀態。'
+      :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜待人工審核：'+needsReview+' 位｜'+
+        queueHint+'｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
+    if(button){button.dataset.aiEnabled=canRun?'true':'false';button.disabled=!canRun;}
+    const reconciliationContainer=document.getElementById('encounterScheduleReconciliationItems');
+    if(reconciliationContainer){
+      const items=Array.isArray(data.reconciliation_jobs)?data.reconciliation_jobs:[];
+      reconciliationContainer.innerHTML=items.length?items.map(item=>{
+        const batchId=e(item.batch_id||'');
+        const characterId=e(item.character_id||'');
+        const started=item.started_at?new Date(item.started_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'時間未提供';
+        const code=e(item.failure_code||item.job_error_code||'unknown');
+        return '<article class="panel stack" style="padding:12px">'+
+          '<strong>'+e(item.character_name||'角色')+'｜待核對</strong>'+
+          '<p class="small muted">批次時間：'+e(started)+'｜錯誤代碼：'+code+'｜已嘗試 '+Number(item.attempt_count||0)+' 次</p>'+
+          '<p class="small">AI 供應商的請求結果目前無法確認；可能已完成，也可能已產生供應商費用。此操作只會將工作標記為終止失敗，不會重試 AI，也不會刪除原批次或用量紀錄。</p>'+
+          '<div class="row wrap"><button type="button" data-action="resolve-encounter-schedule-reconciliation" data-batch-id="'+batchId+'" data-character-id="'+characterId+'">確認終止此待核對工作</button></div>'+
+        '</article>';
+      }).join(''):'<p class="small muted">目前沒有待核對工作。</p>';
+    }
+    const reviewContainer=document.getElementById('encounterScheduleManualReviewItems');
+    if(reviewContainer){
+      const items=Array.isArray(data.manual_review_jobs)?data.manual_review_jobs:[];
+      reviewContainer.innerHTML=items.length?items.map(item=>{
+        const name=e(item.character_name||'角色');
+        const reason=e(item.reason||'worldview_manual_review_required');
+        const updated=item.updated_at?new Date(item.updated_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'時間未提供';
+        return '<article class="panel stack" style="padding:12px">'+
+          '<strong>'+name+'｜待人工審核</strong>'+
+          '<p class="small muted">原因：'+reason+'｜保留時間：'+e(updated)+'</p>'+
+          '<p class="small">系統無法可靠判定此角色的世界觀是否適用現代地圖，因此已暫停行程生成。請依角色設定明確分類；選擇現代地圖適用只會加入待生成佇列，不會立即呼叫 AI。選擇不適用則結束審核並保留既有行程與招呼池。</p>'+
+          '<div class="row wrap"><button type="button" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="modern_map_compatible">判定為現代地圖適用</button><button type="button" class="ghost" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="not_applicable">判定不適用（保留既有資料）</button></div>'+
+        '</article>';
+      }).join(''):'<p class="small muted">目前沒有待人工審核的未知世界觀角色。</p>';
+    }
+    void loadEncounterScheduleRepairOutputs();
+  }catch(error){
+    section.hidden=true;
+    if(button){button.disabled=true;button.dataset.aiEnabled='false';}
+    console.warn('Encounter schedule test status failed:',error?.message||error);
+  }
+}
+
+document.addEventListener('click',async event=>{
+  const worldviewButton=event.target.closest('[data-action="worldview-review-decision"]');
+  if(worldviewButton){
+    event.preventDefault();
+    const characterId=String(worldviewButton.dataset.characterId||'');
+    const decision=String(worldviewButton.dataset.decision||'');
+    const modernDecision=decision==='modern_map_compatible';
+    const confirmText=modernDecision
+      ?'請確認：此角色確實適用現代地圖。確認後只會加入待生成佇列，不會立即呼叫 AI；之後執行排程工作時才可能產生 AI 成本。'
+      :'請確認：此角色不適用現代地圖。確認後會結束人工審核，並保留既有行程與招呼池，不會刪除資料。';
+    if(!characterId||!['modern_map_compatible','not_applicable'].includes(decision)||!window.confirm(confirmText))return;
+    worldviewButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.rpc('review_encounter_schedule_worldview',{
+        p_character_id:characterId,
+        p_decision:decision
+      });
+      if(error)throw error;
+      if(data?.ai_invoked!==false)throw new Error('review_rpc_result_invalid');
+      toast(modernDecision?'已確認現代地圖適用，角色已加入待生成佇列；尚未呼叫 AI。':'已完成不適用判定，既有行程與招呼池均保留。');
+      await loadEncounterScheduleTestTools();
+    }catch(error){
+      toast('人工審核保存失敗；原待審核狀態會保留。');
+      console.warn('Encounter worldview review failed:',error?.message||error);
+    }finally{
+      worldviewButton.disabled=false;
+    }
+    return;
+  }
+  const reconcileButton=event.target.closest('[data-action="resolve-encounter-schedule-reconciliation"]');
+  if(reconcileButton){
+    event.preventDefault();
+    if(!window.confirm('請確認：無法判定先前 AI 請求是否已完成或計費。確認後只會將這筆工作標記為終止失敗，不會再次呼叫 AI；原批次與用量紀錄會保留。若之後重新生成，會是新的 AI 請求並可能再次產生成本。要繼續嗎？'))return;
+    reconcileButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+        body:{mode:'reconcile_confirm',batch_id:reconcileButton.dataset.batchId,character_id:reconcileButton.dataset.characterId}
+      });
+      if(error)throw error;
+      if(data?.status==='resolved_without_retry'){
+        toast('待核對工作已標記為終止失敗；沒有重試 AI，原紀錄已保留。');
+        await loadEncounterScheduleTestTools();
+      }else{
+        toast('待核對工作尚未完成處理：'+String(data?.error||data?.status||'未知狀態'));
+      }
+    }catch(error){
+      toast('待核對工作處理失敗；原安全鎖仍會保留。');
+      console.warn('Encounter schedule reconciliation failed:',error?.message||error);
+    }finally{
+      reconcileButton.disabled=false;
+    }
+    return;
+  }
+  const button=event.target.closest('[data-action="organize-encounter-schedules"]');
+  if(!button)return;
+  if(button.dataset.aiEnabled!=='true'||button.disabled)return;
+  event.preventDefault();
+  button.disabled=true;
+  const status=document.getElementById('encounterScheduleTestStatus');
+  if(status)status.textContent='正在整理公開角色行程，請稍候…';
+  try{
+    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'manual'}});
+    if(error)throw error;
+    const state=String(data?.status||'unknown');
+    if(state==='completed'||state==='partial'){
+      window.PoyozzCityMap?.refreshScenes?.();
+      window.PoyozzCityMap?.refreshSchedules?.();
+      const sceneStatus=data.scene_publish_status==='failed'?'；場景文案更新失敗，請檢查後端記錄':data.scene_publish_status==='partial'?'；有 '+Number(data.skipped_scene_count||0)+' 個場景因資格或地圖名額限制未發布':'；場景資料更新 '+Number(data.published_scene_count||0)+' 個';
+      const retryStatus=state==='partial'?'；另有 '+Number(data.failed_character_count||0)+' 位角色保留待重試':'';
+      toast('本次待整理 '+Number(data.queued_character_count||0)+' 位；已完成 '+Number(data.published_character_count||0)+' 位，無匹配地點 '+Number(data.unplaced_character_count||0)+' 位'+retryStatus+sceneStatus+'。');
+    }
+    else if(state==='no_pending_jobs')toast('目前沒有待整理的公開角色行程。');
+    else if(state==='waiting_threshold'||state==='cooldown')toast('目前無法執行整理：'+state);
+    else toast('行程整理結果：'+state);
+    await loadEncounterScheduleTestTools();
+  }catch(error){
+    toast('行程整理失敗，待處理資料會保留；請稍後再試。');
+    console.warn('Encounter schedule test trigger failed:',error);
+  }finally{
+    const current=document.querySelector('#encounterScheduleTestTools [data-action="organize-encounter-schedules"]');
+    if(current)current.disabled=current.dataset.aiEnabled!=='true';
+  }
+});
+
+
+document.addEventListener('click',async event=>{
+  const loadButton=event.target.closest('[data-action="load-encounter-schedule-repairs"]');
+  if(loadButton){
+    event.preventDefault();
+    await loadEncounterScheduleRepairOutputs();
+    return;
+  }
+  const autoRepairButton=event.target.closest('[data-action="auto-repair-encounter-schedule-output"]');
+  if(autoRepairButton){
+    event.preventDefault();
+    const outputId=autoRepairButton.dataset.outputId||'';
+    const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
+    if(!textarea||!textarea.value.trim())return toast('找不到完整的原始行程內容。');
+    let corrected;
+    try{corrected=autoCorrectEncounterScheduleOutput(textarea.value);}
+    catch(error){return toast(error&&error.message?error.message:'無法解析原始行程。');}
+    if(!window.confirm('將依 POYOZZ 空間規則修正室內／戶外／車內判斷、地點與超長描述，保留時段、選項與權重，並立即重新驗證及發布？不會呼叫 AI，原始回覆會完整保留。'))return;
+    autoRepairButton.disabled=true;
+    textarea.value=corrected.text;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+        body:{mode:'repair',output_id:outputId,corrected_response:corrected.text}
+      });
+      if(error&&data&&data.status!=='validation_failed')throw error;
+      if(data&&data.status==='validation_failed'){
+        toast('自動修正後仍有驗證問題：'+(data.validation_errors||[]).join('、')+'；修正版已保留在文字框，可再人工調整。');
+      }else if(data&&data.status==='completed'){
+        toast('顧言行程已自動修正並發布；未重新呼叫 AI。');
+        window.PoyozzCityMap?.refreshScenes?.();
+        window.PoyozzCityMap?.refreshSchedules?.();
+        await loadEncounterScheduleRepairOutputs();
+        await loadEncounterScheduleTestTools();
+      }else{
+        toast('自動修正結果：'+String(data&& (data.error||data.status)||'未知狀態'));
+      }
+    }catch(error){
+      toast('自動修正發布未完成；原始 AI 回覆仍完整保留。');
+      console.warn('Encounter schedule auto-repair failed:',error&&error.message?error.message:error);
+    }finally{autoRepairButton.disabled=false;}
+    return;
+  }
+  const hideButton=event.target.closest('[data-action="hide-encounter-schedule-output"]');
+  if(hideButton){
+    event.preventDefault();
+    const outputId=hideButton.dataset.outputId||'';
+    if(!outputId||!window.confirm('只會將這筆原始回覆從修復清單隱藏；原始 AI 回覆與所有修正版本仍會保留，不會刪除資料，也不會呼叫 AI。要繼續嗎？'))return;
+    hideButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_hide',output_id:outputId}});
+      if(error)throw error;
+      if(data?.status!=='hidden'||data?.ai_called!==false||data?.original_preserved!==true)throw new Error('repair_hide_result_invalid');
+      toast('已從修復清單隱藏；原始回覆與修正歷程仍保留，沒有呼叫 AI。');
+      await loadEncounterScheduleRepairOutputs();
+    }catch(error){
+      toast('隱藏失敗；原始回覆與修正歷程均未刪除。');
+      console.warn('Encounter schedule repair hide failed:',error?.message||error);
+    }finally{ hideButton.disabled=false; }
+    return;
+  }
+  const repairButton=event.target.closest('[data-action="repair-encounter-schedule-output"]');
+  if(!repairButton)return;
+  event.preventDefault();
+  const outputId=repairButton.dataset.outputId||'';
+  const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
+  if(!textarea||!textarea.value.trim())return toast('請先填入完整的 JSON 修正版。');
+  if(!window.confirm('將以這份內容重新驗證並嘗試發布行程？不會呼叫 AI，也不會覆蓋原始回覆。'))return;
+  repairButton.disabled=true;
+  try{
+    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+      body:{mode:'repair',output_id:outputId,corrected_response:textarea.value}
+    });
+    if(error&&data?.status!=='validation_failed')throw error;
+    if(data?.status==='validation_failed'){
+      toast('修正版尚未通過檢查：'+(data.validation_errors||[]).join('、'));
+    }else if(data?.status==='completed'){
+      toast('人工補正已通過驗證並發布；沒有再次呼叫 AI。');
+      window.PoyozzCityMap?.refreshScenes?.();
+      window.PoyozzCityMap?.refreshSchedules?.();
+      await loadEncounterScheduleRepairOutputs();
+      await loadEncounterScheduleTestTools();
+    }else{
+      toast('人工補正結果：'+String(data?.error||data?.status||'未知狀態'));
+    }
+  }catch(error){
+    toast('人工補正未完成；原始 AI 回覆仍會保留。');
+    console.warn('Encounter schedule manual repair failed:',error?.message||error);
+  }finally{
+    repairButton.disabled=false;
+  }
+});
 
 /* Account */
 function renderShop() {
@@ -10175,10 +10514,28 @@ function renderModal(o) {
   switch(o.name) {
     case 'environment':
       showDialog('測試環境，非正式網頁',`
-        <p>此網站目前使用本機帳號、固定聊天回覆與本機日記摘錄。</p>
-        <p>AI、Google／Email登入、圖片生成、付款、廣告獎勵與檢舉傳送尚未串接。</p>
-        <p class="muted">鑽石與銀幣為本機測試資料，不代表付費資產。
-          清除瀏覽器資料會失去角色、聊天與回憶。請勿輸入真正機密。</p>`);
+        <p>此網站目前使用測試環境資料，請勿輸入真正機密或真實付款資訊。</p>
+        <p class="muted">鑽石與銀幣為測試資料，不代表正式付費資產。</p>
+        <section class="panel stack" id="encounterScheduleTestTools" style="margin:10px 0;padding:12px" hidden>
+          <strong>相遇模式｜AI 行程與場景整理</strong>
+          <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
+          <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
+          <div class="stack" style="margin:10px 0">
+            <strong>待核對工作</strong>
+            <div id="encounterScheduleReconciliationItems" class="stack"></div>
+          </div>
+          <div class="stack" style="margin:10px 0">
+            <strong>未知世界觀｜待人工審核</strong>
+            <div id="encounterScheduleManualReviewItems" class="stack"></div>
+          </div>
+          <div class="row wrap">
+            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
+            <button type="button" data-action="load-encounter-schedule-repairs">查看失敗 AI 原始回覆</button>
+          </div>
+          <div id="encounterScheduleRepairOutputs" class="stack" style="margin-top:12px"></div>
+          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。失敗回覆最多保留 30 天，開啟工具時會清除已到期資料；補正只重新驗證與發布，不會再次呼叫 AI。正式環境不提供此工具。</p>
+        </section>`);
+      void loadEncounterScheduleTestTools();
       break;
     case 'wallet-insufficient':
       openInsufficientFundsDialog('single');
@@ -10949,7 +11306,6 @@ document.addEventListener('click',async event => {
         if(option==='persona'){personaPickerSelection=null;openModal('persona');break;}
         if(option==='group-persona'){openModal('group-persona-settings');break;}
         if(option==='manage-conversation'){const next={...route,chatOverlay:'manage-conversation'};delete next.overlay;go(next);break;}
-        if(option==='encounter-end'){const session=currentSession();if(session?.encounterMode)showDialog('結束相遇','<p>結束本次相遇，期待下次與您相遇。</p><div class="row end" style="gap:8px;margin-top:16px"><button type="button" data-action="back">再聊一下</button><button type="button" class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">結束相遇</button></div>');break;}
         if(option==='delete'){const next={...route,chatOverlay:'delete-confirm'};delete next.overlay;go(next);break;}
         break;
       }
@@ -10965,8 +11321,8 @@ document.addEventListener('click',async event => {
           await setEncounterLifecycleState(session.id,'pause');
           session.archived=false;session.archivedAt=null;session.encounterTemporarilyLeftAt=Date.now();
           if(!persist())throw new Error('本機聊天狀態無法保存。');
-          const saved=await saveChatSessionSafely(session);
-          if(saved!==true)throw new Error('雲端聊天狀態未確認保存。');
+          // Lifecycle metadata is persisted by encounter-session-state; avoid a
+          // second chat snapshot write that can fail on pending-message races.
         }catch(error){
           session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;
           persist();
@@ -10979,26 +11335,58 @@ document.addEventListener('click',async event => {
         }
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
+      case 'encounter-end-prompt': {
+        const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
+        showDialog('結束相遇','<p>結束後將整理好感度與相遇日記，今天無法續談。</p><div class="row" style="justify-content:flex-end"><button data-action="encounter-dialog-dismiss">取消</button><button class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">確定結束</button></div>');break;
+      }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
         const messages=session.messages||[];
         const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
-        const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
+        const isEncounterSystemMessage=message=>['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message?.text||message?.content||'').trim());
+         const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()&&!isEncounterSystemMessage(m)).slice(-1)[0];
+        const previous={archived:session.archived,archivedAt:session.archivedAt,endedAt:session.encounterEndedAt,
+          temporarilyLeftAt:session.encounterTemporarilyLeftAt,name:session.name,summary:session.encounterSummary};
         const summaryParts=[];
         if(lastUser)summaryParts.push('你說：「'+String(lastUser.text||lastUser.content).trim().slice(0,70)+'」。');
+         else if(messages.some(m=>m.role==='user'&&isEncounterSystemMessage(m)))summaryParts.push('你選擇讓角色主動發現你。');
         if(lastCharacter)summaryParts.push((sessionCharacter(session)?.name||'角色')+'回應：「'+String(lastCharacter.text||lastCharacter.content).trim().slice(0,90)+'」。');
         session.encounterSummary=summaryParts.join(' ').slice(0,360)||'這次相遇留下了一段尚待整理的回憶。';
         session.encounterEndedAt=Date.now();session.archived=true;session.archivedAt=session.encounterEndedAt;
         session.encounterTemporarilyLeftAt=null;
         session.name='相遇紀錄 · '+timeText(session.encounterEndedAt);
         if(!persist())break;
-        try{const saved=await saveChatSessionSafely(session);if(saved!==true)throw new Error('雲端未確認儲存結果。');}catch(error){
+        try{
+          const saved=await saveChatSessionSafely(session);
+          if(saved!==true)throw new Error('雲端未確認儲存結果。');
+        }catch(error){
           console.error('結束相遇同步失敗：',error);
-          session.archived=false;session.archivedAt=null;session.encounterEndedAt=null;persist();
-          toast('相遇回憶尚未成功保存到雲端，請稍後再試。');break;
+          session.archived=previous.archived;session.archivedAt=previous.archivedAt;session.encounterEndedAt=previous.endedAt;
+          session.encounterTemporarilyLeftAt=previous.temporarilyLeftAt;session.name=previous.name;session.encounterSummary=previous.summary;
+          persist();
+          toast('相遇日記尚未成功保存到雲端，請稍後再試。');break;
         }
+
+        let settlementQueued=false;
+        let settlementError=null;
+        try{
+          await setEncounterLifecycleState(session.id,'end');
+          settlementQueued=true;
+        }catch(error){
+          if(error?.code==='encounter_scene_expired_or_closed')settlementQueued=true;
+          else{
+            settlementError=error;
+            // A lost response may hide a successful state transition; retrying is safe and idempotent.
+            try{await setEncounterLifecycleState(session.id,'end');settlementQueued=true;settlementError=null;}
+            catch(retryError){settlementError=retryError;}
+          }
+        }
+        if(settlementError)console.warn('相遇已保存，但提早結算排程尚未確認；原排程到期時仍會再次入列：',settlementError);
         $('modal')?.close();hideList=false;go({page:'citymap'});
-        toast('本次相遇已結束並保存到相遇回憶。');break;
+        toast(settlementQueued
+          ? '本次相遇已結束並保存，正在整理好感度與關係回憶。'
+          : '本次相遇已結束並保存；結算排程暫時未確認，系統會於原定場景結束時再次處理。');
+        break;
       }
       case 'chat-settings-back': {
         const next={...route,chatOverlay:'settings'};delete next.overlay;
@@ -11320,9 +11708,10 @@ document.addEventListener('click',async event => {
         const mode=button.dataset.value;
         const sourceId=button.dataset.sourceEncounterSessionId||null;
         if(!['fresh_story','encounter_snapshot'].includes(mode))break;
+        const affinityMode=button.dataset.affinityMode==='independent'?'independent':'shared';
         if(mode==='encounter_snapshot'&&!isUuid(sourceId)){toast('找不到可承接的相遇紀錄。');break;}
         $('modal')?.close();
-        try{await createStorySession(characterId,mode,sourceId);}
+        try{await createStorySession(characterId,mode,sourceId,affinityMode);}
         catch(error){console.error('建立新故事失敗：',error);toast(error?.message||'新故事建立失敗，請稍後再試。');}
         break;
       }
@@ -12556,7 +12945,15 @@ const {
           await runPendingChatTurn(s);
           break;
         }
-        if (!text.trim()) text = GROUP_CONTINUE_SENTINEL;
+        if (!text.trim()) {
+          // The first blank Encounter send must always be a discovery event.
+          // An initial scene/opening payload is not a player turn; only a persisted
+          // player message means the Encounter has already started.
+          const encounterHasStarted = s.encounterMode && (s.messages || []).some(message =>
+            message?.role === 'user' && String(message.text || message.content || '').trim()
+          );
+          text = s.encounterMode && !encounterHasStarted ? ENCOUNTER_DISCOVERY_SENTINEL : ENCOUNTER_CONTINUE_SENTINEL;
+        }
         const platformCommand = parsePlatformCommand(text);
         if (platformCommand.type === 'platform') {
           if (platformCommand.name === 'help') {
@@ -13227,7 +13624,7 @@ async function importCharacter(file) {
   const character = {
     id:id(),name,intro,opening,image,tags,
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
-    age:String(data.age || '').slice(0,20),
+    age:String(data.age ?? '').trim().slice(0,25),
     race:String(data.race || '').slice(0,50),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
     authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
@@ -13329,24 +13726,19 @@ async function loadCityCharacterSchedules(characterIds=[]){
   const client=window.mySupabase;
   const ids=[...new Set((characterIds||[]).filter(Boolean))].slice(0,10);
   const schedules=new Map();
-  if(!client||!ids.length)return schedules;
-  let data=[];
-  try{
-    const result=await client.rpc('get_encounter_character_schedules',{p_character_ids:ids});
-    if(result.error)throw result.error;
-    data=result.data||[];
-  }catch(error){
-    console.warn('城市角色排程批次載入失敗：',error?.message||error);
-    return schedules;
-  }
-  for(const row of data){
+  if(!client)throw new Error('城市角色行程服務尚未連線。');
+  if(!ids.length)return schedules;
+  const {data,error}=await client.rpc('get_encounter_character_schedules_with_scene',{p_character_ids:ids});
+  if(error)throw new Error('讀取角色行程失敗：'+error.message);
+  for(const row of Array.isArray(data)?data:[]){
     const lines=schedules.get(row.character_id)||[];
     lines.push([
       row.weekday==null?'*':row.weekday,
       String(row.start_time||'').slice(0,5),
       String(row.end_time||'').slice(0,5),
       row.location_key,
-      row.activity
+      row.activity,
+      encodeURIComponent(String(row.scene_description||''))
     ].join('|'));
     schedules.set(row.character_id,lines);
   }
@@ -13362,10 +13754,10 @@ function renderCityMapMVP() {
     return;
   }
   return renderCityMap({
-    $, state, accessible, escapeHTML, safeImage, currentUser, toast, go, requireLogin,
+    $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
-    releaseCharacterVideo, hydrateCharacterVideo, findResumableEncounterSession,
-    setEncounterLifecycleState, saveChatSessionSafely, createEncounterSession,
+    releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
+    setEncounterLifecycleState, createEncounterSession,
     loadCityCharacterPage, loadCityCharacterSchedules
   });
 }
@@ -13638,14 +14030,27 @@ document.addEventListener('submit',function(event){
 .city-location-close{flex:0 0 38px;position:relative;z-index:3}
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
-.city-character-affinity{width:100%;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:linear-gradient(135deg,rgba(25,29,43,.54),rgba(72,61,76,.34));color:rgba(255,255,255,.92);font-size:10px;line-height:1.35;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-height:35px;display:flex;flex-direction:column;justify-content:center;gap:5px}
-.city-character-affinity-heading{display:flex;align-items:center;gap:5px;white-space:nowrap}
-.city-character-affinity-heading span{opacity:.78}
-.city-character-affinity-heading strong{font-size:13px;font-weight:700;letter-spacing:.02em}
-.city-character-affinity-heading em{margin-left:auto;font-style:normal;color:#f3d9c4}
-.city-character-affinity-meter{height:4px;border-radius:99px;background:rgba(255,255,255,.17);overflow:hidden}
-.city-character-affinity-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#a99acb,#f1c6b0);box-shadow:0 0 8px rgba(226,190,205,.35)}
-.city-character-affinity-empty{opacity:.78;text-align:center}
+
+/* One canonical relationship badge: restrained jewel tones, a clear heart cue, and consistent sizing. */
+.poyozz-affinity-ui{display:inline-flex;align-items:center;justify-content:center;gap:5px;max-width:100%;min-width:0;padding:4px 10px;border:1px solid var(--affinity-border);border-radius:999px;background:var(--affinity-bg);color:var(--affinity-text);font-size:10px;font-weight:650;line-height:1.25;letter-spacing:.015em;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(12,8,24,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.poyozz-affinity-ui.is-negative{--affinity-border:rgba(112,91,145,.58);--affinity-bg:linear-gradient(135deg,rgba(35,27,48,.94),rgba(65,48,78,.88));--affinity-text:#e8dff1}
+.poyozz-affinity-ui.is-positive{--affinity-border:rgba(230,174,218,.62);--affinity-bg:linear-gradient(135deg,rgba(116,72,111,.92),rgba(151,105,157,.88));--affinity-text:#fff0fb}
+.poyozz-affinity-ui.is-neutral{--affinity-border:rgba(196,184,218,.5);--affinity-bg:linear-gradient(135deg,rgba(83,76,99,.82),rgba(112,103,129,.78));--affinity-text:#f4eff9}
+.poyozz-affinity-heart{display:inline-block;flex:0 0 auto;font-family:Georgia,serif;font-size:11px;line-height:1;text-shadow:0 1px 5px currentColor}
+.poyozz-affinity-label{display:block;overflow:hidden;text-overflow:ellipsis}
+.poyozz-affinity-ui.story{padding:4px 10px}
+#storyRelationshipLabel{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
+.poyozz-affinity-ui{box-sizing:border-box!important;width:calc(5.5em + 30px)!important;min-width:calc(5.5em + 30px)!important;max-width:calc(5.5em + 30px)!important;justify-content:center!important;gap:4px!important;white-space:nowrap!important}
+.poyozz-affinity-ui .poyozz-affinity-label{width:5.5em!important;min-width:5.5em!important;text-align:center!important;white-space:nowrap!important}
+.poyozz-affinity-ui .poyozz-affinity-heart{width:11px!important}
+.poyozz-affinity-empty{box-sizing:border-box!important;width:7.5em!important;min-width:7.5em!important;max-width:7.5em!important;white-space:nowrap!important;overflow:visible!important}
+#storyRelationshipLabel .poyozz-affinity-ui.story{padding:3px 4px!important;font-size:10px!important;line-height:1.15!important}
+.poyozz-affinity-ui.compact{gap:4px;padding:3px 8px;font-size:9px}
+.poyozz-affinity-ui.encounter{max-width:150px;gap:4px;padding:3px 8px;font-size:9px}
+.poyozz-affinity-empty{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid rgba(196,184,218,.42);border-radius:999px;background:rgba(83,76,99,.34);color:rgba(245,239,250,.86);font-size:9px}
+.poyozz-affinity-empty .poyozz-affinity-heart{color:#c9bfd6}
+
+.city-character-affinity{width:100%;padding:0;min-width:0;display:flex;justify-content:center;align-items:center}
 .city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
 .city-character-meet{width:100%;padding:9px 5px;font-size:11px;line-height:1.35;white-space:normal;border-radius:10px;min-height:42px}
 .city-character-copy{min-width:0;overflow-y:auto;overscroll-behavior:contain;padding:0 3px 0 0}
@@ -13657,7 +14062,9 @@ document.addEventListener('submit',function(event){
 .city-character-page-dots{min-width:30px;text-align:center}
 .city-encounter-history-list{display:grid;gap:9px}
 .city-encounter-history-item{padding:10px;border:1px solid rgba(255,255,255,.17);border-radius:11px;background:rgba(18,22,32,.18)}
-.city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:4px}
+.city-encounter-history-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.city-encounter-history-item strong{display:block;font-size:11px;margin-bottom:0}
+.city-encounter-history-status{flex:0 0 auto;font-size:9px;padding:2px 6px;border-radius:999px;background:rgba(255,255,255,.1);color:var(--muted);white-space:nowrap}
 .city-encounter-history-item p{margin:0;font-size:11px;line-height:1.6}
 .encounter-memory-list{gap:10px}
 .encounter-memory-card{display:block;width:100%;text-align:left;color:inherit;cursor:pointer;transition:border-color .18s ease,background .18s ease}
@@ -13696,10 +14103,13 @@ document.addEventListener('submit',function(event){
 .city-location-news-items{display:grid;gap:7px}
 .city-location-news-items p{margin:0;color:#e5e1ef;font-size:11px;line-height:1.65;overflow-wrap:anywhere}
 .city-location-empty{margin:0;padding:14px 12px;width:100%;border:1px dashed rgba(235,225,255,.22);border-radius:14px;color:#d2cfe0;font-size:12px;line-height:1.7;text-align:center}
-.city-location-person{display:flex;flex-direction:column;align-items:center;gap:6px;flex:0 0 72px;min-width:72px;padding:4px 3px 8px;border:0!important;border-radius:0;background:transparent!important;box-shadow:none!important;color:#fff;cursor:pointer;outline:none}
-.city-location-person:hover,.city-location-person:focus,.city-location-person:focus-visible{background:transparent!important;box-shadow:none!important;outline:none}
-.city-location-person .city-location-avatar-fallback,.city-location-person-image{display:grid;place-items:center;width:54px;height:54px;flex:0 0 54px;border-radius:50%;border:0!important;background:transparent!important;box-shadow:none!important;filter:none;font-size:20px;overflow:hidden}
-.city-location-person-image{display:block;object-fit:cover;object-position:center 25%;outline:none!important;clip-path:circle(50% at 50% 50%);-webkit-mask-image:none}
+#cityMapAvatarStrip > button.city-location-person{all:unset!important;-webkit-appearance:none!important;appearance:none!important;display:flex!important;flex-direction:column!important;align-items:center!important;gap:6px!important;flex:0 0 72px!important;width:72px!important;min-width:72px!important;height:auto!important;padding:4px 3px 8px!important;margin:0!important;border:0!important;border-radius:0!important;background:none!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;filter:none!important;color:#fff!important;cursor:pointer!important;outline:none!important;overflow:visible!important;-webkit-tap-highlight-color:transparent!important}
+#cityMapAvatarStrip > button.city-location-person:hover,#cityMapAvatarStrip > button.city-location-person:focus,#cityMapAvatarStrip > button.city-location-person:focus-visible{background:none!important;background-color:transparent!important;background-image:none!important;box-shadow:none!important;filter:none!important;outline:none!important}
+#cityMapAvatarStrip > button.city-location-person::before,#cityMapAvatarStrip > button.city-location-person::after{content:none!important;display:none!important;background:none!important;box-shadow:none!important}
+.city-location-person-avatar-frame{position:relative;isolation:isolate;display:block;width:54px;height:54px;flex:0 0 54px;overflow:hidden;border:0!important;border-radius:50%!important;background:transparent!important;box-shadow:none!important;clip-path:circle(50% at 50% 50%);-webkit-clip-path:circle(50% at 50% 50%)}
+.city-location-person-avatar-frame::before,.city-location-person-avatar-frame::after{content:none!important;display:none!important}
+.city-location-person .city-location-avatar-fallback{display:grid;place-items:center;width:100%;height:100%;border:0!important;border-radius:inherit!important;background:linear-gradient(145deg,#625b83,#34334f);box-shadow:none!important;font-size:20px;overflow:hidden}
+.city-location-person-image{display:block!important;width:100%!important;height:100%!important;max-width:none!important;max-height:none!important;object-fit:cover!important;object-position:center 25%;border:0!important;border-radius:50%!important;background:transparent!important;box-shadow:none!important;filter:none!important;outline:none!important;clip-path:circle(50% at 50% 50%)!important;-webkit-clip-path:circle(50% at 50% 50%)!important}
 .city-location-person-name{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#f3efff}
 .city-location-person:disabled{opacity:.6}
 @media(max-width:600px){.city-location-modal{padding:14px}.city-location-glass{width:100%;height:calc(100dvh - 28px);min-height:0;max-height:calc(100dvh - 28px);padding:17px 18px;border-radius:23px}.city-location-title-row h2{font-size:20px}.city-location-rule{margin:12px 0}.city-character-card-body{grid-template-columns:104px minmax(0,1fr);gap:10px}.city-character-portrait{width:104px;height:150px;flex-basis:104px}}
@@ -13711,6 +14121,8 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;margin:12px 0}
 .city-character-portrait{width:118px;height:164px;object-fit:cover;object-position:center top;border-radius:12px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);box-shadow:none;display:block}
 .city-character-portrait-fallback{display:grid;place-items:center;color:#eee;font-size:30px}
+/* Portraits and transparent cutout art must not inherit a gray placeholder backing. */
+.city-character-portrait,.city-character-portrait-video{background:transparent!important;}
 .city-character-copy{min-width:0;color:#f4f2fa;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .city-character-copy h3{margin:0 0 9px;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
 .city-character-meta{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:9px}
@@ -13743,7 +14155,7 @@ document.addEventListener('submit',function(event){
 .city-character-card-close{flex-basis:32px!important;width:32px!important;height:32px!important;min-width:32px!important;min-height:32px!important}
 .city-character-card-body{display:grid!important;grid-template-columns:104px minmax(0,1fr)!important;gap:12px!important;align-items:start!important;min-height:0!important;overflow:hidden!important;margin:10px 0 0!important;padding-right:0!important}
 .city-character-photo-column{display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:9px!important;min-width:0!important}
-.city-character-photo-column .city-character-portrait{width:100%!important;height:136px!important;min-height:0!important;flex:0 0 136px!important;object-fit:cover!important;object-position:center top!important;border:0!important;box-shadow:none!important}
+.city-character-photo-column .city-character-portrait{width:100%!important;height:136px!important;min-height:0!important;flex:0 0 136px!important;object-fit:cover!important;object-position:center top!important;border:0!important;box-shadow:none!important;background:transparent!important}
 .city-character-meet{display:flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;min-height:40px!important;line-height:1.35!important}
 .city-character-copy{min-width:0!important;min-height:0!important;max-height:100%!important;overflow-y:auto!important;overscroll-behavior:contain!important}
 .city-character-bookmarks{position:absolute!important;z-index:5!important;top:18px!important;right:-15px!important;display:flex!important;flex-direction:column!important;align-items:stretch!important;gap:7px!important;width:30px!important;overflow:visible!important}
@@ -13789,7 +14201,7 @@ document.addEventListener('submit',function(event){
 #cityCharacterCard .city-character-card-footer .city-character-page-button::before,#cityCharacterCard .city-character-card-footer .city-character-page-button::after{content:none!important;display:none!important}
 #cityCharacterCard .city-character-card-footer{display:flex!important;align-items:center!important;justify-content:center!important;gap:10px!important}
 #cityCharacterCard .city-character-page-dots{display:flex!important;align-items:center!important;justify-content:center!important;gap:5px!important;line-height:1!important}
-#cityCharacterCard .city-character-portrait-video{display:block!important;width:100%!important;max-width:100%!important;height:118px!important;flex:0 0 118px!important;object-fit:cover!important;background:#171b27!important;border-radius:12px!important}
+#cityCharacterCard .city-character-portrait-video{display:block!important;width:100%!important;max-width:100%!important;height:118px!important;flex:0 0 118px!important;object-fit:cover!important;background:transparent!important;border-radius:12px!important}
 @media(max-width:600px){
  #cityCharacterCard{margin-right:29px!important}
  #cityCharacterCard .city-character-bookmarks{right:-30px!important;width:29px!important}
@@ -13800,95 +14212,15 @@ document.addEventListener('submit',function(event){
 
 </style>
 
-<style id="encounter-mode-render-conflict-fix">
-/* Final encounter overrides intentionally come after all legacy chat styles. */
-body.encounter-mode-active .chat-main.encounter-scene,
-body.encounter-mode-active .chat-main.encounter-scene:before{background-color:transparent!important}
-body.encounter-mode-active .chat-main.encounter-scene:before{
-  background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important;
-  background-position:center,center,center!important;background-size:cover,cover,cover!important;background-repeat:no-repeat!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .composer{
-  background:linear-gradient(180deg,rgba(17,14,24,.04),rgba(17,14,24,.20) 24%,rgba(17,14,24,.48) 100%)!important;
-  backdrop-filter:blur(5px)!important;-webkit-backdrop-filter:blur(5px)!important;
-}
-/* Keep the character avatar in the heading as specified; remove only duplicate message/speaker avatars. */
-body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,
-body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,
-body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{gap:8px!important}
-body.encounter-mode-active .chat-main.encounter-scene .messages{overflow-y:auto!important;overscroll-behavior:contain!important}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;cursor:pointer}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
-@media(max-width:767px){
-  body.encounter-mode-active .chat-main.encounter-scene .composer{background:linear-gradient(180deg,rgba(17,14,24,.02),rgba(17,14,24,.18) 22%,rgba(17,14,24,.42) 100%)!important}
-}
-
-/* Encounter visual-novel polish: soft glass gradients, restrained nameplate and lighter dialogue surfaces. */
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading{
-  background:linear-gradient(110deg,rgba(25,22,35,.30) 0%,rgba(45,38,55,.18) 52%,rgba(25,22,35,.10) 100%)!important;
-  border-color:rgba(255,255,255,.12)!important;
-  box-shadow:0 8px 28px rgba(8,6,14,.08)!important;
-  backdrop-filter:blur(12px)!important;-webkit-backdrop-filter:blur(12px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{
-  max-width:calc(100% - 12px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{
-  display:flex!important;flex-direction:column!important;align-items:stretch!important;
-  width:min(100%,760px)!important;margin:0 auto!important;text-align:left!important;
-  gap:9px!important;padding:17px 19px 12px!important;
-  color:rgba(255,250,247,.96)!important;
-  background:linear-gradient(135deg,rgba(35,29,43,.54) 0%,rgba(61,48,66,.43) 48%,rgba(31,28,42,.48) 100%)!important;
-  border:1px solid rgba(255,237,242,.22)!important;border-radius:17px!important;
-  box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px 0 rgba(255,255,255,.10)!important;
-  backdrop-filter:blur(15px)!important;-webkit-backdrop-filter:blur(15px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{
-  align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;
-  padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;
-  font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;
-  color:rgba(255,239,224,.98)!important;
-  background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;
-  border-left:2px solid rgba(244,204,218,.72)!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{
-  display:block!important;font-size:15px!important;line-height:1.9!important;
-  font-weight:450!important;white-space:pre-wrap!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{
-  align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;
-  color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;
-  font-size:10px!important;letter-spacing:.05em!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel,
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-cards,
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card,
-body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel .suggestion-card.active{
-  background:linear-gradient(135deg,rgba(38,32,47,.30),rgba(72,57,77,.22) 52%,rgba(36,31,46,.26))!important;
-  border-color:rgba(255,255,255,.13)!important;
-  box-shadow:0 6px 22px rgba(8,6,14,.07),inset 0 1px 0 rgba(255,255,255,.07)!important;
-  backdrop-filter:blur(13px)!important;-webkit-backdrop-filter:blur(13px)!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-action,
-body.encounter-mode-active .chat-main.encounter-scene .suggestion-card-dialogue{
-  background:transparent!important;
-}
-body.encounter-mode-active .chat-main.encounter-scene .composer{
-  background:linear-gradient(180deg,rgba(24,20,31,.015),rgba(36,29,43,.13) 42%,rgba(26,22,34,.30) 100%)!important;
-}
-@media(max-width:767px){
-  body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}
-  body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}
-  body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}
-}
+<style id="poyozz-chat-full-bleed-shared">
+/* Full-bleed rules shared by standard chat modes only; Encounter visual styles are kept separate. */
 /* Final full-bleed chat frame: remove the outer panel inset and let header/composer glass meet the phone edges. */
 body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
 body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
 body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
 body.chat-page .messages,body.conversation .messages,body.group-chat-page .messages{width:100%;max-width:none;}
 </style>
+
 
 
 <style id="poyozz-chat-keyboard-viewport">
@@ -13901,35 +14233,6 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
   height:100%;
   min-height:0;
 }
-/* Encounter mode has its own fixed full-screen shell; resize every fixed layer with visualViewport. */
-html body.encounter-mode-active .app,
-html body.encounter-mode-active #view,
-html body.encounter-mode-active .chat-layout,
-html body.encounter-mode-active .chat-main.encounter-scene{
-  top:var(--poyozz-visual-viewport-top,0px)!important;
-  bottom:auto!important;
-  height:var(--poyozz-chat-viewport-height,100dvh)!important;
-  min-height:0!important;
-}
-html body.encounter-mode-active .app,
-html body.encounter-mode-active #view,
-html body.encounter-mode-active .chat-layout{
-  inset-inline:0!important;
-}
-html body.encounter-mode-active .chat-main.encounter-scene{
-  inset-inline:0!important;
-}
-body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .composer{
-  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;
-}
-body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .messages{
-  bottom:calc(var(--poyozz-encounter-composer-height,190px) + 8px)!important;
-  max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - var(--poyozz-encounter-composer-height,190px) - 100px)!important;
-}
-body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
-  height:clamp(150px,34dvh,280px)!important;
-  opacity:.35!important;
-}
 </style>
 <script id="poyozz-chat-keyboard-viewport">
 (() => {
@@ -13938,6 +14241,38 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
   let framePending = false;
   let observedEncounterComposer = null;
   let composerResizeObserver = null;
+  let baselineViewportHeight = Math.max(
+    Number(window.innerHeight) || 0,
+    Number(root.clientHeight) || 0,
+    Number(viewport?.height) || 0
+  );
+
+  const isChatComposer = element =>
+    !!element?.matches?.('#messageInput, #groupMessageInput');
+
+  const syncKeyboardState = () => {
+    const layoutHeight = Math.max(
+      Number(window.innerHeight) || 0,
+      Number(root.clientHeight) || 0,
+      baselineViewportHeight
+    );
+    const visibleHeight = Number(viewport?.height) || layoutHeight;
+    const threshold = Math.max(120, baselineViewportHeight * 0.18);
+    const keyboardOpen = isChatComposer(document.activeElement) &&
+      (viewport ? baselineViewportHeight - visibleHeight > threshold : true);
+
+    if (keyboardOpen) document.body.classList.add('chat-keyboard-open');
+    else document.body.classList.remove('chat-keyboard-open');
+
+    if (!keyboardOpen && visibleHeight >= baselineViewportHeight - threshold) {
+      baselineViewportHeight = Math.max(
+        Number(window.innerHeight) || 0,
+        Number(root.clientHeight) || 0,
+        visibleHeight
+      );
+    }
+    return keyboardOpen;
+  };
 
   const updateEncounterComposerHeight = () => {
     const composer = document.querySelector('.chat-main.encounter-scene .composer');
@@ -13966,6 +14301,8 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
     if (height > 0) root.style.setProperty('--poyozz-chat-viewport-height', height + 'px');
     root.style.setProperty('--poyozz-visual-viewport-top', top + 'px');
     updateEncounterComposerHeight();
+    const keyboardOpen=syncKeyboardState();
+    root.style.removeProperty('--encounter-keyboard-offset');
   };
   const scheduleViewportUpdate = () => {
     if (framePending) return;
@@ -13975,22 +14312,26 @@ body.encounter-mode-active.chat-keyboard-open .encounter-character-sprite{
       updateViewportHeight();
     });
   };
-  const isChatComposer = element =>
-    !!element?.matches?.('#messageInput, #groupMessageInput');
 
   updateViewportHeight();
   window.addEventListener('resize', scheduleViewportUpdate, { passive: true });
+  window.addEventListener('orientationchange', () => {
+    baselineViewportHeight = Math.max(
+      Number(window.innerHeight) || 0,
+      Number(root.clientHeight) || 0,
+      Number(viewport?.height) || 0
+    );
+    scheduleViewportUpdate();
+  }, { passive: true });
   viewport?.addEventListener('resize', scheduleViewportUpdate, { passive: true });
   viewport?.addEventListener('scroll', scheduleViewportUpdate, { passive: true });
 
   document.addEventListener('focusin', event => {
     if (!isChatComposer(event.target)) return;
-    document.body.classList.add('chat-keyboard-open');
     updateViewportHeight();
     scheduleViewportUpdate();
-    if (document.body.classList.contains('encounter-mode-active')) {
-      requestAnimationFrame(() => event.target.scrollIntoView?.({ block:'nearest', inline:'nearest' }));
-    }
+    // Encounter scene art is anchored to the scene; never scroll the page or sprite
+    // together with the composer when the software keyboard opens.
   });
   document.addEventListener('focusout', () => {
     requestAnimationFrame(() => {

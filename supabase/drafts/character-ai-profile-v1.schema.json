@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://poyozz.invalid/schemas/character-ai-profile-v1.schema.json",
-  "title": "POYOZZ Character AI Profile v1",
+  "$id": "https://poyozz.invalid/schemas/character-ai-profile-v1.1.schema.json",
+  "title": "POYOZZ Character AI Profile v1.1",
   "description": "Backend-only derived roleplay profile. Author source fields remain authoritative. Runtime schedules and phone settings are loaded separately at turn time and are intentionally excluded from this long-lived profile. This schema validates the model-generated payload, not database metadata.",
   "type": "object",
   "additionalProperties": false,
@@ -16,6 +16,7 @@
     "knowledge_boundaries",
     "speech_style",
     "appearance_markers",
+    "life_context",
     "author_private_context",
     "ooc_rules",
     "unknowns",
@@ -23,7 +24,7 @@
   ],
   "properties": {
     "schema_version": {
-      "const": "1.0"
+      "const": "1.1"
     },
     "identity_background": {
       "$ref": "#/$defs/section"
@@ -256,6 +257,43 @@
           "resolution_status": {
             "const": "needs_author_clarification"
           }
+        }
+      }
+    },
+    "life_context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "work_environment",
+        "residence_environment",
+        "daily_routines",
+        "interests_and_leisure",
+        "social_circles",
+        "recurring_places",
+        "environmental_constraints"
+      ],
+      "description": "Derived role life context for schedule planning. Every item must be evidence-backed and distinguish author facts from inference.",
+      "properties": {
+        "work_environment": {
+          "$ref": "#/$defs/section"
+        },
+        "residence_environment": {
+          "$ref": "#/$defs/section"
+        },
+        "daily_routines": {
+          "$ref": "#/$defs/section"
+        },
+        "interests_and_leisure": {
+          "$ref": "#/$defs/section"
+        },
+        "social_circles": {
+          "$ref": "#/$defs/section"
+        },
+        "recurring_places": {
+          "$ref": "#/$defs/section"
+        },
+        "environmental_constraints": {
+          "$ref": "#/$defs/section"
         }
       }
     }

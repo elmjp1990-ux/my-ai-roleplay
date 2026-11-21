@@ -11,7 +11,7 @@ const ui = readFileSync("index.html", "utf8");
 assert.match(source, /const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL/);
 assert.match(openRouterShared, /POYOZZ_DEFAULT_CHAT_MODEL = "deepseek\/deepseek-v4-flash-20260423"/);
 assert.doesNotMatch(source, /Deno\.env\.get\("OPENROUTER_MODEL"\)/);
-assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/);
+assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(/);
 assert.match(source, /processDueStoryMemorySummary\(admin, session, user\.id, openRouterKey\)/);
 assert.match(source, /recordChatModelUsage\(admin/);
 assert.match(source, /storedSummary/);
@@ -81,7 +81,7 @@ assert.doesNotMatch(source, /requestStoryGeneration/,
   "single Story must not keep a private provider wrapper beside the shared transport");
 assert.doesNotMatch(groupSource, /fetch\(/,
   "group Story must use the shared provider transport, not its own HTTP request");
-assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(\)/,
+assert.match(openRouterShared, /provider: buildOpenRouterProviderOptions\(/,
   "all chat and summary requests must use the shared approved provider allowlist");
 
 console.log("Dual-model Story chat and five-turn memory-summary contract passed.");

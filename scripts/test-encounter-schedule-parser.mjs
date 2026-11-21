@@ -5,6 +5,8 @@ const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const worldviewReviewMigration = fs.readFileSync("supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
 assert.match(html, /name="encounterScheduleDescription"/);
@@ -14,6 +16,14 @@ assert.doesNotMatch(html, /可直接用自然語言描述；不需要輸入星�
 assert.doesNotMatch(html, /name="clearEncounterSchedules"/);
 assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
 assert.doesNotMatch(html, /星期\(0=日、1=一/);
+
+// City weather and dynamic scenes are session-cached to avoid repeat RPC egress on map re-entry.
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
+assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
+assert.match(cityMap, /sessionStorage\.getItem\('poyozz-city-map-/);
+assert.match(cityMap, /readCityMapCache\('weather'/);
+assert.match(cityMap, /readCityMapCache\('scenes-v2'/);
+assert.match(cityMap, /if\(cached\?\.fresh\)return/);
 
 // Save/load must use the separate author-only description table.
 assert.match(html, /async function saveEncounterScheduleDescription\(/);
@@ -80,16 +90,37 @@ assert.match(cleanupMigration, /GRANT SELECT, INSERT, UPDATE, DELETE/);
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_select_own[\s\S]*?auth\.uid\(\)/);
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
+// Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
+assert.match(html, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
+assert.match(html, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
+ 
+// City-scene avatars must be clipped by a dedicated transparent circular frame;
+// the clickable button must not inherit the legacy square avatar backing.
+assert.match(cityMap, /city-location-person-avatar-frame/);
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}/,
+  "City map avatars must prefer the refreshed image URL over a stale raw avatar_url");
+assert.match(cityMap, /characterAvatarMarkup\(\{\.\.\.person,image,avatar_url:image\}[^\n]*loading:'eager'/,
+  "The selected character detail portrait must load eagerly");
+assert.match(cityMap, /image\.dataset\.characterAvatarId\)return/,
+  "City map must not replace shared avatar images before the signed-URL recovery handler retries them");
+assert.match(html, /const loading=options\.loading==='eager'\?'eager':'lazy'/,
+  "The shared avatar renderer must keep lazy loading by default and support eager detail portraits");
+assert.doesNotMatch(cityMap, /class="city-location-avatar city-location-person"/);
+assert.match(html, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
+assert.match(html, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
+assert.match(html, /#cityMapAvatarStrip > button\.city-location-person\{[^}]*all:unset!important[^}]*background:none!important[^}]*background-color:transparent!important[^}]*background-image:none!important/);
+assert.match(html, /#cityMapAvatarStrip > button\.city-location-person::before,#cityMapAvatarStrip > button\.city-location-person::after\{content:none!important/);
+
 // The card primary image is not reused as encounter-scene art.
-assert.match(encounterScene, /const sceneIllustration=safeImage\(character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
+assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);
 // Restore muted inline card video playback while retaining lazy signed-URL hydration.
 assert.ok(html.includes('<video data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline preload="none"'));
-assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId) {"));
+assert.ok(html.includes("function hydrateEncounterGalleryIllustration(characterId,illustrationId=null) {"));
 assert.ok(encounterScene.includes("正在載入角色立繪…"));
 assert.ok(encounterScene.includes("角色半立繪素材待補"));
 assert.ok(html.includes("const ownerLocal=state.characters.find(character=>"));
 assert.ok(html.includes("ownerLocal?.galleryIllustrations||cachedPublic?.galleryIllustrations||[]"));
-assert.match(encounterScene, /const halfBodyImage=dedicatedSprite\|\|sceneIllustration/);
+assert.match(encounterScene, /const halfBodyImage=selectedGalleryImage\|\|dedicatedSprite\|\|sceneIllustration/);
 assert.doesNotMatch(html, /const cardPortrait=safeImage\(character\?\.image/);
 assert.match(html, /相遇模式立繪（最多 5 張）/);
 assert.match(html, /主要角色圖預覽/);
@@ -159,7 +190,7 @@ assert.ok((html.match(/renderGrid\(\{append:true\}\);/g)||[]).length >= 2);
  assert.ok(html.includes("releaseCharacterVideo(previousDetailVideo)"));
  // Discarded Explore and city portrait nodes must release their detached media resources.
  assert.ok(html.includes("existingVideosByCharacter.forEach(video=>{\n      characterVideoObserver?.unobserve(video);\n      releaseCharacterVideo(video);"));
- assert.ok(cityMap.includes("}else if(previousCharacterVideo){\n      characterVideoObserver?.unobserve(previousCharacterVideo);\n      releaseCharacterVideo(previousCharacterVideo);"));
+ assert.match(cityMap, /else if\(previousCharacterVideo\)\{\s*characterVideoObserver\?\.unobserve\(previousCharacterVideo\);\s*releaseCharacterVideo\(previousCharacterVideo\);/);
  assert.ok(html.includes("video.dataset.videoObservePending='false';"));
  assert.ok(html.includes("window.addEventListener('pageshow',()=>{"));
  assert.ok(html.includes("void hydrateCharacterVideo(video);"));
@@ -176,5 +207,19 @@ assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanu
 assert.ok(html.includes("client.rpc('get_latest_owned_character_stories'"), "Owned character hydration must fetch only the latest story per character through the bounded RPC.");
 assert.ok(html.includes(".select('opening_message')"), "Public character detail must select only the opening field it displays.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
+
+// Unknown worldview review is author-scoped and decisions never invoke AI inline.
+assert.match(scheduleOrganizer, /\.eq\("status", "needs_review"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /\.eq\("status", "pending"\)\.eq\("author_id", actorUserId\)/);
+assert.match(scheduleOrganizer, /\.eq\("status", "processing"\)\.eq\("author_id", actorUserId\)/);
+assert.match(worldviewReviewMigration, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/);
+
+assert.match(scheduleOrganizer, /getEncounterWorldviewScheduleDisposition\([\s\S]*?source\.worldview_review_decision/);
+assert.match(html, /data-action="worldview-review-decision"/);
+assert.match(html, /review_encounter_schedule_worldview/);
+assert.match(html, /只會加入待生成佇列，不會立即呼叫 AI/);
+assert.match(html, /保留既有行程與招呼池/);
+assert.match(html, /modern_map_compatible/);
+assert.match(html, /not_applicable/);
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");

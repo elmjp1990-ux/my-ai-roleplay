@@ -1,5 +1,8 @@
 import { withSupabase } from "npm:@supabase/server@1";
-import { buildOpenRouterProviderOptions } from "../_shared/openrouter-provider-policy.ts";
+import {
+  APPROVED_OPENROUTER_PROVIDERS,
+  buildOpenRouterProviderOptions,
+} from "../_shared/openrouter-provider-policy.ts";
 import {
   buildCharacterProfileMessages,
   CHARACTER_PROFILE_MODEL,
@@ -7,6 +10,7 @@ import {
   validateCharacterProfileSourcePayload,
   type CharacterProfileSourcePayload,
 } from "../_shared/character-profile-organization.ts";
+import { recordAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BATCH = 1;
@@ -43,6 +47,14 @@ type ProfileUsageMetadata = {
   provider: string;
   requestId: string | null;
   usage: Record<string, unknown>;
+  rawOutputText?: string | null;
+  rawResponseBody?: string | null;
+  refusalText?: string | null;
+  httpStatus?: number | null;
+  finishReason?: string | null;
+  responseContentType?: string | null;
+  responseBodyLength?: number | null;
+  responseParsed?: boolean | null;
 };
 
 type GeneratedProfile = ProfileUsageMetadata & {
@@ -117,108 +129,176 @@ async function generateProfile(
   item: WorkItem,
   apiKey: string,
 ): Promise<GeneratedProfile> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-  try {
-    let response: Response;
+  const messages = buildCharacterProfileMessages(item.source_payload);
+  for (const provider of APPROVED_OPENROUTER_PROVIDERS) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
-      response = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": "https://poyozz.com",
-          "X-Title": "POYOZZ Character Profile Organization",
-        },
-        body: JSON.stringify({
+      let response: Response;
+      try {
+        response = await fetch(OPENROUTER_URL, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://poyozz.com",
+            "X-Title": "POYOZZ Character Profile Organization",
+          },
+          body: JSON.stringify({
+            model: CHARACTER_PROFILE_MODEL,
+            messages,
+            response_format: { type: "json_object" },
+            temperature: 0.2,
+            // Pin each attempt to one approved non-training provider. The
+            // application controls failover; OpenRouter fallback stays off.
+            provider: buildOpenRouterProviderOptions(provider),
+          }),
+        });
+      } catch (error) {
+        // A network/timeout failure has an ambiguous billing outcome. Do not
+        // send the same private character source to another provider.
+        const code = error instanceof Error && error.name === "AbortError"
+          ? "provider_request_timeout"
+          : "provider_outcome_unknown";
+        throw new ProfileGenerationError(code, {
           model: CHARACTER_PROFILE_MODEL,
-          messages: buildCharacterProfileMessages(item.source_payload),
-          response_format: { type: "json_object" },
-          temperature: 0.2,
-          // Match POYOZZ's selected OpenRouter privacy policy: no fallback route
-          // and no provider-side data collection for author-only character sources.
-          provider: buildOpenRouterProviderOptions(),
-        }),
-      });
-    } catch (error) {
-      // A timeout/network failure has an ambiguous billing outcome. Do not
-      // automatically retry it; require an explicit author save to retry later.
-      const code = error instanceof Error && error.name === "AbortError"
-        ? "provider_request_timeout"
-        : "provider_outcome_unknown";
-      throw new ProfileGenerationError(code, {
-        model: CHARACTER_PROFILE_MODEL,
-        provider: "deepinfra",
-        requestId: null,
-        usage: {},
-      });
-    }
-    if (!response.ok) {
-      if (response.status >= 500) {
+          provider,
+          requestId: null,
+          usage: {},
+        });
+      }
+
+      // A rate-limit response is an explicit non-generation failure and may
+      // safely use the next approved provider once. Generic 5xx responses are
+      // treated as ambiguous and are not retried.
+      if (response.status === 429 && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
+        await response.body?.cancel();
+        continue;
+      }
+      if (!response.ok) {
+        await response.body?.cancel();
+        if (response.status >= 500) {
+          throw new ProfileGenerationError("provider_outcome_unknown", {
+            model: CHARACTER_PROFILE_MODEL,
+            provider,
+            requestId: response.headers.get("x-request-id"),
+            usage: {},
+          });
+        }
+        throw new ProfileGenerationError("openrouter_http_" + response.status, {
+          model: CHARACTER_PROFILE_MODEL,
+          provider,
+          requestId: response.headers.get("x-request-id"),
+          usage: {},
+        });
+      }
+
+      let result: any;
+      let responseText: string;
+      try {
+        responseText = await readBoundedResponseText(response);
+        result = JSON.parse(responseText);
+      } catch (error) {
+        if (error instanceof Error && error.message === "provider_response_too_large") {
+          throw new ProfileGenerationError("provider_response_too_large", {
+            model: CHARACTER_PROFILE_MODEL,
+            provider,
+            requestId: response.headers.get("x-request-id"),
+            usage: {},
+          });
+        }
         throw new ProfileGenerationError("provider_outcome_unknown", {
           model: CHARACTER_PROFILE_MODEL,
-          provider: "deepinfra",
+          provider,
           requestId: response.headers.get("x-request-id"),
           usage: {},
         });
       }
-      throw new Error("openrouter_http_" + response.status);
-    }
-    let result: any;
-    let responseText: string;
-    try {
-      responseText = await readBoundedResponseText(response);
-      result = JSON.parse(responseText);
-    } catch (error) {
-      if (error instanceof Error && error.message === "provider_response_too_large") {
-        throw new ProfileGenerationError("provider_response_too_large", {
-          model: CHARACTER_PROFILE_MODEL,
-          provider: "deepinfra",
-          requestId: response.headers.get("x-request-id"),
-          usage: {},
-        });
-      }
-      throw new ProfileGenerationError("provider_outcome_unknown", {
-        model: CHARACTER_PROFILE_MODEL,
-        provider: "deepinfra",
-        requestId: response.headers.get("x-request-id"),
-        usage: {},
-      });
-    }
-    const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
-      ? result.usage as Record<string, unknown>
-      : {};
-    const responseProvider = typeof result?.provider === "string" ? result.provider : "deepinfra";
-    const requestIdValue = response.headers.get("x-request-id") ||
-      (typeof result?.id === "string" ? result.id : null);
-    const metadata: ProfileUsageMetadata = {
-      model: CHARACTER_PROFILE_MODEL,
-      provider: responseProvider.slice(0, 100),
-      requestId: typeof requestIdValue === "string" &&
-        /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
-      usage,
-    };
-    const content = result?.choices?.[0]?.message?.content;
-    if (typeof content !== "string" || !content.trim()) {
-      throw new ProfileGenerationError("model_content_missing", metadata);
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(content);
-    } catch {
-      throw new ProfileGenerationError("model_json_invalid", metadata);
-    }
-    const validation = validateCharacterAiProfile(parsed, item.source_payload);
-    if (!validation.ok) {
-      throw new ProfileGenerationError("profile_schema_invalid_" + validation.errors[0], metadata);
-    }
-    return { ...metadata, profile: parsed as Record<string, unknown> };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
 
+      const errorCode = typeof result?.error?.code === "string"
+        ? result.error.code.toLowerCase().replace(/[\s-]+/g, "_")
+        : "";
+      const isExplicitOverload = [
+        "engine_overloaded",
+        "upstream_overloaded",
+        "upstream_unavailable",
+        "provider_overloaded",
+        "capacity_exceeded",
+        "rate_limit",
+        "temporarily_unavailable",
+        "upstream_busy",
+      ].some((code) => errorCode.includes(code));
+      if (isExplicitOverload && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
+        continue;
+      }
+      if (result?.error != null) {
+        throw new ProfileGenerationError("provider_" + safeCode(result.error, "generation_failed"), {
+          model: CHARACTER_PROFILE_MODEL,
+          provider,
+          requestId: response.headers.get("x-request-id") ||
+            (typeof result?.id === "string" ? result.id : null),
+          usage: result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
+            ? result.usage as Record<string, unknown>
+            : {},
+          rawOutputText: typeof result?.choices?.[0]?.message?.content === "string" ? result.choices[0].message.content : null,
+          rawResponseBody: responseText,
+          refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
+          httpStatus: response.status,
+          finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
+          responseContentType: response.headers.get("content-type") || "",
+          responseBodyLength: responseText.length,
+          responseParsed: true,
+        });
+      }
+
+      const usage = result?.usage && typeof result.usage === "object" && !Array.isArray(result.usage)
+        ? result.usage as Record<string, unknown>
+        : {};
+      const responseProvider = typeof result?.provider === "string" ? result.provider : provider;
+      const requestIdValue = response.headers.get("x-request-id") ||
+        (typeof result?.id === "string" ? result.id : null);
+      const content = result?.choices?.[0]?.message?.content;
+      const metadata: ProfileUsageMetadata = {
+        model: CHARACTER_PROFILE_MODEL,
+        provider: responseProvider.slice(0, 100),
+        requestId: typeof requestIdValue === "string" &&
+          /^[A-Za-z0-9._:-]{1,128}$/.test(requestIdValue) ? requestIdValue : null,
+        usage,
+        rawOutputText: typeof content === "string" ? content : null,
+        rawResponseBody: responseText,
+        refusalText: typeof result?.choices?.[0]?.message?.refusal === "string" ? result.choices[0].message.refusal : null,
+        httpStatus: response.status,
+        finishReason: typeof result?.choices?.[0]?.finish_reason === "string" ? result.choices[0].finish_reason : null,
+        responseContentType: response.headers.get("content-type") || "",
+        responseBodyLength: responseText.length,
+        responseParsed: true,
+      };
+      if (typeof content !== "string" || !content.trim()) {
+        throw new ProfileGenerationError("model_content_missing", metadata);
+      }
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(content);
+      } catch {
+        throw new ProfileGenerationError("model_json_invalid", metadata);
+      }
+      const validation = validateCharacterAiProfile(parsed, item.source_payload);
+      if (!validation.ok) {
+        throw new ProfileGenerationError("profile_schema_invalid_" + validation.errors[0], metadata);
+      }
+      return { ...metadata, profile: parsed as Record<string, unknown> };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw new ProfileGenerationError("provider_fallback_exhausted", {
+    model: CHARACTER_PROFILE_MODEL,
+    provider: APPROVED_OPENROUTER_PROVIDERS[APPROVED_OPENROUTER_PROVIDERS.length - 1],
+    requestId: null,
+    usage: {},
+  });
+}
 const safeUsageInteger = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
   const parsed = typeof value === "number" ? value : Number(value);
@@ -307,6 +387,14 @@ export default {
         const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
         const generated = await generateProfile(item, apiKey);
+        await recordAiGenerationDiagnostic(supabase, {
+          generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
+          sourceRef: item.source_hash, model: generated.model, provider: generated.provider,
+          requestId: generated.requestId, httpStatus: generated.httpStatus, finishReason: generated.finishReason,
+          responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
+          rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed, rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
+          refusalText: generated.refusalText, usage: generated.usage, status: "completed",
+        });
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
         // The provider has already completed and may have billed this request.
@@ -319,6 +407,16 @@ export default {
         const code = safeCode(error, "profile_generation_failed");
         if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
           const failedUsage = error instanceof ProfileGenerationError ? error.metadata : null;
+          if (failedUsage) await recordAiGenerationDiagnostic(supabase, {
+            generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
+            sourceRef: item.source_hash, model: failedUsage.model, provider: failedUsage.provider,
+            requestId: failedUsage.requestId, httpStatus: failedUsage.httpStatus,
+            finishReason: failedUsage.finishReason, responseContentType: failedUsage.responseContentType,
+            responseBodyLength: failedUsage.responseBodyLength, rawResponseBody: failedUsage.rawResponseBody,
+            responseParsed: failedUsage.responseParsed, rawOutputText: failedUsage.rawOutputText, refusalText: failedUsage.refusalText,
+            usage: failedUsage.usage, status: "failed", failureStage: "profile_output_validation", failureCode: code,
+            validationErrors: code.startsWith("profile_schema_invalid_") ? [code] : code === "model_json_invalid" ? ["model_json_invalid"] : [],
+          });
           await recordProfileUsage(supabase, item, failedUsage, "failed", code);
           usageRecorded = true;
         }

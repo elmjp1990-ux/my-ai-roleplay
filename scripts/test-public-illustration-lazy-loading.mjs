@@ -74,6 +74,6 @@ assert.match(cityMap, /locationModal\.dataset\.cardMode===mode&&card\.dataset\.p
 assert.match(html, /route\.page==='detail'&&c\.cloudPublic===true&&!c\.owner/);
 
 // Encounter gallery and owner/editor asset hydration remain unchanged.
-assert.match(html, /async function hydrateEncounterGalleryIllustration\(characterId\)/);
+assert.match(html, /async function hydrateEncounterGalleryIllustration\(characterId,illustrationId=null\)/);
 assert.match(html, /async function hydrateCharacterIllustrationsIntoEditor\(characterId\)/);
 console.log("Public character detail payload lazy-loading tests passed.");

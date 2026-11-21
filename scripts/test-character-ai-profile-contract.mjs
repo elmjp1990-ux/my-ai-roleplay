@@ -1,18 +1,23 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import vm from "node:vm";
 
 const schema = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-v1.schema.json", "utf8"));
 const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profile-source-registry-v1.json", "utf8"));
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
+const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
+const coreUtils = fs.readFileSync("core-utils.js", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
+const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
 
 assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
-assert.equal(schema.properties.schema_version.const, "1.0");
+assert.equal(schema.properties.schema_version.const, "1.1");
 assert.equal(schema.additionalProperties, false);
 
 const required = new Set(schema.required);
@@ -20,9 +25,11 @@ for (const key of [
   "identity_background", "core_personality", "inner_motivations",
   "emotional_response_patterns", "relationship_dynamics", "behavior_and_agency",
   "knowledge_boundaries", "speech_style", "appearance_markers",
-  "author_private_context", "ooc_rules", "unknowns", "source_conflicts",
+  "life_context", "author_private_context", "ooc_rules", "unknowns", "source_conflicts",
 ]) assert.ok(required.has(key), `Profile schema must require ${key}`);
 assert.ok(!required.has("life_schedule_context"), "Schedules must remain runtime context, not stale derived profile data");
+for (const key of ["work_environment", "residence_environment", "daily_routines", "interests_and_leisure", "social_circles", "recurring_places", "environmental_constraints"]) assert.ok(schema.properties.life_context.properties[key], "Missing life context section " + key);
+assert.ok(registry.runtime_only_sources.some(item => item.path === "character_stories.opening_message" && item.refresh_on_change === false), "Opening-message polishing must not regenerate the profile");
 
 const ooc = schema.properties.ooc_rules;
 assert.ok(ooc.allOf.some(rule => rule.if?.properties?.status?.const === "ready" && rule.then?.properties?.rules?.minItems === 3),
@@ -52,6 +59,7 @@ for (const path of [
   "character_private_info.personality_profile.dislikes",
   "character_private_info.personality_profile.boundaries",
   "character_private_info.personality_profile.relationshipPacing",
+  "character_private_info.personality_profile.occupation",
 ]) assert.ok(refreshPaths.has(path), `Missing AI refresh source ${path}`);
 
 for (const path of [
@@ -62,25 +70,67 @@ for (const path of [
   assert.ok(!refreshPaths.has(path), `${path} must not trigger derived profile refresh`);
 }
 
-const aiProfileFields = frontend.slice(frontend.indexOf("const aiProfileFields"), frontend.indexOf("for (const [key, label] of Object.entries(aiProfileFields))"));
+
+const classifierSandbox = { window: {} };
+vm.runInNewContext(coreUtils, classifierSandbox);
+const classifyProfileChange = classifierSandbox.window.PoyozzCoreUtils.classifyCharacterProfileChanges;
+const baseCharacter = {
+  name: "角色甲", intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
+  phone_settings: {}, phoneSettings: {}, privateInfo: "住在城市", tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
+};
+const basePrivate = { private_info: "住在城市", personality_profile: baseCharacter.personalityProfile };
+const classify = (characterPatch = {}, privatePatch = {}, existingPatch = {}) => classifyProfileChange({
+  existingCharacter: { ...baseCharacter, ...existingPatch },
+  existingPrivateProfile: { ...basePrivate, ...privatePatch },
+  character: { ...baseCharacter, ...characterPatch },
+  normalizePersonalityProfile: value => value || {},
+  rowPhoneSettingsForDiff: value => value || {},
+});
+assert.equal(classify({ name: "角色乙" }).requiresDerivedRefresh, false,
+  "Renaming a character must not trigger AI profile generation");
+assert.equal(classify({ opening: "優化後的開場白" }).requiresDerivedRefresh, false,
+  "Opening-message edits must not trigger AI profile generation");
+assert.equal(classify({ intro: "一名生活在城市中的\\n角色" }).requiresDerivedRefresh, true,
+  "Any raw source-text change must refresh so the profile source hash remains current");
+assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜", "有戒心"], values: ["誠實"] } }).requiresDerivedRefresh, true,
+  "A substantive core personality change must trigger profile regeneration");
+assert.equal(classify({ personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"], occupation: "醫師" } }).requiresDerivedRefresh, true,
+  "A saved occupation change must trigger life-context regeneration");
+assert.equal(classify({ intro: "一名不生活在城市中的角色" }).requiresDerivedRefresh, true,
+  "A substantive background change must trigger profile regeneration");
+assert.equal(classify({ phoneSettings: { noticePrompts: ["新通知規則"] } }).requiresDerivedRefresh, false,
+  "Runtime phone settings must not regenerate the durable profile");
+
+const aiProfileFields = coreUtils.slice(coreUtils.indexOf("const fields"), coreUtils.indexOf("for (const key of fields)"));
 assert.ok(aiProfileFields.length > 0, "Character save classifier must define its personality field allowlist");
 for (const key of ["coreTraits", "values", "speechStyle", "behaviorRules", "likes", "dislikes", "boundaries", "relationshipPacing"]) {
-  assert.match(aiProfileFields, new RegExp(`\\b${key}:`), `Classifier must diff ${key}`);
+  assert.ok(aiProfileFields.includes(key), `Classifier must diff ${key}`);
 }
 for (const key of ["intro", "race", "style", "private_info"]) {
-  assert.ok(frontend.includes(`compareCharacterField(aiRelevantChanges, '${key}'`),
+  assert.ok(coreUtils.includes(`compareSource('${key}'`),
     `Classifier must diff AI source field ${key}`);
 }
-assert.match(frontend, /compareCharacterField\(runtimeAiChanges, 'phone_settings'/,
+assert.match(coreUtils, /compare\(runtime, 'phone_settings'/,
   "Phone settings must stay in runtime AI configuration changes");
-assert.match(frontend, /compareCharacterField\(nonAiChanges, 'name'/,
+assert.match(coreUtils, /compare\(nonAi, 'name'/,
   "Character renaming must not trigger profile generation");
-assert.match(frontend, /shouldCallModel: false/,
+assert.match(coreUtils, /shouldCallModel: false/,
   "The browser must never call the model directly");
+assert.match(frontend, /p_source_changed: aiOrganizationDecision\.requiresDerivedRefresh === true/, "Save flow must pass its deterministic source-change decision to the database");
+assert.match(profileVersionMigration, /p_source_changed boolean/, "Profile queue must accept the deterministic source-change decision");
+assert.match(profileVersionMigration, /character_private_info\.personality_profile\.occupation/, "The profile source payload must include the creator occupation field");
+assert.match(profileVersionMigration, /AS \$queue_wrapper\$[\s\S]*?RETURN public\.enqueue_character_profile_organization\(p_character_id, true\);[\s\S]*?\$queue_wrapper\$;/, "Legacy one-argument queue RPC must retain valid dollar quoting");
+assert.match(profileVersionMigration, /AS \$profile_source\$[\s\S]*?RETURN v_payload;[\s\S]*?\$profile_source\$;/, "The source payload replacement must use valid dollar quoting");
+assert.match(profileVersionMigration, /p\.profile->>'schema_version' = '1\.1'/, "Legacy profile schemas must be refreshed once");
+assert.match(profileVersionMigration, /p\.profile \? 'life_context'/, "A profile is current only when structured life context exists");
+assert.match(profileVersionMigration, /status = 'processing'[\s\S]*?RAISE EXCEPTION 'character_profile_worker_active_retry_migration'/, "Source hash migration must refuse to run while a Worker lease is active");
+assert.match(profileVersionMigration, /LOCK TABLE public\.character_profile_organization_jobs IN SHARE ROW EXCLUSIVE MODE/, "Source hash migration must block concurrent claims and writes while rehashing");
+assert.match(profileVersionMigration, /UPDATE public\.character_profile_organization_jobs[\s\S]*source_hash = refreshed\.source_hash/, "Existing queued jobs must be rehashed before the new source payload is claimed");
+assert.match(profileVersionMigration, /to_jsonb\(COALESCE\(pi\.personality_profile ->> 'coreTraits', ''\)\)/, "Missing personality values must hash identically to the empty strings persisted by the form");
 assert.match(frontend, /enqueue_character_profile_organization/,
   "A verified character save must enqueue a derived-profile refresh");
-assert.match(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
-  "Only AI-relevant source changes may enqueue a refresh");
+assert.doesNotMatch(frontend, /if \(aiOrganizationDecision\.requiresDerivedRefresh === true\)/,
+  "Every save may check profile freshness, but the database must decide whether model work is needed");
 assert.ok(frontend.indexOf("const { data: savedCharacter") < frontend.indexOf("enqueue_character_profile_organization"),
   "Profile enqueue must happen only after persisted character data is verified");
 assert.ok(frontend.indexOf("enqueue_character_profile_organization") < frontend.indexOf("const { data: existingStory"),
@@ -102,8 +152,11 @@ assert.match(migration, /REVOKE ALL ON public\.character_profile_organization[\s
 assert.match(worker, /deepseek\/deepseek-v4-flash-20260423|CHARACTER_PROFILE_MODEL/,
   "Worker must use the confirmed DeepSeek V4 Flash 0423 model");
 assert.match(worker, /OPENROUTER_API_KEY/, "Worker must read the provider key only from server environment");
-assert.match(worker, /buildOpenRouterProviderOptions\(\)/, "Profile requests must use the shared OpenRouter provider policy");
-assert.match(providerPolicy, /data_collection: "deny"/, "Profile requests must enforce POYOZZ's no-provider-data-collection policy");
+assert.match(worker, /buildOpenRouterProviderOptions\(provider\)/, "Profile requests must pin each attempt to the shared OpenRouter provider policy");
+assert.match(worker, /APPROVED_OPENROUTER_PROVIDERS/, "Profile requests must use only the approved provider order");
+assert.match(worker, /response\.status === 429/, "Profile requests may fail over on explicit provider rate limits");
+assert.match(worker, /Generic 5xx responses are[\s\S]*not retried/, "Ambiguous profile-generation outcomes must not be retried on another provider");
+assert.match(providerPolicy, /data_collection: "allow"/, "Profile requests must enforce POYOZZ's limited-retention, no-training provider policy");
 assert.match(providerPolicy, /APPROVED_OPENROUTER_PROVIDERS = \["deepinfra", "inference-net"\]/, "Profile requests must use the same approved provider allowlist as Story generation");
 assert.match(migration, /character_profile_organization_usage/,
   "Profile generation must have a separate private usage/cost ledger, not reuse the queue");
@@ -113,10 +166,15 @@ assert.match(worker, /prompt_tokens:[\s\S]*completion_tokens:[\s\S]*total_tokens
   "Profile usage ledger must capture provider token and cost fields");
 assert.match(workerCore, /validateCharacterAiProfile/, "Worker output must pass strict profile validation");
 assert.match(workerCore, /source_refs/, "Every derived statement must cite allowlisted source paths");
+assert.match(workerCore, /character_private_info\.personality_profile\.occupation/, "The worker must validate occupation as an allowlisted source key");
+assert.match(frontend, /occupation:500/, "The character form normalizer must preserve saved occupation values");
 assert.match(storyTurn, /get_character_ai_profile_for_chat/,
   "Story chat-turn must load only a source-current derived profile");
 assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
   "Private-derived evidence must join the server-side output leak guard");
+assert.match(scheduleOrganizer, /get_character_ai_profile_for_chat/, "Schedule worker must read the saved current profile without generating a second profile");
+assert.match(scheduleGeneration, /character_life_context/, "Schedule prompt must receive the saved structured life context");
+assert.match(scheduleGeneration, /不得為取得生活環境而在行程生成階段再次呼叫分析 AI/, "Schedule prompt must not request another life-context analysis call");
 assert.match(storyTurn, /CHAR_AI_PROFILE/,
   "Story system prompt must receive the derived profile and OOC context");
 assert.match(migration, /Keep profile organization serial by default/,
@@ -178,5 +236,11 @@ assert.ok(workerCore.includes("profile_output_too_large") && workerCore.includes
   "Profile validator must enforce output byte, string and item-count limits");
 assert.ok(worker.includes("provider_response_too_large") && worker.includes("requestId: response.headers.get"),
   "Oversized or malformed provider responses must be terminal with a traceable request ID");
+
+assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
+assert.match(coreUtils, /const sourceChanged = changed/, "Profile source comparison must remain aligned with the exact database source hash");
+assert.match(coreUtils, /const prev = existingPrivateProfile\?\.personality_profile/, "Profile diff must compare raw persisted values instead of hiding normalization changes");
+assert.match(coreUtils, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
+assert.match(coreUtils, /relationshipPacing.*occupation/, "Occupation changes must be classified as AI-relevant source changes");
 
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");

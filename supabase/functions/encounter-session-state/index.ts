@@ -27,7 +27,7 @@ Deno.serve(async (request: Request) => {
   try { body = await request.json(); } catch { return json({ error: "invalid_json" }, 400); }
   const sessionId = body.sessionId;
   const action = body.action;
-  if (!isUuid(sessionId) || !["pause", "resume"].includes(String(action))) {
+  if (!isUuid(sessionId) || !["pause", "resume", "end"].includes(String(action))) {
     return json({ error: "invalid_encounter_state_request" }, 400);
   }
 
@@ -62,6 +62,87 @@ Deno.serve(async (request: Request) => {
     if (error.code === "22023") return json({ error: "invalid_encounter_state_request" }, 400);
     console.error("Encounter state transition failed:", message);
     return json({ error: "encounter_state_update_failed" }, 503);
+  }
+
+  if (action === "pause" || action === "resume") {
+    const { error: metadataError } = await admin.rpc("persist_encounter_session_pause_resume_metadata", {
+      p_session_id: sessionId, p_user_id: user.id, p_action: action,
+    });
+    if (metadataError) {
+      try { await admin.rpc("set_encounter_session_lifecycle_state", {
+        p_session_id: sessionId, p_user_id: user.id, p_action: action === "pause" ? "resume" : "pause",
+      }); } catch (_) {}
+      return json({ error: "encounter_state_metadata_persistence_failed" }, 503);
+    }
+  }
+
+  if (action === "end") {
+    // Persist the ended state immediately, independently of the asynchronous AI summary.
+    const { data: sessionRow, error: sessionReadError } = await admin.from("chat_sessions")
+      .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
+    if (sessionReadError || !sessionRow) return json({ error: "encounter_end_metadata_unavailable" }, 503);
+    const persistedSessionData = sessionRow as unknown as { session_data?: unknown };
+    const currentSessionData = persistedSessionData.session_data && typeof persistedSessionData.session_data === "object" && !Array.isArray(persistedSessionData.session_data)
+      ? persistedSessionData.session_data as Record<string, unknown> : {};
+    const { error: metadataError } = await admin.from("chat_sessions").update({
+      session_data: { ...currentSessionData, archived: true, encounterEndedAt: Date.now() },
+      updated_at: new Date().toISOString(),
+    }).eq("id", sessionId).eq("user_id", user.id).eq("chat_mode", "encounter").is("deleted_at", null);
+    if (metadataError) return json({ error: "encounter_end_metadata_persistence_failed" }, 503);
+    const queueEvaluation = async () => {
+      try {
+        const { data: lifecycle, error: lifecycleError } = await admin
+          .from("encounter_session_lifecycle")
+          .select("session_id,user_id,character_id,status,scheduled_end_at")
+          .eq("session_id", sessionId)
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (lifecycleError || !lifecycle || lifecycle.status !== "ready_to_settle" ||
+            new Date(lifecycle.scheduled_end_at).getTime() > Date.now()) {
+          if (lifecycleError) console.error("Encounter evaluation queue lookup failed:", lifecycleError.message);
+          return;
+        }
+
+        const { error: queueError } = await admin
+          .from("encounter_session_evaluation_jobs")
+          .insert({
+            session_id: lifecycle.session_id,
+            user_id: lifecycle.user_id,
+            character_id: lifecycle.character_id,
+            status: "pending",
+          });
+        // A pre-existing job is expected on an idempotent end retry. Never reset a
+        // completed job or create a second evaluation for the same scene.
+        if (queueError && queueError.code !== "23505") {
+          throw new Error("encounter_evaluation_job_enqueue_failed");
+        }
+
+        const workerUrl = url.replace(/\/+$/, "") + "/functions/v1/encounter-evaluation-worker";
+        const workerResponse = await fetch(workerUrl, {
+          method: "POST",
+          headers: {
+            Authorization: "Bearer " + serviceRoleKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ limit: 1, sessionId: lifecycle.session_id }),
+        });
+        if (!workerResponse.ok) {
+          throw new Error("encounter_evaluation_worker_http_" + workerResponse.status);
+        }
+      } catch (evaluationError) {
+        console.error(
+          "Encounter evaluation background trigger failed:",
+          evaluationError instanceof Error ? evaluationError.message : "unknown_error",
+        );
+      }
+    };
+
+    const runtime = (globalThis as unknown as {
+      EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void };
+    }).EdgeRuntime;
+    const task = queueEvaluation();
+    if (typeof runtime?.waitUntil === "function") runtime.waitUntil(task);
+    else await task;
   }
 
   return json({ encounter: data });

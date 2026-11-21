@@ -13,10 +13,10 @@ for (const [name,source] of [['story',story],['encounter',encounter]]) {
 }
 assert.match(story,/character\.author_id === user\.id[\s\S]*storyQuery\.eq\("visibility", "public"\)/,
   'Story snapshots must not expose private opening messages to non-authors');
-assert.match(encounter,/from\("character_stories"\)[\s\S]*\.eq\("visibility", "public"\)/,
-  'Encounter snapshots must read only public opening messages');
-assert.match(encounter,/opening: openingMessage/,
-  'Encounter snapshots must preserve the public character opening');
+assert.doesNotMatch(encounter,/from\("character_stories"\)/,
+  'Encounter sessions must not preload character-story opening text; the first response is generated dynamically by encounter-turn');
+assert.match(encounter,/create_encounter_session_with_lifecycle/,
+  'Encounter sessions must initialize through the lifecycle RPC without embedding a pre-generated opening');
 assert.match(html,/async function hydrateCloudSessionCharacterImage\(s\)/);
 assert.match(html,/getCharacterIllustrationSignedUrl\(path,\{forceRefresh:!!cached\}\)/);
 assert.match(html,/cloudSessionImageUrlCache\.set\(key,\{url,expiresAt:Date\.now\(\)\+55\*60\*1000\}\)/);
