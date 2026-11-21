@@ -8879,20 +8879,15 @@ function chatSidebarToggleButton(mobileAction) {
 window.PoyozzAffinityUI = window.PoyozzAffinityUI || {
   labels:{hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'},
   render(affinity,stage,variant='compact'){
-    const label=this.labels[stage],value=Number(affinity);
-    if(!Number.isInteger(value)||value < -100||value > 100||!label)return '<span class="poyozz-affinity-empty">你們還不認識</span>';
-    const progress=Math.round((value+100)/2);
-    return '<div class="poyozz-affinity-ui '+variant+'" role="status" aria-label="關係階段 '+label+'，好感度進度 '+progress+'%"><span class="poyozz-affinity-heart" aria-hidden="true">♡</span><span class="poyozz-affinity-label">關係 · '+label+'</span><span class="poyozz-affinity-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span></div>';
+    const label=this.labels[stage];
+    if(!label)return '<span class="poyozz-affinity-empty">你們還不認識</span>';
+    return '<span class="poyozz-affinity-ui '+variant+'" role="status" aria-label="關係階段 '+label+'"><span class="poyozz-affinity-label">'+label+'</span></span>';
   }
 };
 async function loadStoryRelationshipState(session) {
   if (!session?.storyMode || !isUuid(session.id) || !window.mySupabase) return;
   const target = document.getElementById('storyRelationshipLabel');
   if (!target) return;
-  const labels = {
-    hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',
-    acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'
-  };
   try {
     const { data, error } = await window.mySupabase.rpc('get_story_relationship_state', {
       p_session_id: session.id
@@ -8901,7 +8896,7 @@ async function loadStoryRelationshipState(session) {
     const row = Array.isArray(data) ? data[0] : data;
     if (!row) { target.remove(); return; }
     const affinity = Number(row.affinity);
-    const label = labels[row.relationship_stage];
+    const label = window.PoyozzAffinityUI?.labels?.[row.relationship_stage];
     if (!Number.isInteger(affinity) || affinity < -100 || affinity > 100 || !label) {
       target.textContent = '關係資料待確認';
       return;
@@ -8910,7 +8905,6 @@ async function loadStoryRelationshipState(session) {
     session.storyRelationshipStage = row.relationship_stage;
     persist();
     target.innerHTML = window.PoyozzAffinityUI.render(affinity,row.relationship_stage,'story');
-    target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
     target.textContent = '關係資料暫時無法載入';
@@ -14027,17 +14021,13 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
 
-/* Shared affinity presentation: one UI across story, encounter, and city character panels. */
-.poyozz-affinity-ui{display:flex;align-items:center;gap:6px;min-width:0;color:rgba(255,255,255,.88);font-size:11px;line-height:1.25}
-.poyozz-affinity-heart{color:#efc7d8;font-size:15px;line-height:1}
-.poyozz-affinity-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.poyozz-affinity-meter{display:block;flex:1;min-width:24px;height:4px;border-radius:99px;background:rgba(255,255,255,.17);overflow:hidden}
-.poyozz-affinity-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#a99acb,#f1c6b0);box-shadow:0 0 7px rgba(226,190,205,.3)}
-.poyozz-affinity-ui.story{padding:3px 0}
-.poyozz-affinity-ui.compact{font-size:9px;gap:4px}
-.poyozz-affinity-ui.compact .poyozz-affinity-heart{font-size:12px}
-.poyozz-affinity-ui.encounter{max-width:150px;padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:9px;gap:4px}
-.poyozz-affinity-empty{font-size:10px;opacity:.75}
+/* One canonical relationship chip; variants change size only, never content or color. */
+.poyozz-affinity-ui{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;padding:3px 9px;border:1px solid rgba(205,184,255,.68);border-radius:999px;background:rgba(169,154,203,.24);color:#fff;font-size:10px;font-weight:600;line-height:1.25;white-space:nowrap;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+.poyozz-affinity-label{display:block;overflow:hidden;text-overflow:ellipsis}
+.poyozz-affinity-ui.story{padding:3px 9px}
+.poyozz-affinity-ui.compact{padding:2px 7px;font-size:9px}
+.poyozz-affinity-ui.encounter{max-width:150px;padding:2px 7px;font-size:9px}
+.poyozz-affinity-empty{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(205,184,255,.45);border-radius:999px;background:rgba(169,154,203,.16);color:rgba(255,255,255,.8);font-size:9px}
 
 .city-character-affinity{width:100%;padding:0;min-width:0;display:flex;justify-content:center;align-items:center}
 .city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
