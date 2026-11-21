@@ -8879,8 +8879,11 @@ window.PoyozzAffinityUI = window.PoyozzAffinityUI || {
   labels:{hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'},
   render(affinity,stage,variant='compact'){
     const label=this.labels[stage];
-    if(!label)return '<span class="poyozz-affinity-empty">你們還不認識</span>';
-    return '<span class="poyozz-affinity-ui '+variant+'" role="status" aria-label="關係階段 '+label+'"><span class="poyozz-affinity-label">'+label+'</span></span>';
+    const score=Number(affinity);
+    const tone=Number.isFinite(score)&&score<0?'is-negative':Number.isFinite(score)&&score>0?'is-positive':'is-neutral';
+    const heartColor=tone==='is-negative'?'#b9a3d2':tone==='is-positive'?'#f4b9df':'#d8cde4';
+    if(!label)return '<span class="poyozz-affinity-empty"><span class="poyozz-affinity-heart" aria-hidden="true" style="color:'+heartColor+'">♥</span><span>你們還不認識</span></span>';
+    return '<span class="poyozz-affinity-ui '+variant+' '+tone+'" role="status" aria-label="好感度關係：'+label+'"><span class="poyozz-affinity-heart" aria-hidden="true">♥</span><span class="poyozz-affinity-label">'+label+'</span></span>';
   }
 };
 async function loadStoryRelationshipState(session) {
@@ -14020,13 +14023,18 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
 
-/* One canonical relationship chip; variants change size only, never content or color. */
-.poyozz-affinity-ui{display:inline-flex;align-items:center;justify-content:center;max-width:100%;min-width:0;padding:3px 9px;border:1px solid rgba(205,184,255,.68);border-radius:999px;background:rgba(169,154,203,.24);color:#fff;font-size:10px;font-weight:600;line-height:1.25;white-space:nowrap;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+/* One canonical relationship badge: restrained jewel tones, a clear heart cue, and consistent sizing. */
+.poyozz-affinity-ui{display:inline-flex;align-items:center;justify-content:center;gap:5px;max-width:100%;min-width:0;padding:4px 10px;border:1px solid var(--affinity-border);border-radius:999px;background:var(--affinity-bg);color:var(--affinity-text);font-size:10px;font-weight:650;line-height:1.25;letter-spacing:.015em;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(12,8,24,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.poyozz-affinity-ui.is-negative{--affinity-border:rgba(112,91,145,.58);--affinity-bg:linear-gradient(135deg,rgba(35,27,48,.94),rgba(65,48,78,.88));--affinity-text:#e8dff1}
+.poyozz-affinity-ui.is-positive{--affinity-border:rgba(230,174,218,.62);--affinity-bg:linear-gradient(135deg,rgba(116,72,111,.92),rgba(151,105,157,.88));--affinity-text:#fff0fb}
+.poyozz-affinity-ui.is-neutral{--affinity-border:rgba(196,184,218,.5);--affinity-bg:linear-gradient(135deg,rgba(83,76,99,.82),rgba(112,103,129,.78));--affinity-text:#f4eff9}
+.poyozz-affinity-heart{display:inline-block;flex:0 0 auto;font-family:Georgia,serif;font-size:11px;line-height:1;text-shadow:0 1px 5px currentColor}
 .poyozz-affinity-label{display:block;overflow:hidden;text-overflow:ellipsis}
-.poyozz-affinity-ui.story{padding:3px 9px}
-.poyozz-affinity-ui.compact{padding:2px 7px;font-size:9px}
-.poyozz-affinity-ui.encounter{max-width:150px;padding:2px 7px;font-size:9px}
-.poyozz-affinity-empty{display:inline-flex;align-items:center;padding:2px 7px;border:1px solid rgba(205,184,255,.45);border-radius:999px;background:rgba(169,154,203,.16);color:rgba(255,255,255,.8);font-size:9px}
+.poyozz-affinity-ui.story{padding:4px 10px}
+.poyozz-affinity-ui.compact{gap:4px;padding:3px 8px;font-size:9px}
+.poyozz-affinity-ui.encounter{max-width:150px;gap:4px;padding:3px 8px;font-size:9px}
+.poyozz-affinity-empty{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid rgba(196,184,218,.42);border-radius:999px;background:rgba(83,76,99,.34);color:rgba(245,239,250,.86);font-size:9px}
+.poyozz-affinity-empty .poyozz-affinity-heart{color:#c9bfd6}
 
 .city-character-affinity{width:100%;padding:0;min-width:0;display:flex;justify-content:center;align-items:center}
 .city-character-photo-column .city-character-portrait{width:100%;height:136px;min-height:0;flex:0 0 136px;border:0;border-radius:13px;object-fit:cover;background:transparent}
