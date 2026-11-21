@@ -407,6 +407,60 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001000_fix_encounter_schedule_publisher_jsonb_key_count.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001200_fix_encounter_schedule_null_weather_greeting.sql
 
+      - name: Apply and verify 14-day AI generation diagnostics retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This creates the cleanup Cron only inside the disposable local database.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261121120000_ai_generation_diagnostics_14_day_retention.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $diagnostics_check$
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_class c
+              JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+              WHERE n.nspname = 'public' AND c.relname = 'ai_generation_diagnostics'
+                AND c.relrowsecurity IS TRUE
+            ) THEN
+              RAISE EXCEPTION 'AI generation diagnostics table missing or RLS disabled';
+            END IF;
+            IF has_table_privilege('anon', 'public.ai_generation_diagnostics', 'SELECT')
+               OR has_table_privilege('authenticated', 'public.ai_generation_diagnostics', 'SELECT') THEN
+              RAISE EXCEPTION 'AI diagnostics must not be readable by anon/authenticated';
+            END IF;
+            IF NOT has_table_privilege('service_role', 'public.ai_generation_diagnostics', 'SELECT')
+               OR NOT has_table_privilege('service_role', 'public.ai_generation_diagnostics', 'INSERT') THEN
+              RAISE EXCEPTION 'service_role diagnostics access missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'ai_generation_diagnostics'
+                AND column_name = 'raw_response_body'
+            ) OR NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'ai_generation_diagnostics'
+                AND column_name = 'raw_response_truncated'
+            ) THEN
+              RAISE EXCEPTION 'raw provider response body diagnostics columns missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_constraint con
+              JOIN pg_catalog.pg_class rel ON rel.oid = con.conrelid
+              JOIN pg_catalog.pg_namespace n ON n.oid = rel.relnamespace
+              WHERE n.nspname = 'public' AND rel.relname = 'ai_generation_diagnostics'
+                AND con.contype = 'f' AND con.confdeltype = 'c'
+            ) THEN
+              RAISE EXCEPTION 'account deletion cascade foreign key missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM cron.job WHERE jobname = 'poyozz-ai-generation-diagnostics-purge'
+            ) THEN
+              RAISE EXCEPTION '14-day AI diagnostics purge Cron job missing';
+            END IF;
+          END
+          $diagnostics_check$;
+          SQL
+
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
         run: |
