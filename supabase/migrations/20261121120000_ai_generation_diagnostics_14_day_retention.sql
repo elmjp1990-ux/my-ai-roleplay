@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.ai_generation_diagnostics (
   response_parsed boolean,
   raw_output_text text,
   raw_response_body text,
+  raw_response_truncated boolean NOT NULL DEFAULT false,
   refusal_text text,
   failure_stage text,
   failure_code text,
