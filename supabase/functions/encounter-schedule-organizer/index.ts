@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { findPrivateContextLeak } from "../_shared/private-context-guard.ts";
 import {
   buildEncounterScheduleBatchMessages,
@@ -726,6 +727,7 @@ Deno.serve(async (request) => {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
     let rawOutputId: string | null = null;
+    let diagnosticId: string | null = null;
     let providerDurationMs = 0;
     const providerStartedAt = Date.now();
     try {
@@ -734,14 +736,30 @@ Deno.serve(async (request) => {
         timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS, temperature: 0.35, responseFormat: { type: "json_object" },
       });
       providerDurationMs = providerResponse.durationMs;
+      diagnosticId = await recordAiGenerationDiagnostic(admin, {
+        generationType: "encounter_schedule", userId: actorUserId, characterId: source.character_id,
+        sourceRef: batchId, model: providerResponse.model, provider: providerResponse.provider,
+        requestId: providerResponse.requestId, httpStatus: providerResponse.httpStatus,
+        finishReason: providerResponse.finishReason, responseContentType: providerResponse.responseContentType,
+        responseBodyLength: providerResponse.responseBodyLength, responseParsed: providerResponse.responseParsed,
+        rawOutputText: providerResponse.rawOutputText || (providerResponse.result.kind === "generated" ? providerResponse.result.text : ""),
+        refusalText: providerResponse.rawRefusalText, usage: providerResponse.usage,
+        status: providerResponse.result.kind === "generated" ? "received" : "failed",
+        failureStage: providerResponse.result.kind === "generated" ? null : "provider_response",
+        failureCode: providerResponse.result.kind === "provider_error" ? providerResponse.result.code :
+          providerResponse.result.kind === "content_rejected" ? "schedule_content_rejected" :
+          providerResponse.result.kind === "empty_output" ? "schedule_empty_output" : null,
+      });
       rawOutputId = await recordRawGenerationOutput(
         admin, batchId, source.character_id, actorUserId, providerResponse,
       );
       if (!rawOutputId) {
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "diagnostic_persistence", failureCode: "schedule_raw_output_persist_failed" });
         return { sourceId: source.character_id, failureCode: "schedule_raw_output_persist_failed", retryable: false, ambiguous: false };
       }
       if (providerResponse.result.kind !== "generated") {
         const result = providerResponse.result;
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: result.kind === "provider_error" ? result.code : result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output" });
         const failureCode = result.kind === "provider_error" ? result.code :
           result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
         await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode);
@@ -755,6 +773,7 @@ Deno.serve(async (request) => {
       let decodedValue: unknown;
       try { decodedValue = JSON.parse(providerResponse.result.text); }
       catch {
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_parsing", failureCode: "schedule_output_json_invalid", validationErrors: ["invalid_json"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_json_invalid", ["invalid_json"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid", source.character_id, {
           output_shape_error: "invalid_json",
@@ -762,6 +781,7 @@ Deno.serve(async (request) => {
         return { sourceId: source.character_id, failureCode: "schedule_output_json_invalid", retryable: false, ambiguous: false };
       }
       if (!decodedValue || typeof decodedValue !== "object" || Array.isArray(decodedValue)) {
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_output_root_invalid", validationErrors: ["schedule_output_root_invalid"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_root_invalid", ["schedule_output_root_invalid"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_root_invalid", source.character_id, {
           output_root_type: Array.isArray(decodedValue) ? "array" : decodedValue === null ? "null" : typeof decodedValue,
@@ -783,6 +803,7 @@ Deno.serve(async (request) => {
         const failureCode = !Array.isArray(characters) ? "schedule_output_characters_invalid" :
           characters.length !== 1 ? "schedule_single_character_count_invalid" :
           !Array.isArray(scenes) ? "schedule_output_scenes_invalid" : "schedule_output_unknown_root_fields";
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode, validationErrors: [failureCode], metadata: outputDiagnostics });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode, source.character_id, {
           ...outputDiagnostics,
@@ -792,15 +813,18 @@ Deno.serve(async (request) => {
       }
       const character = asRow(characters[0]);
       if (asText(character.character_id) !== source.character_id) {
+        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_character_identity_mismatch", validationErrors: ["character_identity_mismatch"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_character_identity_mismatch", ["character_identity_mismatch"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_character_identity_mismatch", source.character_id);
         return { sourceId: source.character_id, failureCode: "schedule_character_identity_mismatch", retryable: false, ambiguous: false };
       }
+      await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null, metadata: { validated_character_count: 1, scene_count: scenes.length } });
       return { sourceId: source.character_id, providerResponse, rawOutputId, character, scenes };
     } catch (error) {
       const measuredProviderDurationMs = providerDurationMs || Date.now() - providerStartedAt;
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
+      await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_request", failureCode });
       await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
       await recordBatchUsage(admin, batchId, {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
