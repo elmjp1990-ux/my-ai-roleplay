@@ -7926,12 +7926,7 @@ async function loadEncounterMemoryPage(list,session,pager){
     const rows=sessionRows||[];
     const sessionIds=rows.map(row=>row.id).filter(isUuid);
     const diaryBySession=new Map();
-    const sessionsWithAssistantReply=new Set();
     if(sessionIds.length){
-      const {data:replyRows,error:replyError}=await client.from('chat_messages')
-        .select('session_id').in('session_id',sessionIds).eq('role','assistant').is('deleted_at',null).limit(200);
-      if(replyError)throw replyError;
-      for(const row of replyRows||[])if(isUuid(row.session_id))sessionsWithAssistantReply.add(row.session_id);
       const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
         .select('id,event_type,summary,occurred_at,metadata')
         .eq('user_id',uid).eq('character_id',session.characterId)
@@ -7944,7 +7939,7 @@ async function loadEncounterMemoryPage(list,session,pager){
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
-    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id)||sessionsWithAssistantReply.has(row.id));
+    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id));
     const cards=[];
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
@@ -8013,15 +8008,26 @@ let encounterMemoryDetailPager=null;
 function renderEncounterMemoryDetailDialog(){
   const pager=encounterMemoryDetailPager;
   if(!pager)return;
-  const body=pager.messages.map(message=>{
-    const speaker=message.role==='user'?'你':pager.characterName;
-    const stamp=message.created_at?new Date(message.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(message.content||'')+'</p></article>';
+  const entries=pager.source==='diary'?(pager.entries||[]):(pager.messages||[]);
+  const body=entries.map(entry=>{
+    const isDiary=pager.source==='diary';
+    const speaker=isDiary?'相遇摘要':entry.role==='user'?'你':pager.characterName;
+    const stamp=(isDiary?entry.occurred_at:entry.created_at)?new Date(isDiary?entry.occurred_at:entry.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(isDiary?entry.summary:entry.content||'')+'</p></article>';
   }).join('');
-  const loadMore=pager.hasMore
-    ?'<button type="button" class="ghost" data-action="encounter-memory-load-older" '+(pager.loading?'disabled':'')+'>'+ (pager.loading?'正在載入…':'載入更早的 5 則訊息')+'</button>'
+  const sentinel=pager.hasMore
+    ?'<div data-encounter-memory-detail-sentinel="true" class="small muted" style="padding:12px;text-align:center">'+(pager.loading?'正在載入更早的紀錄…':'繼續往下滑動，載入更早的紀錄…')+'</div>'
     :'';
-  showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div>'+loadMore+'<div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>'+loadMore);
+  const modal=$('modal');
+  const previousScroll=modal?.scrollTop||0;
+  showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(pager.placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+sentinel+'</div>');
+  const updatedModal=$('modal');
+  if(updatedModal)updatedModal.scrollTop=previousScroll;
+  pager.observer?.disconnect();
+  const nextSentinel=updatedModal?.querySelector('[data-encounter-memory-detail-sentinel]');
+  if(nextSentinel&&pager.hasMore){
+    pager.observer=window.PoyozzListPagination.observeEnd(nextSentinel,()=>void loadEncounterMemoryDetailOlder(),{root:updatedModal,rootMargin:'180px 0px'});
+  }
 }
 async function loadEncounterMemoryDetailOlder(){
   const pager=encounterMemoryDetailPager;
@@ -8037,20 +8043,35 @@ async function loadEncounterMemoryDetailOlder(){
       .eq('chat_mode','encounter').maybeSingle();
     if(sessionError)throw sessionError;
     if(!ownedSession)throw new Error('無法讀取這段相遇日記。');
-    const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
+    const pageSize=10;
     const cursor=pager.cursor;
-    const {data:rows,error}=await client.from('chat_messages')
-      .select('id,role,content,created_at').eq('session_id',pager.sessionId)
-      .is('deleted_at',null)
-      .or('created_at.lt.'+cursor.created_at+',and(created_at.eq.'+cursor.created_at+',id.lt.'+cursor.id+')')
-      .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
-    if(error)throw error;
-    const descendingRows=Array.isArray(rows)?rows:[];
-    const olderRows=[...descendingRows].reverse();
-    if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
-    pager.messages=window.PoyozzListPagination.mergeUnique(olderRows,pager.messages,message=>message.id);
-    pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
-    pager.hasMore=descendingRows.length===pageSize;
+    if(pager.source==='diary'){
+      const {data:rows,error}=await client.from('encounter_diary')
+        .select('id,summary,occurred_at,metadata').eq('user_id',uid).eq('character_id',pager.characterId)
+        .eq('metadata->>session_id',pager.sessionId)
+        .or('occurred_at.lt.'+cursor.occurred_at+',and(occurred_at.eq.'+cursor.occurred_at+',id.lt.'+cursor.id+')')
+        .order('occurred_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
+      if(error)throw error;
+      const descendingRows=Array.isArray(rows)?rows:[];
+      const olderRows=[...descendingRows].reverse();
+      if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+      pager.entries=window.PoyozzListPagination.mergeUnique(olderRows,pager.entries,row=>row.id);
+      pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
+      pager.hasMore=descendingRows.length===pageSize;
+    }else{
+      const {data:rows,error}=await client.from('chat_messages')
+        .select('id,role,content,created_at').eq('session_id',pager.sessionId)
+        .is('deleted_at',null)
+        .or('created_at.lt.'+cursor.created_at+',and(created_at.eq.'+cursor.created_at+',id.lt.'+cursor.id+')')
+        .order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
+      if(error)throw error;
+      const descendingRows=Array.isArray(rows)?rows:[];
+      const olderRows=[...descendingRows].reverse();
+      if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+      pager.messages=window.PoyozzListPagination.mergeUnique(olderRows,pager.messages,message=>message.id);
+      pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
+      pager.hasMore=descendingRows.length===pageSize;
+    }
   }catch(error){
     console.error('載入更早的相遇日記失敗：',error);
     toast(error?.message||'載入更早的相遇日記失敗，請稍後重試。');
@@ -8078,7 +8099,7 @@ async function openEncounterMemoryDetail(button){
         .eq('chat_mode','encounter').maybeSingle();
       if(sessionError)throw sessionError;
       if(ownedSession){
-        const pageSize=window.PoyozzListPagination?.pageSize('messages')||5;
+        const pageSize=10;
         const {data:messageRows,error:messageError}=await client.from('chat_messages')
           .select('id,role,content,created_at').eq('session_id',sessionId)
           .is('deleted_at',null).order('created_at',{ascending:false}).order('id',{ascending:false}).limit(pageSize);
@@ -8099,14 +8120,26 @@ async function openEncounterMemoryDetail(button){
       renderEncounterMemoryDetailDialog();
       return;
     }
-    let query=client.from('encounter_diary').select('summary,occurred_at')
-      .eq('user_id',uid).eq('character_id',session.characterId)
-      .order('occurred_at',{ascending:true}).limit(window.PoyozzListPagination?.pageSize('encounterMemories')||10);
+    let query=client.from('encounter_diary').select('id,summary,occurred_at,metadata')
+      .eq('user_id',uid).eq('character_id',session.characterId);
     if(isUuid(sessionId))query=query.eq('metadata->>session_id',sessionId);
     else if(isUuid(memoryId))query=query.eq('id',memoryId);
+    query=query.order('occurred_at',{ascending:false}).order('id',{ascending:false}).limit(10);
     const {data:diaries,error:diaryError}=await query;
     if(diaryError)throw diaryError;
-    const body=(diaries||[]).map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
+    const descendingDiaries=Array.isArray(diaries)?diaries:[];
+    if(isUuid(sessionId)){
+      encounterMemoryDetailPager={
+        source:'diary',uid,sessionId,characterId:session.characterId,
+        placeLabel,entries:[...descendingDiaries].reverse(),
+        hasMore:descendingDiaries.length===10,
+        cursor:descendingDiaries.length?descendingDiaries[descendingDiaries.length-1]:null,
+        loading:false
+      };
+      renderEncounterMemoryDetailDialog();
+      return;
+    }
+    const body=[...descendingDiaries].reverse().map(row=>'<article class="encounter-memory-message"><div class="small muted">'+e(new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW'))+'</div><p>'+e(row.summary||'')+'</p></article>').join('');
     encounterMemoryDetailPager=null;
     showDialog('相遇日記','<div class="small muted encounter-memory-detail-place">📍 相遇地點：'+e(placeLabel)+'</div><div class="encounter-memory-detail">'+(body||'<p class="muted">目前沒有可顯示的詳細對話內容。</p>')+'</div>');
   }catch(error){
