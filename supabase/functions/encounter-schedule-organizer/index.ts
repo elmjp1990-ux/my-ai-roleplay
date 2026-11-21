@@ -743,6 +743,7 @@ Deno.serve(async (request) => {
         finishReason: providerResponse.finishReason, responseContentType: providerResponse.responseContentType,
         responseBodyLength: providerResponse.responseBodyLength, responseParsed: providerResponse.responseParsed,
         rawOutputText: providerResponse.rawOutputText || (providerResponse.result.kind === "generated" ? providerResponse.result.text : ""),
+    rawResponseBody: providerResponse.rawResponseBody,
         refusalText: providerResponse.rawRefusalText, usage: providerResponse.usage,
         status: providerResponse.result.kind === "generated" ? "received" : "failed",
         failureStage: providerResponse.result.kind === "generated" ? null : "provider_response",
