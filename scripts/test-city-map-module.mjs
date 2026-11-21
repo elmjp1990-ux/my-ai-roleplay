@@ -9,6 +9,10 @@ assert.match(encounterHistory,/\.range\(offset,offset\+N-1\)/,
   'City Encounter history must fetch only ten sessions per page');
 assert.match(encounterHistory,/\.limit\(N\)/,
   'City Encounter history preview hydration must be capped at ten messages');
+assert.match(encounterHistory,/\.select\('session_id'\)/,
+  'City Encounter history fallback must fetch only session IDs, never message bodies');
+assert.doesNotMatch(encounterHistory,/\.select\('session_id,content'\)/,
+  'City Encounter history list must not transfer full chat message content');
 assert.match(encounterHistory,/observeEnd/,
   'City Encounter history must load the next ten records when scrolled to the end');
 assert.match(encounterHistory,/encounterHistoryOffset=offset\+batch\.length/);
