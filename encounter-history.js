@@ -44,22 +44,29 @@
         offset+=PAGE_SIZE;
       }
       if(currentUser()?.uid!==uid)throw new Error('登入狀態已變更，請重新登入。');
-      const ids=rows.map(row=>row.id),latestBySession=new Map();
+      const ids=rows.map(row=>row.id),latestBySession=new Map(),playerMessageSessions=new Set();
       if(ids.length){
-        const {data:messages,error:messageError}=await client.from('chat_messages')
-          .select('session_id,role,content,created_at,deleted_at')
-          .in('session_id',ids).is('deleted_at',null)
-          .order('created_at',{ascending:false}).limit(200);
-        if(!messageError){
-          for(const message of messages||[]){
-            if(latestBySession.has(message.session_id))continue;
-            const speaker=message.role==='user'?'你':(person.name||'角色');
+        let messageOffset=0;
+        while(true){
+          const {data:messages,error:messageError}=await client.from('chat_messages')
+            .select('session_id,role,content')
+            .in('session_id',ids).eq('role','user').is('deleted_at',null)
+            .order('created_at',{ascending:false})
+            .range(messageOffset,messageOffset+499);
+          if(messageError)throw messageError;
+          const batch=Array.isArray(messages)?messages:[];
+          for(const message of batch){
             const text=cleanSummary(message.content||'').slice(0,50);
-            if(text&&!excludedMessages.has(text))latestBySession.set(message.session_id,speaker+'：'+text);
+            if(!text||excludedMessages.has(text))continue;
+            playerMessageSessions.add(message.session_id);
+            if(!latestBySession.has(message.session_id))latestBySession.set(message.session_id,'你：'+text);
           }
+          if(batch.length<500)break;
+          messageOffset+=500;
         }
       }
-      person.encounterHistoryCloud=rows.map(row=>{
+      // Sessions are created when the Encounter opens; only show history after a real player message was persisted.
+      person.encounterHistoryCloud=rows.filter(row=>playerMessageSessions.has(row.id)).map(row=>{
         const data=row.session_data&&typeof row.session_data==='object'&&!Array.isArray(row.session_data)?row.session_data:{};
         const endedAt=Number(data.encounterEndedAt)||null;
         return {
