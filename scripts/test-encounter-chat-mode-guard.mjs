@@ -458,14 +458,16 @@ assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
 const encounterPresentation = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
 assert.match(encounterHistory, /loadCloudHistory/);
-assert.match(encounterHistory, /range\(offset,offset\+PAGE_SIZE-1\)/);
+assert.match(encounterHistory, /const N=10/);
+assert.match(encounterHistory, /range\(offset,offset\+N-1\)/);
 assert.match(encounterHistory, /session_data->>encounterMode/);
-assert.match(encounterHistory, /encounterSummary:cleanSummary\(data\.encounterSummary/);
-assert.match(encounterHistory, /archived:data\.archived===true\|\|!!endedAt/);
+assert.match(encounterHistory, /encounterSummary:clean\(r\.encounter_summary/);
+assert.match(encounterHistory, /archived:r\.session_archived==='true'\|\|!!ended/);
 assert.match(encounterHistory, /本次相遇已結束，尚未產生文字摘要/);
 assert.doesNotMatch(encounterHistory, /limit\(2\)/);
 assert.match(encounterHistory, /chat_messages/, "speaker preview query is expected");
-assert.match(encounterHistory, /limit\(200\)/, "preview query must remain bounded");
+assert.match(encounterHistory, /limit\(N\)/, "preview query must remain capped at ten");
+assert.doesNotMatch(encounterHistory, /limit\(200\)|while\(true\)/);
 assert.match(encounterHistory, /正在讀取雲端相遇紀錄/);
 assert.match(encounterPresentation, /hasAnyPlayerTurn/);
 assert.match(encounterPresentation, /hasAssistantTurnReply/);
@@ -512,50 +514,50 @@ assert.match(pauseResumeEndpoint, /EdgeRuntime/);
 assert.match(pauseResumeEndpoint, /encounter-evaluation-worker/);
 assert.match(pauseResumeEndpoint, /if \(action === "end"\)/);
 
-// Functional regression: all pages of encounter history are loaded, and ended
-// blank-send sessions render their saved summary rather than "故事仍待續".
+// Functional regression: history is fetched ten records at a time and appends on demand.
 const historyWindow = {};
 vm.runInNewContext(encounterHistory, { window: historyWindow, Set, Date, Error, String, Array, Number, Object });
 const historyApi = historyWindow.PoyozzEncounterHistory;
-const historyRows = Array.from({ length: 51 }, (_, index) => ({
-  id: "session-" + index,
-  chat_mode: "encounter",
-  created_at: "2026-11-20T00:00:00.000Z",
-  updated_at: "2026-11-20T00:00:00.000Z",
-  session_data: index === 1
-    ? { archived: true, encounterEndedAt: 1795134702137, encounterSummary: '你說：「你在家嗎？」。顧言回應：門沒有鎖。' }
-    : { archived: false, lastMessagePreview: "相遇片段 " + index },
+const historyRows = Array.from({ length: 20 }, (_, index) => ({
+  id: "session-" + index, chat_mode: "encounter",
+  created_at: "2026-11-20T00:00:00.000Z", updated_at: "2026-11-20T00:00:00.000Z",
+  encounter_place: "apartment",
+  encounter_summary: index === 1 ? '你說：「你在家嗎？」。顧言回應：門沒有鎖。' : '',
+  last_message_preview: "相遇片段 " + index,
+  session_archived: index === 1 ? 'true' : 'false',
+  session_started_at: "1795134702137",
+  encounter_ended_at: index === 1 ? "1795134702137" : null,
+  session_has_user_message: index === 9 ? 'false' : 'true',
 }));
-const rangeCalls = [];
-const messageFetchIds = [];
+const rangeCalls = [], messageFetchIds = [];
 let orFilter = "";
 const query = {
-  select() { return this; },
-  eq() { return this; },
-  or(value) { orFilter = value; return this; },
-  is() { return this; },
-  in(column,ids) { messageFetchIds.push(...ids); return this; },
-  order() { return this; },
-  limit(n) { assert.equal(n,200,"bounded preview fetch"); return Promise.resolve({data:Array.from({length:50},(_,index)=>({session_id:"session-"+(index+1),role:"user",content:index===0?"你在家嗎？":"玩家訊息 "+(index+1),created_at:"2026-11-20T01:00:00Z",deleted_at:null}))}); },
-  range(start, end) {
-    rangeCalls.push([start, end]);
-    return Promise.resolve({ data: start === 0 ? historyRows.slice(0, 50) : historyRows.slice(50), error: null });
+  select() { return this; }, eq() { return this; },
+  or(value) { orFilter = value; return this; }, is() { return this; },
+  in(column,ids) { messageFetchIds.push(...ids); return this; }, order() { return this; },
+  limit(n) {
+    assert.equal(n,10,"preview query must be capped at ten");
+    return Promise.resolve({data:Array.from({length:10},(_,index)=>({
+      session_id:"session-"+(rangeCalls.at(-1)[0]+index),
+      role:"user",content:"玩家訊息 "+index,created_at:"2026-11-20T01:00:00Z"
+    }))});
   },
+  range(start,end) { rangeCalls.push([start,end]); return Promise.resolve({data:historyRows.slice(start,end+1),error:null}); },
 };
-const historyPerson = { id: "character-1", name: "顧言" };
-await historyApi.loadCloudHistory(
-  historyPerson,
-  () => ({ uid: "user-1" }),
-  { auth: { getUser: async () => ({ data: { user: { id: "user-1" } }, error: null }) }, from: () => query },
-);
-assert.deepEqual(rangeCalls, [[0, 49], [50, 99]], "history must continue paging after the first 50 records");
-assert.equal(historyPerson.encounterHistoryCloud.length, 50, "only sessions with a real player message are retained; the blank discovery-only session is excluded");
-assert.match(orFilter, /session_data->>encounterMode/, "legacy sessions marked in session_data must remain discoverable");
-const historyHtml = historyApi.renderHistory(historyPerson, historyPerson.encounterHistoryCloud, value => value, {});
-assert.match(historyHtml, /已結束/, "ended sessions may retain ended-only status");
-assert.doesNotMatch(historyHtml, /進行中|這次相遇仍在進行中/, "ongoing status is removed");
-assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview, /你：/, "player preview uses you prefix");
-assert.match(historyPerson.encounterHistoryCloud[1].lastMessagePreview, /你：/, "all previews come from saved player messages");
-assert.equal(messageFetchIds.length,51,"preview fetch scoped to loaded history sessions");
-assert.doesNotMatch(historyHtml, /你選擇讓角色主動發現你/, "discovery-only blank sessions are excluded from history");
-assert.doesNotMatch(historyHtml, /POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
+const historyPerson = { id:"character-1", name:"顧言" };
+const user=()=>({uid:"user-1"});
+const client={auth:{getUser:async()=>({data:{user:{id:"user-1"}},error:null})},from:()=>query};
+await historyApi.loadCloudHistory(historyPerson,user,client);
+assert.deepEqual(rangeCalls,[[0,9]],"initial history load must fetch only ten records");
+assert.equal(historyPerson.encounterHistoryCloud.length,9,"blank discovery-only session is excluded from the visible history");
+assert.match(orFilter,/session_data->>encounterMode/,"legacy sessions marked in session_data remain discoverable");
+const historyHtml=historyApi.renderHistory(historyPerson,historyPerson.encounterHistoryCloud,value=>value,{});
+assert.match(historyHtml,/已結束/,"ended sessions may retain ended-only status");
+assert.match(historyHtml,/data-encounter-history-sentinel/,"more history is exposed through a scroll sentinel");
+assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,"player preview uses you prefix");
+await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});
+assert.deepEqual(rangeCalls,[[0,9],[10,19]],"scroll pagination fetches the next ten records");
+assert.equal(historyPerson.encounterHistoryCloud.length,19,"the next page appends without dropping or duplicating records");
+assert.equal(messageFetchIds.length,20,"each history page hydrates no more than ten player-message previews");
+assert.doesNotMatch(historyHtml,/你選擇讓角色主動發現你/,"discovery-only blank sessions are excluded from history");
+assert.doesNotMatch(historyHtml,/POYOZZ_ENCOUNTER_DISCOVERY_EVENT|故事仍待續/);
