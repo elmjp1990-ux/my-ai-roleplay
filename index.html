@@ -8876,6 +8876,15 @@ function chatSidebarToggleButton(mobileAction) {
   const icon=isMobile?ICON.back:(hideList?ICON.forward:ICON.back);
   return `<button class="ghost" data-action="chat-sidebar-toggle" data-mobile-action="${mobileAction}" aria-label="${label}" title="${label}" aria-expanded="${hideList?'false':'true'}">${icon}</button>`;
 }
+window.PoyozzAffinityUI = window.PoyozzAffinityUI || {
+  labels:{hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'},
+  render(affinity,stage,variant='compact'){
+    const label=this.labels[stage],value=Number(affinity);
+    if(!Number.isInteger(value)||value < -100||value > 100||!label)return '<span class="poyozz-affinity-empty">你們還不認識</span>';
+    const progress=Math.round((value+100)/2);
+    return '<div class="poyozz-affinity-ui '+variant+'" role="status" aria-label="關係階段 '+label+'，好感度進度 '+progress+'%"><span class="poyozz-affinity-heart" aria-hidden="true">♡</span><span class="poyozz-affinity-label">關係 · '+label+'</span><span class="poyozz-affinity-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span></div>';
+  }
+};
 async function loadStoryRelationshipState(session) {
   if (!session?.storyMode || !isUuid(session.id) || !window.mySupabase) return;
   const target = document.getElementById('storyRelationshipLabel');
@@ -8900,8 +8909,7 @@ async function loadStoryRelationshipState(session) {
     session.storyAffinity = affinity;
     session.storyRelationshipStage = row.relationship_stage;
     persist();
-    const progress = Math.round((affinity + 100) / 2);
-    target.innerHTML = '<span class="story-relationship-icon" aria-hidden="true"><svg width="15" height="15" viewBox="0 0 24 24"><path d="M20.8 4.9a5.5 5.5 0 0 0-7.8 0L12 5.9l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.3 1-1a5.5 5.5 0 0 0 0-7.8Z"/></svg></span><span>關係 · '+e(label)+'</span><span class="story-relationship-meter" aria-hidden="true"><i style="width:'+progress+'%"></i></span>';
+    target.innerHTML = window.PoyozzAffinityUI.render(affinity,row.relationship_stage,'story');
     target.setAttribute('aria-label','關係階段 '+label+'，好感度進度 '+progress+'%');
   } catch (error) {
     console.warn('Story 關係狀態載入失敗：',error?.message||error);
@@ -14018,6 +14026,19 @@ document.addEventListener('submit',function(event){
 .city-location-close{flex:0 0 38px;position:relative;z-index:3}
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
+
+/* Shared affinity presentation: one UI across story, encounter, and city character panels. */
+.poyozz-affinity-ui{display:flex;align-items:center;gap:6px;min-width:0;color:rgba(255,255,255,.88);font-size:11px;line-height:1.25}
+.poyozz-affinity-heart{color:#efc7d8;font-size:15px;line-height:1}
+.poyozz-affinity-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.poyozz-affinity-meter{display:block;flex:1;min-width:24px;height:4px;border-radius:99px;background:rgba(255,255,255,.17);overflow:hidden}
+.poyozz-affinity-meter i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#a99acb,#f1c6b0);box-shadow:0 0 7px rgba(226,190,205,.3)}
+.poyozz-affinity-ui.story{padding:3px 0}
+.poyozz-affinity-ui.compact{font-size:9px;gap:4px}
+.poyozz-affinity-ui.compact .poyozz-affinity-heart{font-size:12px}
+.poyozz-affinity-ui.encounter{max-width:150px;padding:3px 6px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);font-size:9px;gap:4px}
+.poyozz-affinity-empty{font-size:10px;opacity:.75}
+
 .city-character-affinity{width:100%;padding:7px 8px;border:1px solid rgba(255,255,255,.2);border-radius:10px;background:linear-gradient(135deg,rgba(25,29,43,.54),rgba(72,61,76,.34));color:rgba(255,255,255,.92);font-size:10px;line-height:1.35;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);min-height:35px;display:flex;flex-direction:column;justify-content:center;gap:5px}
 .city-character-affinity-heading{display:flex;align-items:center;gap:5px;white-space:nowrap}
 .city-character-affinity-heading span{opacity:.78}
