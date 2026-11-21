@@ -60,6 +60,7 @@ export async function recordAiGenerationDiagnostic(
       response_parsed: input.responseParsed ?? null,
       raw_output_text: input.rawOutputText ?? null,
       raw_response_body: input.rawResponseBody ?? null,
+      raw_response_truncated: Boolean(input.rawResponseBody && Number(input.responseBodyLength || 0) > input.rawResponseBody.length),
       refusal_text: input.refusalText ?? null,
       failure_stage: input.failureStage || null,
       failure_code: input.failureCode || null,
