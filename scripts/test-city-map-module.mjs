@@ -123,7 +123,7 @@ assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
 const ageTextMigration=fs.readFileSync('supabase/migrations/20261121100000_character_age_as_text.sql','utf8');
 assert.match(ageTextMigration,/ALTER COLUMN age TYPE text/);
 assert.match(ageTextMigration,/USING age::text/);
-assert.match(html,/const age=ageValue \|\| null/);
+assert.match(html,/const age = ageValue \|\| null/);
 assert.match(html,/ageValue\.length > 40/);
 assert.match(html,/select\('visibility, age, first_published_at/);
 assert.match(html,/String\(savedCharacter\.age \?\? ''\) !== ageValue/);
