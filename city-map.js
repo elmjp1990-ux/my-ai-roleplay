@@ -553,42 +553,24 @@
  document.body.classList.add('city-location-active');
  };
  const loadCityCharacterAffinity=async(characterId)=>{
- const target=$('cityCharacterAffinity');
- if(!target||target.dataset.characterId!==String(characterId))return;
- if(!currentUser()){
- target.textContent='登入後查看與角色的好感度';
- return;
- }
+ const target=$('cityCharacterAffinity');if(!target||target.dataset.characterId!==String(characterId))return;
+ const user=currentUser?.();if(!user?.uid){target.textContent='登入後查看與角色的好感度';return;}
  target.textContent='正在讀取好感度…';
  try{
- const client=window.mySupabase;
- if(!client)throw new Error('關係資料服務尚未連線');
- const {data,error}=await client.rpc('get_encounter_character_affinity',{p_character_id:characterId});
- if(error)throw error;
- const row=Array.isArray(data)?data[0]:data;
- const liveTarget=$('cityCharacterAffinity');
- if(!liveTarget||liveTarget.dataset.characterId!==String(characterId))return;
- if(!row){
- liveTarget.innerHTML='<span class="city-character-affinity-empty">你們還不認識</span>';
- liveTarget.setAttribute('aria-label','你們還不認識（尚無已結算的相遇紀錄）');
- return;
- }
- const affinity=Number(row.affinity);
- const labels={hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'};
- const stage=labels[row.relationship_stage];
+ const client=window.mySupabase;if(!client)throw new Error('關係資料服務尚未連線');
+ let row=null;
+ const rpc=await client.rpc('get_encounter_character_affinity',{p_character_id:characterId});
+ row=Array.isArray(rpc.data)?rpc.data[0]||null:rpc.data||null;
+ if(!row){const direct=await client.from('encounter_character_state').select('affinity,relationship_stage').eq('user_id',user.uid).eq('character_id',characterId).maybeSingle();if(!direct.error&&direct.data)row=direct.data;}
+ if(!row){const story=await client.from('story_relationship_states').select('affinity,relationship_stage,updated_at').eq('user_id',user.uid).eq('character_id',characterId).order('updated_at',{ascending:false}).limit(1);if(!story.error&&story.data?.[0])row=story.data[0];}
+ const live=$('cityCharacterAffinity');if(!live||live.dataset.characterId!==String(characterId))return;
+ if(!row){live.innerHTML='<span class="city-character-affinity-empty">你們還不認識</span>';live.setAttribute('aria-label','你們還不認識');return;}
+ const affinity=Number(row.affinity),labels={hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'},stage=labels[row.relationship_stage];
  if(!Number.isInteger(affinity)||affinity < -100||affinity > 100||!stage)throw new Error('好感度資料格式不正確');
- const progress=Math.round((affinity+100)/2);
- const score=affinity>0?'+'+affinity:String(affinity);
- liveTarget.innerHTML='<div class="city-character-affinity-heading"><span>好感度</span><strong>'+score+'</strong><em>'+stage+'</em></div><div class="city-character-affinity-meter" role="img" aria-label="好感度進度 '+progress+'%"><i style="width:'+progress+'%"></i></div>';
- liveTarget.setAttribute('aria-label','好感度 '+score+'，關係階段 '+stage);
- }catch(error){
- console.warn('城市角色好感度載入失敗：',error?.message||error);
- const liveTarget=$('cityCharacterAffinity');
- if(liveTarget&&liveTarget.dataset.characterId===String(characterId)){
- liveTarget.textContent='好感度暫時無法載入';
- liveTarget.setAttribute('aria-label','好感度暫時無法載入');
- }
- }
+ const progress=Math.round((affinity+100)/2),score=affinity>0?'+'+affinity:String(affinity);
+ live.innerHTML='<div class="city-character-affinity-heading"><span>好感度</span><strong>'+score+'</strong><em>'+stage+'</em></div><div class="city-character-affinity-meter" role="img" aria-label="好感度進度 '+progress+'%"><i style="width:'+progress+'%"></i></div>';
+ live.setAttribute('aria-label','好感度 '+score+'，關係階段 '+stage);
+ }catch(error){console.warn('城市角色好感度載入失敗：',error?.message||error);const live=$('cityCharacterAffinity');if(live&&live.dataset.characterId===String(characterId)){live.textContent='好感度暫時無法載入';live.setAttribute('aria-label','好感度暫時無法載入');}}
  };
  const renderCityCharacterCard=(person,page=0,mode='status')=>{
  const card=$('cityCharacterCard'),body=$('cityCharacterCardBody');
@@ -664,7 +646,7 @@
  }
  const previousCharacterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
  body.innerHTML=left+copy+bookmarks;
- if(mode==='status'&&page===0)void loadCityCharacterAffinity(person.id);
+ if((mode==='status'&&page===0||mode==='history'))void loadCityCharacterAffinity(person.id);
  let characterVideo=body.querySelector('video.city-character-portrait-video[data-character-video]');
  if(previousCharacterVideo&&characterVideo&&
  previousCharacterVideo.dataset.characterVideo===characterVideo.dataset.characterVideo){
