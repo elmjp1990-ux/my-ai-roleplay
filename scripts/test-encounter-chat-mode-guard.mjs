@@ -261,8 +261,8 @@ assert.match(frontend, /canSavePrecreatedSession = s\.cloudOwned === true/);
 assert.match(frontend, /s\.encounterMode === true \|\| s\.storyMode === true/);
 assert.match(frontend, /if \(!hasUserMessage && !canSavePrecreatedSession\) return false;/);
 assert.match(frontend, /from\(["']encounter_diary["']\)/);
-assert.match(frontend, /sessionsWithAssistantReply\.has\(row\.id\)/);
-assert.match(frontend, /select\(['"]session_id['"]\)\.in\(['"]session_id['"'],sessionIds\)/);
+assert.doesNotMatch(frontend, /sessionsWithAssistantReply/,
+  'Encounter memory list must not scan chat_messages just to detect completed sessions');
 assert.match(frontend, /這裡收藏你與['"]\+e\(sessionCharacter\(session\)\?\.name\|\|['"]角色['"]\)/);
 assert.ok(frontend.includes('<span>陌生人</span>'));
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
