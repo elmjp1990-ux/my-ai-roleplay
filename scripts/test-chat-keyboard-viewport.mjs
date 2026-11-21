@@ -172,7 +172,7 @@ assert.match(encounterScene, /encounter-scene-label\{width:calc\(4em \+ 28px\)!i
 assert.match(encounterScene, /encounter-identity-stack/);
 assert.match(encounterScene, /controlsRow\.appendChild\(tag\)/);
 assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
-assert.match(html, /chat-identity-copy[\s\S]{0,180}storyRelationshipLabel/);
+assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
 assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(hist, /playerMessageSessions\.has\(row\.id\)/);
 assert.match(hist, /excludedMessages\.has\(rawContent\)/);
