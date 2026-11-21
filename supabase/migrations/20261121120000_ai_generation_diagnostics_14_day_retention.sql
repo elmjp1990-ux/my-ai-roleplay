@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS public.ai_generation_diagnostics (
   )),
   status text NOT NULL DEFAULT 'received'
     CHECK (status IN ('received', 'completed', 'failed', 'partial')),
-  user_id uuid,
+  user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
   character_id uuid,
   session_id uuid,
   turn_id uuid,
