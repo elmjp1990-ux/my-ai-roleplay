@@ -633,9 +633,10 @@ const encounterMemoryDetailStart=html.indexOf('async function openEncounterMemor
 const encounterMemoryDetailEnd=html.indexOf('\nfunction ',encounterMemoryDetailStart+10);
 assert.ok(encounterMemoryDetailStart>=0&&encounterMemoryDetailEnd>encounterMemoryDetailStart,'Encounter memory detail loader must remain identifiable');
 const encounterMemoryDetailSource=html.slice(encounterMemoryDetailStart,encounterMemoryDetailEnd);
-assert.match(encounterMemoryDetailSource,/pageSize\('messages'\)\|\|5/,'Encounter memory transcript must use five-message pages');
+assert.match(encounterMemoryDetailSource,/const pageSize=10/,'Encounter memory transcript must use ten-message pages');
 assert.match(encounterMemoryDetailSource,/\.limit\(pageSize\)/,'Encounter memory transcript query must be bounded');
-assert.match(html,/data-action="encounter-memory-load-older"/,'Encounter memory transcript must expose an older-page action');
+assert.match(html,/data-encounter-memory-detail-sentinel="true"/,'Encounter memory transcript must expose a scroll sentinel');
+assert.match(html,/observeEnd\(nextSentinel/,'Encounter memory transcript must load older pages when scrolled to the end');
 assert.match(html,/async function loadEncounterMemoryDetailOlder\(\)/,'Encounter memory transcript must support loading older pages');
 const exploreLatestSource=html.slice(html.indexOf('function exploreList()'),html.indexOf('function card('));
 assert.doesNotMatch(exploreLatestSource,/\.slice\(0,50\)/,'Explore latest must not truncate the 20-row server-paged stream at 50 candidates');
