@@ -8985,10 +8985,7 @@ function renderConversation() {
                 </span>
               </button>
               <span class="chat-name ellipsis">${e(s.name || c.name)}</span>
-              <span class="character-status-label" title="${characterIsOffline(c) ? '角色離線或已下架' : '角色公開中'}">
-                <span class="character-status-dot" style="position:static;background:${characterIsOffline(c) ? '#8993a4' : '#22c55e'}"></span>
-                ${characterIsOffline(c) ? '離線／已下架' : '公開中'}
-              </span>
+
             </div>
             <div class="row" style="gap:1px">
               <button class="ghost" data-action="chat-overlay" data-kind="search" aria-label="搜尋過往聊天記錄">${ICON.search}</button>
@@ -8997,7 +8994,7 @@ function renderConversation() {
               <button class="ghost" data-action="chat-settings-menu" aria-label="聊天功能選單" title="聊天功能選單">${ICON.menu}</button>
             </div>
           </div>
-          ${s.storyMode ? '<div class="story-relationship-chip" id="storyRelationshipLabel" role="status">關係載入中</div>' : ''}
+          ${s.storyMode ? '<div id="storyRelationshipLabel" role="status">關係載入中</div>' : ''}
         </div>
         <div class="messages" id="messages"></div>
         <form class="composer" data-form="message">
@@ -14031,6 +14028,7 @@ document.addEventListener('submit',function(event){
 .poyozz-affinity-heart{display:inline-block;flex:0 0 auto;font-family:Georgia,serif;font-size:11px;line-height:1;text-shadow:0 1px 5px currentColor}
 .poyozz-affinity-label{display:block;overflow:hidden;text-overflow:ellipsis}
 .poyozz-affinity-ui.story{padding:4px 10px}
+#storyRelationshipLabel{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important}
 .poyozz-affinity-ui.compact{gap:4px;padding:3px 8px;font-size:9px}
 .poyozz-affinity-ui.encounter{max-width:150px;gap:4px;padding:3px 8px;font-size:9px}
 .poyozz-affinity-empty{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border:1px solid rgba(196,184,218,.42);border-radius:999px;background:rgba(83,76,99,.34);color:rgba(245,239,250,.86);font-size:9px}
