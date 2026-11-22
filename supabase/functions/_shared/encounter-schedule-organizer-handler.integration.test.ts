@@ -31,7 +31,7 @@ const validOutput = JSON.stringify({
   scenes: [],
 });
 
-function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" = "success") {
+function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" = "success") {
   const calls = { provider: 0, claim: 0, publish: 0, usage: 0, output: 0 };
   const admin = {
     from(table: string) {
@@ -78,7 +78,10 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
       if (name === "get_character_ai_profile_for_chat") {
         if (mode === "profile_missing") return { data: null, error: null };
         const section = { status: "not_provided", items: [] };
-        return { data: { life_context: {
+        if (mode === "profile_incomplete") {
+          return { data: { schema_version: "1.1", life_context: { work_environment: section } }, error: null };
+        }
+        return { data: { schema_version: "1.1", life_context: {
           work_environment: section, residence_environment: section, daily_routines: section,
           interests_and_leisure: section, social_circles: section, recurring_places: section,
           environmental_constraints: section,
@@ -192,5 +195,16 @@ Deno.test("manual POST blocks schedule claim and AI call until source-current Ch
       body.schedule_job_claimed !== false || body.ai_called !== false ||
       mock.calls.claim !== 0 || mock.calls.provider !== 0 || mock.calls.publish !== 0) {
     throw new Error("Schedule generation bypassed the Profile prerequisite: " + JSON.stringify({ body, calls: mock.calls }));
+  }
+});
+
+
+Deno.test("manual POST rejects incomplete Profile life-context schema before schedule claim", async () => {
+  const mock = createMock("profile_incomplete");
+  const response = await invoke(mock);
+  const body = await response.json();
+  if (response.status !== 409 || body.error !== "character_profile_not_ready" ||
+      mock.calls.claim !== 0 || mock.calls.provider !== 0 || mock.calls.publish !== 0) {
+    throw new Error("Incomplete Profile reached schedule generation: " + JSON.stringify({ body, calls: mock.calls }));
   }
 });
