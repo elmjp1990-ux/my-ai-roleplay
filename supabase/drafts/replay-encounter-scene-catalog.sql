@@ -20,9 +20,9 @@ INSERT INTO public.characters (
   ('00000000-0000-4000-8000-000000000020'::uuid, '00000000-0000-4000-8000-000000000021'::uuid,
    'Legacy Placeholder Smoke', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000022'::uuid, '00000000-0000-4000-8000-000000000023'::uuid,
-   'Dynamic Scene Smoke A', '現代都市角色', 'public', 'approved', true, false),
+   'Fixed Scene Smoke A', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000024'::uuid, '00000000-0000-4000-8000-000000000025'::uuid,
-   'Dynamic Scene Smoke B', '現代都市角色', 'public', 'approved', true, false),
+   'Fixed Scene Smoke B', '現代都市角色', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000029'::uuid, '00000000-0000-4000-8000-000000000030'::uuid,
    'Ancient Character Smoke', '古代架空王朝', 'public', 'approved', true, false),
   ('00000000-0000-4000-8000-000000000031'::uuid, '00000000-0000-4000-8000-000000000032'::uuid,
@@ -100,7 +100,7 @@ BEGIN
 END;
 $legacy_placeholder_filter$;
 
-DO $dynamic_scene_publish$
+DO $fixed_scene_publish$
 DECLARE
   v_result jsonb;
   v_catalog record;
@@ -189,7 +189,7 @@ BEGIN
     RAISE EXCEPTION 'shopping-street must remain a fixed scene independent of character count';
   END IF;
 END;
-$dynamic_scene_publish$;
+$fixed_scene_publish$;
 
 -- Anonymous/minor callers must not receive NSFW-backed scene counts or schedules.
 SET LOCAL ROLE anon;
