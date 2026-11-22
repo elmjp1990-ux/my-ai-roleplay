@@ -184,10 +184,12 @@ assert.match(cityMap, /data-action="city-people-retry"/);
 assert.match(cityMap, /const retryButton=event\.target\.closest\('\[data-action="city-people-retry"\]'\)/);
 assert.match(cityMap, /pager\.error=null;void loadCityPeoplePage\(locationModal\.dataset\.place\)/);
 
-const scheduleOrganizer = fs.readFileSync('supabase/functions/encounter-schedule-organizer/index.ts', 'utf8');
+const scheduleOrganizer = fs.readFileSync('supabase/functions/_shared/encounter-schedule-organizer-handler.ts', 'utf8');
+const scheduleOrganizerEntry = fs.readFileSync('supabase/functions/encounter-schedule-organizer/index.ts', 'utf8');
 const schedulePipelineMigration = fs.readFileSync('supabase/migrations/20261117095320_encounter_schedule_pipeline.sql', 'utf8');
 const scheduleBatchMigration = fs.readFileSync('supabase/migrations/20261117133525_encounter_schedule_batch_semantics.sql', 'utf8');
 assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_TEST_MODE["']\) !== ["']true/);
+assert.match(scheduleOrganizerEntry, /handleEncounterScheduleOrganizer\(request, Deno\.env, createClient, 100_000\)/);
 assert.match(scheduleOrganizer, /test_mode: false/);
 assert.match(scheduleOrganizer, /test_mode: true/);
 assert.match(scheduleOrganizer, /auth\.getUser\(\)/);
