@@ -207,7 +207,7 @@ assert.match(frontend, /data-action="organize-encounter-schedules"/,
   "TEST tools must expose the second manual schedule step");
 assert.match(frontend, /character-profile-organization-worker/,
   "TEST UI must read and trigger the Profile worker");
-assert.match(frontend, /profileReady && !profileStatusError/,
+assert.match(frontend, /profileReady&&!profileStatusError/,
   "Schedule button must stay disabled until the current Profile is ready");
 assert.match(scheduleGeneration, /character_life_context/, "Schedule prompt must receive the saved structured life context");
 assert.match(scheduleGeneration, /不得為取得生活環境而在行程生成階段再次呼叫分析 AI/, "Schedule prompt must not request another life-context analysis call");
