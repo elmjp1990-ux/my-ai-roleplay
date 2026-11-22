@@ -31,9 +31,9 @@ const validOutput = JSON.stringify({
   scenes: [],
 });
 
-function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" | "profile_disappears" = "success") {
-  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null; profileContext: boolean; profileRead: number; release: number } = {
-    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null, profileContext: false, profileRead: 0, release: 0,
+function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" | "profile_disappears" | "worldview_review" = "success") {
+  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null; profileContext: boolean; profileRead: number; release: number; reviewUpdates: number; batchCompletions: number } = {
+    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null, profileContext: false, profileRead: 0, release: 0, reviewUpdates: 0, batchCompletions: 0,
   };
   const admin = {
     from(table: string) {
@@ -51,6 +51,9 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
           if (table === "encounter_schedule_generation_jobs") {
             const pendingLookup = filters.some(([column, value]) => column === "status" && value === "pending");
             return { data: pendingLookup ? { character_id: characterId } : { source_hash: "test-source-hash" }, error: null };
+          }
+          if (table === "encounter_schedule_batch_runs" && action === "update") {
+            return { data: { id: batchId }, error: null };
           }
           if (table === "characters") return { data: { name: "測試角色" }, error: null };
           return { data: null, error: null };
@@ -74,6 +77,8 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
             result.data = [{ id: characterId, name: "測試角色" }];
           }
           if (table === "encounter_schedule_generation_usage" && action === "insert") calls.usage++;
+          if (table === "encounter_schedule_generation_jobs" && action === "update" && payload?.status === "needs_review") calls.reviewUpdates++;
+          if (table === "encounter_schedule_batch_runs" && action === "update" && payload?.status === "completed") calls.batchCompletions++;
           return Promise.resolve(result).then(resolve, reject);
         },
       };
@@ -87,7 +92,22 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
       if (name === "claim_encounter_schedule_batch") {
         calls.claimAuthor = String(args?.p_actor_user_id || "");
         calls.claim++;
-        return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [source] }, error: null };
+        const claimedSource = mode === "worldview_review" ? {
+          ...source,
+          intro: "一位神秘旅人。",
+          world_era: "",
+          title: "",
+          occupation: "",
+          race: "",
+          style: "",
+          tags: [],
+          modern_setting_compatible: false,
+          time_travel_explicit: false,
+          schedule_description: "",
+          private_info: "",
+          personality_profile: {},
+        } : source;
+        return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [claimedSource] }, error: null };
       }
       if (name === "get_character_ai_profile_for_chat") {
         calls.profileRead++;
@@ -178,6 +198,20 @@ Deno.test("manual POST mock executes authenticated AI-to-publish happy path with
   }
   if (!mock.calls.profileContext) {
     throw new Error("Schedule AI prompt did not receive the saved derived Character AI Profile: " + JSON.stringify(mock.calls));
+  }
+});
+
+Deno.test("manual POST moves unknown-worldview roles to needs_review without AI or parser failure", async () => {
+  const mock = createMock("worldview_review");
+  const response = await invoke(mock);
+  const body = await response.json();
+  if (response.status !== 200 || body.status !== "completed" ||
+      body.needs_review_character_count !== 1 || body.failed_character_count !== 0) {
+    throw new Error("Unknown worldview should complete into manual review, not fail: " + JSON.stringify({ status: response.status, body }));
+  }
+  if (mock.calls.provider !== 0 || mock.calls.publish !== 0 || mock.calls.reviewUpdates !== 1 ||
+      mock.calls.batchCompletions !== 1) {
+    throw new Error("Review-only character must skip AI/publisher and persist review + batch completion: " + JSON.stringify(mock.calls));
   }
 });
 
