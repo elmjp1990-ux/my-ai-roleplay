@@ -282,12 +282,21 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
+  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe''';
+  v_new := '''commercial'', ''airport'', ''university'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'fixed_scene_hourly_rain_fallback_patch_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
   v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
   v_new := '''commercial'', ''airport'', ''university'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
-  IF v_count <> 2 THEN
-    RAISE EXCEPTION 'fixed_scene_rain_fallback_patch_unexpected: %', v_count;
+  IF v_count <> 1 THEN
+    RAISE EXCEPTION 'fixed_scene_special_event_rain_fallback_patch_unexpected: %', v_count;
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
