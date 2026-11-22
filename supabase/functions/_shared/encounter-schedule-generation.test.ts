@@ -243,8 +243,14 @@ Deno.test("classifies activity space independently from scene location", () => {
     throw new Error("street shops and small eateries must resolve to fixed scene F");
   }
   if (normalizeEncounterSceneKey("後巷") !== "shopping-street" ||
-      normalizeEncounterSceneKey("巷口") !== "shopping-street") {
-    throw new Error("alleys and street corners must resolve to the existing street scene");
+      normalizeEncounterSceneKey("巷口") !== "shopping-street" ||
+      normalizeEncounterSceneKey("二手樂器行") !== "shopping-street" ||
+      normalizeEncounterSceneKey("樂器行") !== "shopping-street") {
+    throw new Error("alleys, street corners, and instrument shops must resolve to fixed scene F");
+  }
+  if (normalizeEncounterSceneKey("夜間酒吧", "晚上九點後進行樂團演出") !== "night-bar" ||
+      normalizeEncounterSceneKey("Live House", "白天進行樂團演出") !== "live-house") {
+    throw new Error("explicit night-bar and daytime Live House locations must remain distinct");
   }
 });
 
