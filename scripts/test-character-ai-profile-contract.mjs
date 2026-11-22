@@ -314,6 +314,9 @@ assert.ok(worker.includes("updateAiGenerationDiagnostic"),
   "Profile Worker must update the AI diagnostic after persistence completes or fails");
 assert.ok(worker.includes('error_code: "http_429"') && worker.includes("provider_attempts: generated.providerAttempts || []"),
   "A 429 failover attempt must remain visible in the final Profile generation diagnostic");
+assert.ok(worker.includes("error.metadata.providerAttempts = providerAttempts"),
+  "A failed fallback sequence must retain earlier provider errors in its final failure diagnostic");
+
 assert.ok(worker.includes("providerAttempts?: Array<Record<string, unknown>>"),
   "Profile diagnostics must support a compact history of provider attempts");
 
