@@ -96,15 +96,20 @@
         <div class="city-map-block cafe"></div><div class="city-map-block school"></div><div class="city-map-block park"></div><div class="city-map-block shop"></div><div class="city-map-block home"></div>
         <svg class="city-building-layer" id="cityBuildingLayer" viewBox="0 0 1662 932" preserveAspectRatio="none" aria-label="城市地點玻璃圓形圖標">
           <!-- Marker anchors follow the user's annotated city-map reference; icons are specific to each place type. -->
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(220 140)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">✈️</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1305 94)" tabindex="0" role="button" aria-label="商業大樓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏢</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="waterfront" transform="translate(1392 638)" tabindex="0" role="button" aria-label="水岸港區"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🌊</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="commercial" transform="translate(1303 44)" tabindex="0" role="button" aria-label="辦公大樓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏢</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="airport" transform="translate(425 124)" tabindex="0" role="button" aria-label="機場"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">✈️</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="university" transform="translate(280 365)" tabindex="0" role="button" aria-label="校園"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🎓</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(423 474)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🌳</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="shopping-street" transform="translate(672 646)" tabindex="0" role="button" aria-label="商店街"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🛍️</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="department-store" transform="translate(1039 280)" tabindex="0" role="button" aria-label="百貨公司"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏬</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="hospital" transform="translate(1245 450)" tabindex="0" role="button" aria-label="中央醫院"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏥</text></g>
           <g class="city-place-marker is-available" data-action="city-landmark" data-place="night-bar" transform="translate(632 294)" tabindex="0" role="button" aria-label="夜間酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🍸</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="live-house" transform="translate(868 416)" tabindex="0" role="button" aria-label="Live House 音樂酒吧"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🎸</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="live-house" transform="translate(862 410)" tabindex="0" role="button" aria-label="展演空間"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🎸</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="luxury-apartment" transform="translate(1580 236)" tabindex="0" role="button" aria-label="高級公寓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏙️</text></g>
           <g class="city-place-marker is-available" data-action="city-landmark" data-place="apartment" transform="translate(666 440)" tabindex="0" role="button" aria-label="308公寓"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏠</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="department-store" transform="translate(1020 300)" tabindex="0" role="button" aria-label="百貨公司"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🛍️</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="bookstore" transform="translate(480 733)" tabindex="0" role="button" aria-label="書店"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">📚</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="cafe" transform="translate(645 624)" tabindex="0" role="button" aria-label="咖啡廳"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">☕</text></g>
-          <g class="city-place-marker is-available" data-action="city-landmark" data-place="park" transform="translate(750 766)" tabindex="0" role="button" aria-label="中央公園"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🌳</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="convenience-store" transform="translate(465 700)" tabindex="0" role="button" aria-label="便利商店"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🏪</text></g>
+          <g class="city-place-marker is-available" data-action="city-landmark" data-place="private-club" transform="translate(789 191)" tabindex="0" role="button" aria-label="高級會所"><circle class="city-marker-hit-area" r="38" fill="transparent" pointer-events="all"/><circle class="city-marker-glass" r="23"/><text class="city-marker-glyph city-marker-emoji" x="0" y="1" text-anchor="middle" dominant-baseline="central" font-size="18" font-family="system-ui, sans-serif">🥂</text></g>
         </svg>
 
       </div>
@@ -240,10 +245,9 @@
 
  locationModal=$('cityMapPeople');
  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
- const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+ const cityPlaceNames={waterfront:'水岸港區',commercial:'辦公大樓',airport:'機場',university:'校園',park:'中央公園','shopping-street':'商店街','department-store':'百貨公司',hospital:'中央醫院','night-bar':'夜間酒吧','live-house':'展演空間','luxury-apartment':'高級公寓',apartment:'308公寓','convenience-store':'便利商店','private-club':'高級會所'};
  const cityPlaceSubtitles={
- airport:'航廈・出境',commercial:'商務・辦公','night-bar':'夜生活・樂團','live-house':'LIVE・展演',apartment:'住宅・日常','department-store':'購物・餐飲',bookstore:'閱讀・選書',cafe:'咖啡・甜點',park:'綠地・廣場',
- waterfront:'河岸・碼頭',harbor:'河岸・碼頭','office-building':'商務・辦公',university:'教室・校園','performance-venue':'LIVE・展覽','luxury-apartment':'私宅・高級住宅','convenience-store':'便利・日常','private-club':'私人・娛樂','luxury-club':'私人・娛樂'
+ waterfront:'河岸・碼頭',commercial:'商務・辦公',airport:'航廈・出境',university:'教室・校園',park:'綠地・廣場','shopping-street':'小吃・街邊店','department-store':'購物・餐飲',hospital:'醫療・照護','night-bar':'夜生活・樂團','live-house':'LIVE・展覽','luxury-apartment':'私宅・高級住宅',apartment:'住宅・日常','convenience-store':'便利・日常','private-club':'私人・娛樂'
  };
  const cityVenueScenes={
  airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
@@ -256,74 +260,27 @@
  cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
  park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
  };
- const CITY_MAP_SVG_NS='http://www.w3.org/2000/svg';
- const MAX_DYNAMIC_SCENE_MARKERS=3;
  const renderCityDynamicScenes=(rows)=>{
  const svg=$('cityBuildingLayer');
  if(!svg)return;
- svg.querySelector('#cityDynamicSceneMarkers')?.remove();
- const layer=document.createElementNS(CITY_MAP_SVG_NS,'g');
- layer.setAttribute('id','cityDynamicSceneMarkers');
- const existing=[];
- svg.querySelectorAll('.city-place-marker[data-place]').forEach(marker=>{
- const match=String(marker.getAttribute('transform')||'').match(/translate\(\s*(-?[\d.]+)[ ,]+(-?[\d.]+)\s*\)/);
- if(match)existing.push({x:Number(match[1]),y:Number(match[2])});
- });
- let added=0;
  for(const row of (Array.isArray(rows)?rows:[])){
  const key=String(row?.location_key||'').trim();
+ if(!Object.prototype.hasOwnProperty.call(cityPlaceNames,key))continue;
  const name=String(row?.display_name||'').trim();
- if(!/^[a-z0-9-]{1,48}$/.test(key)||!name)continue;
+ const previous=cityVenueScenes[key]||{};
  const scene={
- icon:String(row.icon||'📍'),heading:String(row.heading||name),
- description:String(row.description||'這個場景由多位公開角色的共同行程建立。'),
- eventLabel:String(row.event_label||'最新消息'),
- eventTitle:String(row.event_title||'場景消息已更新'),
- eventDescription:String(row.event_description||'這裡有符合場景定位的日常活動與消息。')
+ icon:String(row.icon||previous.icon||'📍'),
+ heading:String(row.heading||name||previous.heading||''),
+ description:String(row.description||previous.description||''),
+ eventLabel:String(row.event_label||previous.eventLabel||'場景亮點'),
+ eventTitle:String(row.event_title||previous.eventTitle||''),
+ eventDescription:String(row.event_description||previous.eventDescription||'')
  };
- if(row.is_dynamic!==true){
- if(Object.prototype.hasOwnProperty.call(cityPlaceNames,key)){
- cityPlaceNames[key]=name;
+ if(name)cityPlaceNames[key]=name;
  cityVenueScenes[key]=scene;
- const builtInMarker=Array.from(svg.querySelectorAll('.city-place-marker[data-place]'))
- .find(marker=>marker.getAttribute('data-place')===key);
- if(builtInMarker)builtInMarker.setAttribute('aria-label',name);
+ const marker=svg.querySelector('.city-place-marker[data-place="'+key+'"]');
+ if(marker&&name)marker.setAttribute('aria-label',name);
  }
- continue;
- }
- if(added>=MAX_DYNAMIC_SCENE_MARKERS)continue;
- const x=Number(row?.marker_x),y=Number(row?.marker_y);
- if(!Number.isFinite(x)||!Number.isFinite(y)||x<40||x>1622||y<40||y>892)continue;
- if(existing.some(point=>Math.hypot(point.x-x,point.y-y)<120))continue;
- cityPlaceNames[key]=name;
- cityVenueScenes[key]=scene;
- cityPlaceAliases[key]=[key];
- const marker=document.createElementNS(CITY_MAP_SVG_NS,'g');
- marker.setAttribute('class','city-place-marker is-available is-dynamic');
- marker.setAttribute('data-action','city-landmark');
- marker.setAttribute('data-place',key);
- marker.setAttribute('data-dynamic-scene','true');
- marker.setAttribute('transform','translate('+x+' '+y+')');
- marker.setAttribute('tabindex','0');
- marker.setAttribute('role','button');
- marker.setAttribute('aria-label',name);
- const hit=document.createElementNS(CITY_MAP_SVG_NS,'circle');
- hit.setAttribute('class','city-marker-hit-area');hit.setAttribute('r','38');
- hit.setAttribute('fill','transparent');hit.setAttribute('pointer-events','all');
- const glass=document.createElementNS(CITY_MAP_SVG_NS,'circle');
- glass.setAttribute('class','city-marker-glass');glass.setAttribute('r','23');
- const glyph=document.createElementNS(CITY_MAP_SVG_NS,'text');
- glyph.setAttribute('class','city-marker-glyph city-marker-emoji');
- glyph.setAttribute('x','0');glyph.setAttribute('y','1');
- glyph.setAttribute('text-anchor','middle');glyph.setAttribute('dominant-baseline','central');
- glyph.setAttribute('font-size','18');glyph.setAttribute('font-family','system-ui, sans-serif');
- glyph.setAttribute('fill','#fff');glyph.setAttribute('pointer-events','none');
- glyph.textContent=scene.icon;
- marker.append(hit,glass,glyph);
- layer.appendChild(marker);
- existing.push({x,y});added++;
- }
- if(added)svg.appendChild(layer);
  };
  const loadCityDynamicScenes=async()=>{
  const client=window.mySupabase;
@@ -383,7 +340,7 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const cityPlaceAliases={airport:['airport'],commercial:['commercial','office'], 'night-bar':['night-bar','bar'], 'live-house':['live-house','livehouse'], apartment:['apartment'], 'department-store':['department-store','department_store'], bookstore:['bookstore','book-store'], cafe:['cafe','coffee-shop'], park:['park']};
+ const cityPlaceAliases={waterfront:['waterfront','harbor','riverside'],commercial:['commercial','office','office-building'],airport:['airport'],university:['university','campus'],park:['park'],'shopping-street':['shopping-street','shopping_street','street-market'],'department-store':['department-store','department_store'],hospital:['hospital','central-hospital'],'night-bar':['night-bar','bar'],'live-house':['live-house','livehouse','performance-venue'],'luxury-apartment':['luxury-apartment','premium-apartment'],apartment:['apartment','308-apartment'],'convenience-store':['convenience-store','convenience_store','supermarket'],'private-club':['private-club','luxury-club','club']};
  const isSleepingSchedule=(a,s='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((a+' '+s).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
  const getTaipeiClock=()=>{
  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
