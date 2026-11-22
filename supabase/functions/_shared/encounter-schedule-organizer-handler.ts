@@ -23,7 +23,7 @@ const asRow = (value: unknown): Record<string, unknown> =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
 const ENCOUNTER_SCHEDULE_BATCH_SIZE = 1;
-// Stay below the 120s pg_net dispatch ceiling, leaving time for validation and persistence.
+// Runtime adapters choose a provider timeout that fits their execution budget.
 
 async function recordBatchUsage(
   admin: any,
