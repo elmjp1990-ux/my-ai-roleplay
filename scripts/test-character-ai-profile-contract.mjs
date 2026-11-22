@@ -189,6 +189,9 @@ assert.ok(
   "Profile prerequisite must be checked before the schedule batch claim",
 );
 assert.match(manualProfileMigration, /get_next_encounter_schedule_character_for_author/, "The exact next eligible schedule target must have one shared selector");
+assert.ok(manualProfileMigration.includes("AS $function$") && manualProfileMigration.includes("$function$;"),
+  "Manual Profile selector SQL must use a valid tagged dollar-quoted function body");
+
 assert.match(worker, /get_next_encounter_schedule_character_for_author/,
   "Profile status and Profile claim must use the shared next-role selector");
 assert.match(scheduleOrganizer, /get_next_encounter_schedule_character_for_author/,
