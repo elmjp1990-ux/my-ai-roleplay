@@ -64,6 +64,13 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
             const pendingQuery = status === "pending";
             result.count = pendingQuery ? 1 : 0;
           }
+          if (table === "encounter_schedule_generation_jobs" && action === "select" &&
+              filters.some(([column, value]) => column === "status" && value === "pending")) {
+            result.data = [{ character_id: characterId }];
+          }
+          if (table === "characters" && action === "select") {
+            result.data = [{ id: characterId, name: "測試角色" }];
+          }
           if (table === "encounter_schedule_generation_usage" && action === "insert") calls.usage++;
           return Promise.resolve(result).then(resolve, reject);
         },
