@@ -11,6 +11,7 @@ const manualProfileMigration = fs.readFileSync("supabase/migrations/202611221200
 const manualScheduleClaimMigration = fs.readFileSync("supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
+const supabaseConfig = fs.readFileSync("supabase/config.toml", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
 const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile-organization.ts", "utf8");
 const coreUtils = fs.readFileSync("core-utils.js", "utf8");
@@ -217,6 +218,8 @@ assert.match(manualScheduleClaimMigration, /manual_actor_required/,
   "A forced/manual schedule claim must always carry the authenticated author ID");
 assert.match(worker, /auth: \["user", "secret:default"\]/,
   "Profile worker must accept authenticated manual users and a separate internal secret mode");
+assert.match(supabaseConfig, /\[functions\.character-profile-organization-worker\][\s\S]*?verify_jwt = false/,
+  "Profile worker platform JWT verification must be disabled only because withSupabase validates both accepted credential modes");
 assert.match(worker, /ctx\.authMode === "user"/,
   "Manual Profile mode must distinguish user JWT calls from internal worker calls");
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/,
