@@ -73,6 +73,7 @@ fs.rmSync(routeSmokePath, { force: true });
 const runtimeFiles = [
   'index.html',
   'wallet-ui.js',
+  'chat-keyboard-viewport.js',
   'poyozz-ui.css',
   'memory-capture.js',
   'chat-render-lifecycle.js',
