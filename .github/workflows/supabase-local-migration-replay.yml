@@ -340,6 +340,7 @@ jobs:
           # This migration adds only an author-scoped manual claim RPC. It does
           # not create or activate any cron schedule.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql
 
       - name: Apply formal Encounter evidence and settlement migration
         shell: bash
