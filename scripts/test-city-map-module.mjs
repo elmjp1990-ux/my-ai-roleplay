@@ -164,7 +164,7 @@ assert.match(html,/String\(savedCharacter\.age \?\? ''\) !== ageValue/);
 assert.match(html,/name="age" type="text" maxlength="25"/);
 assert.match(html,/age: row\.age == null \? '' : String\(row\.age\)/);
 
-console.log('City map module extraction, descriptive character age, dynamic scene registry, cached weather, CSS rain fallback, and dependency contract passed.');
+console.log('City map module extraction, fixed A–N scene anchors, descriptive character age, cached weather, CSS rain fallback, and dependency contract passed.');
 
 assert.match(html,/get_encounter_character_schedules/);
 assert.doesNotMatch(cityMap,/hydrateCitySchedule/);
