@@ -217,7 +217,14 @@ Deno.test("classifies activity space independently from scene location", () => {
   if (normalizeEncounterSceneKey("私人工作室", "在地下樂團團練並排練新歌") !== "live-house") {
     throw new Error("music activity keywords must resolve to Live House even when the place name is generic");
   }
-  if (normalizeEncounterSceneKey("小吃店") !== "restaurant") throw new Error("small eatery must resolve to restaurant");
+  if (normalizeEncounterSceneKey("小吃店") !== "restaurant" ||
+      normalizeEncounterSceneKey("路邊攤") !== "restaurant") {
+    throw new Error("small eateries and roadside food stalls must resolve to restaurant");
+  }
+  if (normalizeEncounterSceneKey("後巷") !== "shopping-street" ||
+      normalizeEncounterSceneKey("巷口") !== "shopping-street") {
+    throw new Error("alleys and street corners must resolve to the existing street scene");
+  }
 });
 
 Deno.test("keeps free natural-language locations and applies system scene matching", () => {
