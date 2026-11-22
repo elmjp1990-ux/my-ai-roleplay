@@ -254,6 +254,23 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
 });
 
+Deno.test("prioritizes explicit fixed destinations over incidental activity keywords", () => {
+  const musicActivity = "在現場聽樂團演出並跟著音樂節奏休息";
+  if (normalizeEncounterSceneKey("機場", musicActivity) !== "airport" ||
+      normalizeEncounterSceneKey("中央公園", musicActivity) !== "park" ||
+      normalizeEncounterSceneKey("公司", musicActivity) !== "commercial" ||
+      normalizeEncounterSceneKey("夜間酒吧", musicActivity) !== "night-bar" ||
+      normalizeEncounterSceneKey("便利商店", musicActivity) !== "convenience-store") {
+    throw new Error("explicit fixed destinations must not be overridden by incidental music activity");
+  }
+  if (normalizeEncounterSceneKey("私人工作室", "在地下樂團團練並排練新歌") !== "live-house") {
+    throw new Error("generic venues may still use activity inference when no explicit scene matches");
+  }
+  if (normalizeEncounterSceneKey("未知的私人場所", "單純休息") !== null) {
+    throw new Error("unrecognized locations must remain unresolved for safe fallback handling");
+  }
+});
+
 Deno.test("uses structured character residence context for generic residential rooms", () => {
   const luxuryContext = "角色長期居住於高級公寓";
   if (normalizeEncounterSceneKey("臥室", "", luxuryContext) !== "luxury-apartment" ||
