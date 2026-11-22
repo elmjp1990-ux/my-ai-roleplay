@@ -3,6 +3,7 @@ name: Chat snapshot image path contract
 on:
   pull_request:
     paths:
+      - 'deno.json'
       - 'index.html'
       - 'supabase/functions/story-session/**'
       - 'supabase/functions/encounter-session/**'
