@@ -26,6 +26,8 @@ on:
       - "supabase/functions/encounter-schedule-organizer/**"
       - "supabase/functions/_shared/encounter-schedule-organizer-handler.ts"
       - "api/encounter-schedule-organizer.ts"
+      - "api/package.json"
+      - "scripts/build-vercel-static.mjs"
       - "package.json"
       - "tsconfig.json"
       - "scripts/test-vercel-encounter-schedule-route.mjs"
@@ -87,6 +89,10 @@ jobs:
         run: node scripts/test-encounter-public-character-eligibility.mjs
       - name: Test schedule worker security and wallet isolation
         run: node scripts/test-encounter-schedule-worker.mjs
+      - name: Install Vercel function bundler dependency
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build and verify self-contained Vercel schedule handler artifact
+        run: node scripts/build-vercel-static.mjs
       - name: Test Vercel long-running schedule route contract
         run: node scripts/test-vercel-encounter-schedule-route.mjs
       - uses: denoland/setup-deno@v2
