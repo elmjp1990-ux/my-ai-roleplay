@@ -31,7 +31,7 @@ const validOutput = JSON.stringify({
   scenes: [],
 });
 
-function createMock(mode: "success" | "publish_error" = "success") {
+function createMock(mode: "success" | "publish_error" | "invalid_ai_output" = "success") {
   const calls = { provider: 0, claim: 0, publish: 0, usage: 0, output: 0 };
   const admin = {
     from(table: string) {
@@ -96,7 +96,7 @@ function createMock(mode: "success" | "publish_error" = "success") {
     requestOpenRouterChatCompletion: async () => {
       calls.provider++;
       return {
-        result: { kind: "generated" as const, text: validOutput },
+        result: { kind: "generated" as const, text: mode === "invalid_ai_output" ? "{invalid-json" : validOutput },
         provider: "mock", model: "mock-model", usage: {}, httpStatus: 200,
         responseContentType: "application/json", responseBodyLength: validOutput.length,
         responseParsed: true, rawOutputText: validOutput, rawResponseBody: "",
@@ -158,5 +158,15 @@ Deno.test("manual POST does not report success when schedule publication fails",
   const body = await response.json();
   if (body.status === "completed" || body.published_character_count !== 0 || mock.calls.publish !== 1) {
     throw new Error("Publish failure was incorrectly reported as success: " + JSON.stringify(body));
+  }
+});
+
+
+Deno.test("manual POST rejects malformed mocked AI JSON before publishing", async () => {
+  const mock = createMock("invalid_ai_output");
+  const response = await invoke(mock);
+  const body = await response.json();
+  if (body.status === "completed" || mock.calls.publish !== 0 || mock.calls.provider !== 1) {
+    throw new Error("Malformed AI output reached schedule publication: " + JSON.stringify({ body, calls: mock.calls }));
   }
 });
