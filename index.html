@@ -10130,6 +10130,7 @@ async function loadEncounterScheduleTestTools(){
     let profileTargetAvailable=false;
     let profileJobStatus='unknown';
     let profileTargetName='';
+    let profileAvailableAt=0;
     let profileStatusError=false;
     try{
       const {data:profileData,error:profileError}=await client.functions.invoke('character-profile-organization-worker',{body:{mode:'status'}});
@@ -10138,20 +10139,24 @@ async function loadEncounterScheduleTestTools(){
       profileTargetAvailable=!!profileData.next_character_id;
       profileJobStatus=String(profileData.profile_job_status||'missing');
       profileTargetName=String(profileData.next_character_name||'角色');
+      profileAvailableAt=profileData.profile_available_at?new Date(profileData.profile_available_at).getTime():0;
+      const profileWaiting=profileAvailableAt>Date.now();
       if(profileStatus)profileStatus.textContent=!profileTargetAvailable
         ?'目前沒有待生成行程的公開角色。'
         :profileReady
           ?'下一位：'+profileTargetName+'｜角色資料已整理完成，請檢查下方結果後再執行第二步。'
           :profileJobStatus==='processing'
             ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
-            :profileJobStatus==='failed'
+            :profileWaiting
+              ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
+              :profileJobStatus==='failed'
               ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。保留失敗紀錄，不會自動重試。'
               :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
       if(profilePreview)profilePreview.innerHTML=profileReady
         ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
         :'';
       if(profileButton){
-        const enabled=profileTargetAvailable&&!profileReady&&profileJobStatus!=='processing'&&profileJobStatus!=='failed';
+        const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing'&&profileJobStatus!=='failed';
         profileButton.dataset.aiEnabled=enabled?'true':'false';
         profileButton.disabled=!enabled;
       }
