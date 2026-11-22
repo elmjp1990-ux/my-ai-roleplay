@@ -254,6 +254,13 @@ export function normalizeEncounterSceneKey(
   if (/(路邊攤|小吃攤|攤販|早餐店|便當店|麵店|食堂)/i.test(compact)) return "shopping-street";
   if (/(人行道|路邊|街道|街頭)/i.test(compact)) return "shopping-street";
 
+  // Exact scene keys and legacy aliases are authoritative destination labels.
+  // Resolve them before inferring a venue from incidental activity keywords
+  // (e.g. listening to music at the airport must remain at the airport).
+  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
+  const exactAlias = SCENE_ALIASES[raw] || SCENE_ALIASES[original];
+  if (exactAlias) return exactAlias;
+
   // For generic or otherwise unmapped places, music and performance context
   // can select the Live House background. A residential or explicit shop label
   // above always takes precedence.
