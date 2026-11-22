@@ -1,6 +1,10 @@
 import { createClient } from "@supabase/supabase-js";
 import { handleEncounterScheduleOrganizer } from "../supabase/functions/_shared/encounter-schedule-organizer-handler.ts";
 
+const runtimeProcess = (globalThis as unknown as {
+  process: { env: Record<string, string | undefined> };
+}).process;
+
 function readBody(request: any): Record<string, unknown> {
   if (request?.body && typeof request.body === "object" && !Array.isArray(request.body)) {
     return request.body as Record<string, unknown>;
@@ -34,7 +38,7 @@ export default async function handler(req: any, res: any) {
 
   // This Vercel endpoint is deliberately limited to the authenticated manual
   // test action. Never allow it to run from a production deployment.
-  if (process.env.VERCEL_ENV === "production") {
+  if (runtimeProcess.env.VERCEL_ENV === "production") {
     res.status(403).json({ error: "manual_schedule_trigger_disabled" });
     return;
   }
@@ -63,7 +67,7 @@ export default async function handler(req: any, res: any) {
 
   const runtimeEnv = {
     get(name: string): string | undefined {
-      return process.env[name];
+      return runtimeProcess.env[name];
     },
   };
 
