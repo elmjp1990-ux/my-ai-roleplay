@@ -67,6 +67,19 @@ export default async function handler(req: any, res: any) {
     },
   };
 
+  // Keep the browser connection active while the provider is working. Leading
+  // JSON whitespace is valid, so the client can still call response.json().
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Headers", "authorization, x-client-info, apikey, content-type");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.statusCode = 200;
+  res.flushHeaders?.();
+  const heartbeat = setInterval(() => {
+    if (!res.destroyed && !res.writableEnded) res.write(" ");
+  }, 15_000);
+
   try {
     const response = await handleEncounterScheduleOrganizer(
       webRequest,
@@ -74,11 +87,24 @@ export default async function handler(req: any, res: any) {
       createClient,
       270_000,
     );
-    response.headers.forEach((value, name) => res.setHeader(name, value));
-    res.setHeader("Cache-Control", "no-store");
-    res.status(response.status).send(await response.text());
+    const bodyText = await response.text();
+    if (response.status === 200) {
+      res.end(bodyText);
+    } else {
+      try {
+        const payload = JSON.parse(bodyText);
+        if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+          payload.http_status = response.status;
+        }
+        res.end(JSON.stringify(payload));
+      } catch {
+        res.end(bodyText);
+      }
+    }
   } catch (error) {
     console.error("Encounter schedule Vercel handler failed:", error);
-    res.status(500).json({ error: "schedule_handler_failed" });
+    res.end(JSON.stringify({ error: "schedule_handler_failed", http_status: 500 }));
+  } finally {
+    clearInterval(heartbeat);
   }
 }
