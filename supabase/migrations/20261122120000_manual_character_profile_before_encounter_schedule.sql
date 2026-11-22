@@ -230,6 +230,7 @@ BEGIN
       lease_generation = lease_generation + 1,
       lease_expires_at = now() + interval '3 minutes',
       lease_source_hash = v_hash,
+      last_error_code = NULL,
       updated_at = now()
   WHERE character_id = v_character_id
   RETURNING * INTO v_job;
