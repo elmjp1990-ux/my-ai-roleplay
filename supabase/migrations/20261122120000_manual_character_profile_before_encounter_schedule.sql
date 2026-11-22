@@ -16,6 +16,7 @@ AS $
   FROM public.encounter_schedule_generation_jobs j
   JOIN public.characters c ON c.id = j.character_id
   WHERE j.author_id = p_author_id
+    AND c.author_id = p_author_id
     AND j.status = 'pending'
     AND c.visibility = 'public'
     AND c.review_status = 'approved'
