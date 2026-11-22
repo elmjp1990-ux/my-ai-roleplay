@@ -252,9 +252,9 @@ DECLARE
 BEGIN
   IF EXISTS (
     SELECT 1 FROM public.get_encounter_scene_catalog()
-    WHERE location_key = 'restaurant'
+    WHERE location_key = 'hotel'
   ) THEN
-    RAISE EXCEPTION 'synthetic replay expects restaurant to be unavailable in the scene catalog';
+    RAISE EXCEPTION 'synthetic replay expects hotel to be unavailable in the scene catalog';
   END IF;
 
   INSERT INTO public.character_schedules (
@@ -265,9 +265,9 @@ BEGIN
   (
     '00000000-0000-4000-8000-000000000030'::uuid,
     '00000000-0000-4000-8000-000000000010'::uuid,
-    'weekday', '12:00', '13:00', 'restaurant', '餐廳',
-    '外出用餐', '在餐廳用餐。', 50, true, 'ai', 'option_1', 55,
-    pg_catalog.repeat('他在餐廳用餐，暫時不會出現在其他場景。', 9), false
+    'weekday', '12:00', '13:00', 'hotel', '旅館',
+    '外出用餐', '在旅館用餐。', 50, true, 'ai', 'option_1', 55,
+    pg_catalog.repeat('他在旅館用餐，暫時不會出現在其他場景。', 9), false
   ),
   (
     '00000000-0000-4000-8000-000000000031'::uuid,
@@ -307,7 +307,7 @@ BEGIN
   )::integer;
 
   IF v_option_roll >= 55 THEN
-    RAISE EXCEPTION 'synthetic fixture no longer selects the unavailable restaurant option: %', v_option_roll;
+    RAISE EXCEPTION 'synthetic fixture no longer selects the unavailable hotel option: %', v_option_roll;
   END IF;
 
   -- This character also has a legacy manual primary row from 12:00–14:00
