@@ -208,6 +208,10 @@ const manualCandidates = manualScheduleClaimMigration.slice(
 );
 assert.match(manualCandidates, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/,
   "The actual manual schedule candidate selection must be scoped to the current author, not only the preflight count");
+assert.match(manualCandidates, /c\.author_id = j\.author_id/,
+  "A stale schedule job must not claim a character that has a different current owner");
+assert.match(manualProfileMigration, /c\.author_id = p_author_id/,
+  "The Profile target selector must verify current character ownership");
 assert.match(manualScheduleClaimMigration, /COMMENT ON FUNCTION public\.claim_encounter_schedule_batch/,
   "The author-scoped manual schedule claim behavior must be documented in the migration");
 assert.match(manualScheduleClaimMigration, /lease_expires_at < v_now[\s\S]*p_force IS NOT TRUE OR author_id = p_actor_user_id/,
