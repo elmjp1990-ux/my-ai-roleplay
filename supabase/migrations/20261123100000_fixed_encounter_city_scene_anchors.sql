@@ -269,7 +269,7 @@ COMMENT ON FUNCTION public.publish_encounter_scene_metadata(jsonb) IS
 DO $fixed_scene_publisher_patch$
 DECLARE
   v_definition text;
-  v_old text;
+  v_pattern text;
   v_new text;
   v_count integer;
 BEGIN
@@ -277,33 +277,37 @@ BEGIN
     'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
   ) INTO v_definition;
 
-  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''park'', ''shopping-street'', ''night-market'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
+  -- Canonical schedule keys: preserve the legacy accepted keys while adding
+  -- the four new A–N keys that were not in the original publisher allowlist.
+  v_pattern := '''airport''[[:space:]]*,[[:space:]]*''commercial''[[:space:]]*,[[:space:]]*''night-bar''[[:space:]]*,[[:space:]]*''live-house''[[:space:]]*,[[:space:]]*''apartment''[[:space:]]*,[[:space:]]*''department-store''[[:space:]]*,[[:space:]]*''bookstore''[[:space:]]*,[[:space:]]*''cafe''[[:space:]]*,[[:space:]]*''park''[[:space:]]*,[[:space:]]*''shopping-street''[[:space:]]*,[[:space:]]*''night-market''[[:space:]]*,[[:space:]]*''restaurant''[[:space:]]*,[[:space:]]*''university''[[:space:]]*,[[:space:]]*''hospital''[[:space:]]*,[[:space:]]*''gym''[[:space:]]*,[[:space:]]*''cinema''[[:space:]]*,[[:space:]]*''museum''[[:space:]]*,[[:space:]]*''hotel''[[:space:]]*,[[:space:]]*''train-station''[[:space:]]*,[[:space:]]*''library''[[:space:]]*,[[:space:]]*''theater''[[:space:]]*,[[:space:]]*''art-gallery''[[:space:]]*,[[:space:]]*''community-center''[[:space:]]*,[[:space:]]*''music-studio''[[:space:]]*,[[:space:]]*''bakery''[[:space:]]*,[[:space:]]*''coworking-space''';
   v_new := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''park'', ''shopping-street'', ''night-market'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space'', ''waterfront'', ''luxury-apartment'', ''convenience-store'', ''private-club''';
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
+  v_definition := pg_catalog.regexp_replace(v_definition, v_pattern, v_new, 'g');
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_new, '')))
+    / pg_catalog.length(v_new) INTO v_count;
   IF v_count <> 2 THEN
     RAISE EXCEPTION 'fixed_scene_schedule_key_patch_unexpected: %', v_count;
   END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
-  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || chr(10) ||
-    '                 ''department-store'', ''bookstore'', ''cafe''';
-  v_new := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space'', ''luxury-apartment'', ''convenience-store'', ''private-club''';
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
+  -- Hourly rain fallbacks have a deliberately narrower allowlist than general
+  -- scene keys. The old café fallback is replaced by indoor fixed A–N venues.
+  v_pattern := '''airport''[[:space:]]*,[[:space:]]*''commercial''[[:space:]]*,[[:space:]]*''night-bar''[[:space:]]*,[[:space:]]*''live-house''[[:space:]]*,[[:space:]]*''apartment''[[:space:]]*,[[:space:]]*''department-store''[[:space:]]*,[[:space:]]*''bookstore''[[:space:]]*,[[:space:]]*''cafe''[[:space:]]*[)]';
+  v_new := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''university'', ''hospital'', ''luxury-apartment'', ''convenience-store'', ''private-club''';
+  v_definition := pg_catalog.regexp_replace(v_definition, v_pattern, v_new || ')', 'g');
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_new || ')', '')))
+    / pg_catalog.length(v_new || ')') INTO v_count;
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'fixed_scene_hourly_rain_fallback_patch_unexpected: %', v_count;
   END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
-  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
+  -- Keep the older special-event fallback set valid while adding K, M and N.
+  v_pattern := '''airport''[[:space:]]*,[[:space:]]*''commercial''[[:space:]]*,[[:space:]]*''night-bar''[[:space:]]*,[[:space:]]*''live-house''[[:space:]]*,[[:space:]]*''apartment''[[:space:]]*,[[:space:]]*''department-store''[[:space:]]*,[[:space:]]*''bookstore''[[:space:]]*,[[:space:]]*''cafe''[[:space:]]*,[[:space:]]*''restaurant''[[:space:]]*,[[:space:]]*''university''[[:space:]]*,[[:space:]]*''hospital''[[:space:]]*,[[:space:]]*''gym''[[:space:]]*,[[:space:]]*''cinema''[[:space:]]*,[[:space:]]*''museum''[[:space:]]*,[[:space:]]*''hotel''[[:space:]]*,[[:space:]]*''train-station''[[:space:]]*,[[:space:]]*''library''[[:space:]]*,[[:space:]]*''theater''[[:space:]]*,[[:space:]]*''art-gallery''[[:space:]]*,[[:space:]]*''community-center''[[:space:]]*,[[:space:]]*''music-studio''[[:space:]]*,[[:space:]]*''bakery''[[:space:]]*,[[:space:]]*''coworking-space''[[:space:]]*[)]';
   v_new := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space'', ''luxury-apartment'', ''convenience-store'', ''private-club''';
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
-    / pg_catalog.length(v_old) INTO v_count;
+  v_definition := pg_catalog.regexp_replace(v_definition, v_pattern, v_new || ')', 'g');
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_new || ')', '')))
+    / pg_catalog.length(v_new || ')') INTO v_count;
   IF v_count <> 1 THEN
     RAISE EXCEPTION 'fixed_scene_special_event_rain_fallback_patch_unexpected: %', v_count;
   END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
   EXECUTE v_definition;
 END;
