@@ -82,6 +82,55 @@ SET display_name = EXCLUDED.display_name,
     is_active = true,
     updated_at = pg_catalog.clock_timestamp();
 
+-- Preserve existing schedule rows by moving retired venue keys into their
+-- nearest fixed A–N anchor. Natural location_description text is intentionally
+-- left untouched so "咖啡廳", "書店", etc. remain visible as the character's
+-- specific place inside the broader fixed map location.
+UPDATE public.character_schedules
+SET location_key = CASE location_key
+  WHEN 'cafe' THEN 'shopping-street'
+  WHEN 'bookstore' THEN 'shopping-street'
+  WHEN 'bakery' THEN 'shopping-street'
+  WHEN 'night-market' THEN 'shopping-street'
+  WHEN 'restaurant' THEN 'department-store'
+  WHEN 'cinema' THEN 'department-store'
+  WHEN 'music-studio' THEN 'live-house'
+  WHEN 'theater' THEN 'live-house'
+  WHEN 'art-gallery' THEN 'live-house'
+  WHEN 'museum' THEN 'live-house'
+  WHEN 'library' THEN 'university'
+  WHEN 'coworking-space' THEN 'commercial'
+  ELSE location_key
+END
+WHERE location_key IN (
+  'cafe', 'bookstore', 'bakery', 'night-market', 'restaurant', 'cinema',
+  'music-studio', 'theater', 'art-gallery', 'museum', 'library',
+  'coworking-space'
+);
+
+-- Rain fallbacks must resolve to an indoor fixed scene after the key migration.
+UPDATE public.character_schedules
+SET rain_fallback_location_key = CASE rain_fallback_location_key
+  WHEN 'cafe' THEN 'department-store'
+  WHEN 'bookstore' THEN 'department-store'
+  WHEN 'bakery' THEN 'department-store'
+  WHEN 'night-market' THEN 'department-store'
+  WHEN 'restaurant' THEN 'department-store'
+  WHEN 'cinema' THEN 'department-store'
+  WHEN 'music-studio' THEN 'live-house'
+  WHEN 'theater' THEN 'live-house'
+  WHEN 'art-gallery' THEN 'live-house'
+  WHEN 'museum' THEN 'live-house'
+  WHEN 'library' THEN 'university'
+  WHEN 'coworking-space' THEN 'commercial'
+  ELSE rain_fallback_location_key
+END
+WHERE rain_fallback_location_key IN (
+  'cafe', 'bookstore', 'bakery', 'night-market', 'restaurant', 'cinema',
+  'music-studio', 'theater', 'art-gallery', 'museum', 'library',
+  'coworking-space'
+);
+
 -- Older bookstore/cafe anchors are no longer part of the fixed city map.
 UPDATE public.encounter_scene_registry
 SET is_active = false, updated_at = pg_catalog.clock_timestamp()
