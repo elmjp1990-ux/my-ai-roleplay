@@ -31,7 +31,7 @@ const validOutput = JSON.stringify({
   scenes: [],
 });
 
-function createMock(mode: "success" | "publish_error" | "invalid_ai_output" = "success") {
+function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" = "success") {
   const calls = { provider: 0, claim: 0, publish: 0, usage: 0, output: 0 };
   const admin = {
     from(table: string) {
@@ -46,7 +46,11 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" = "s
         in() { return query; }, order() { return query; }, limit() { return query; },
         not() { return query; },
         async maybeSingle() {
-          if (table === "encounter_schedule_generation_jobs") return { data: { source_hash: "test-source-hash" }, error: null };
+          if (table === "encounter_schedule_generation_jobs") {
+            const pendingLookup = filters.some(([column, value]) => column === "status" && value === "pending");
+            return { data: pendingLookup ? { character_id: characterId } : { source_hash: "test-source-hash" }, error: null };
+          }
+          if (table === "characters") return { data: { name: "測試角色" }, error: null };
           return { data: null, error: null };
         },
         async single() {
@@ -71,7 +75,15 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" = "s
         calls.claim++;
         return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [source] }, error: null };
       }
-      if (name === "get_character_ai_profile_for_chat") return { data: {}, error: null };
+      if (name === "get_character_ai_profile_for_chat") {
+        if (mode === "profile_missing") return { data: null, error: null };
+        const section = { status: "not_provided", items: [] };
+        return { data: { life_context: {
+          work_environment: section, residence_environment: section, daily_routines: section,
+          interests_and_leisure: section, social_circles: section, recurring_places: section,
+          environmental_constraints: section,
+        } }, error: null };
+      }
       if (name === "get_encounter_scene_catalog") return { data: [], error: null };
       if (name === "publish_encounter_schedule_batch") {
         calls.publish++;
@@ -168,5 +180,17 @@ Deno.test("manual POST rejects malformed mocked AI JSON before publishing", asyn
   const body = await response.json();
   if (body.status === "completed" || mock.calls.publish !== 0 || mock.calls.provider !== 1) {
     throw new Error("Malformed AI output reached schedule publication: " + JSON.stringify({ body, calls: mock.calls }));
+  }
+});
+
+
+Deno.test("manual POST blocks schedule claim and AI call until source-current Character AI Profile exists", async () => {
+  const mock = createMock("profile_missing");
+  const response = await invoke(mock);
+  const body = await response.json();
+  if (response.status !== 409 || body.error !== "character_profile_not_ready" ||
+      body.schedule_job_claimed !== false || body.ai_called !== false ||
+      mock.calls.claim !== 0 || mock.calls.provider !== 0 || mock.calls.publish !== 0) {
+    throw new Error("Schedule generation bypassed the Profile prerequisite: " + JSON.stringify({ body, calls: mock.calls }));
   }
 });
