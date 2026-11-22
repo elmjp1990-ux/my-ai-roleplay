@@ -646,27 +646,35 @@ export async function handleEncounterScheduleOrganizer(
 
     // Do not claim a schedule lease or spend schedule-model tokens until the
     // exact next public character has a source-current, complete AI Profile.
-    const { data: nextScheduleJob, error: nextScheduleJobError } = await admin
+    const { data: pendingScheduleJobs, error: nextScheduleJobError } = await admin
       .from("encounter_schedule_generation_jobs")
       .select("character_id")
       .eq("author_id", actorUserId)
       .eq("status", "pending")
       .order("queued_at", { ascending: true })
       .order("character_id", { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(50);
     if (nextScheduleJobError) {
       return json({ error: "character_profile_preflight_unavailable" }, 503);
     }
+    const pendingCharacterIds = (pendingScheduleJobs || []).map((job: any) => job.character_id).filter(Boolean);
+    const { data: eligibleCharacters, error: eligibleCharacterError } = pendingCharacterIds.length
+      ? await admin.from("characters").select("id,name")
+        .in("id", pendingCharacterIds).eq("author_id", actorUserId)
+        .eq("visibility", "public").eq("review_status", "approved")
+        .eq("rights_confirmed", true).is("deleted_at", null)
+      : { data: [], error: null };
+    if (eligibleCharacterError) {
+      return json({ error: "character_profile_preflight_unavailable" }, 503);
+    }
+    const eligibleCharacterById = new Map((eligibleCharacters || []).map((character: any) => [character.id, character]));
+    const nextScheduleJob = (pendingScheduleJobs || []).find((job: any) => eligibleCharacterById.has(job.character_id));
     if (nextScheduleJob?.character_id) {
-      const [{ data: profileData, error: profileError }, { data: characterData }] = await Promise.all([
-        admin.rpc("get_character_ai_profile_for_chat", {
-          p_character_id: nextScheduleJob.character_id,
-          p_author_id: actorUserId,
-        }),
-        admin.from("characters").select("name")
-          .eq("id", nextScheduleJob.character_id).eq("author_id", actorUserId).maybeSingle(),
-      ]);
+      const characterData = eligibleCharacterById.get(nextScheduleJob.character_id);
+      const { data: profileData, error: profileError } = await admin.rpc("get_character_ai_profile_for_chat", {
+        p_character_id: nextScheduleJob.character_id,
+        p_author_id: actorUserId,
+      });
       if (profileError) {
         return json({ error: "character_profile_preflight_unavailable" }, 503);
       }
