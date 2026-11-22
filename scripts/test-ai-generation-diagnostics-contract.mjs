@@ -26,7 +26,7 @@ const callSites = [
   ["supabase/functions/encounter-turn/index.ts", "encounter_chat"],
   ["supabase/functions/_shared/story-memory-summary.ts", "memory_summary"],
   ["supabase/functions/character-profile-organization-worker/index.ts", "character_profile"],
-  ["supabase/functions/encounter-schedule-organizer/index.ts", "encounter_schedule"],
+  ["supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "encounter_schedule"],
   ["supabase/functions/encounter-evaluation-worker/index.ts", "encounter_evaluation"],
 ];
 for (const [file, generationType] of callSites) {
