@@ -391,7 +391,7 @@ export default {
             p_author_id: authorId,
           }),
           supabase.from("character_profile_organization_jobs")
-            .select("status,last_error_code,updated_at")
+            .select("status,last_error_code,updated_at,available_at")
             .eq("character_id", nextJob.character_id).eq("author_id", authorId).maybeSingle(),
         ]);
         if (profileResult.error || jobResult.error) {
@@ -416,6 +416,7 @@ export default {
           profile_job_status: jobResult.data?.status || "missing",
           profile_error_code: jobResult.data?.last_error_code || null,
           profile_updated_at: jobResult.data?.updated_at || null,
+          profile_available_at: jobResult.data?.available_at || null,
           profile_preview: profileReady ? profile : null,
           model: CHARACTER_PROFILE_MODEL,
         });
