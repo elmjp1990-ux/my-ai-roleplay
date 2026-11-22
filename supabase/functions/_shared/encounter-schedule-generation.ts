@@ -32,7 +32,7 @@ const RAIN_FALLBACK_SCENE_KEYS = new Set([
   "airport", "commercial", "night-bar", "live-house", "apartment",
   "department-store", "bookstore", "cafe",
 ]);
-const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館|上班族|辦公室|公司職員|大學校園|現代醫院|現代學校|手機|網路|社群|公寓|都市|城市生活/i;
+const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館|上班族|辦公室|公司職員|大學校園|現代醫院|現代學校|手機|網路|社群|公寓|都市|城市生活|地下\s*Live\s*House|Live\s*House|地下樂團|地下搖滾|搖滾樂團|獨立樂團|樂團主唱|主吉他手|吉他手|貝斯手|鼓手|練團室|錄音室|效果器|重機|機車|出租屋|頂樓出租屋|租屋處|宵夜攤|冰美式|演出|試音|樂器行|排練室|live\s*music|rock\s*band|guitarist|bassist|drummer|motorcycle|rented\s*apartment/i;
 const CULTIVATION_PATTERN = /修仙|仙俠|修真|修煉|靈根|金丹|元嬰|渡劫|宗門|仙界|魔界|靈氣|劍修|丹修|道君|仙尊|cultivation|xianxia|xianxia/i;
 const HISTORICAL_PATTERN = /ancient|historical|medieval|antiquity|古代|歷史|中世紀|中古|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘|大正時代|維多利亞時代/i;
 const SCI_FI_PATTERN = /科幻|未來世界|未來都市|星際|太空殖民|賽博龐克|賽博|機甲|人工智慧統治|星球聯邦|science fiction|sci-fi|cyberpunk/i;
@@ -224,11 +224,14 @@ export type EncounterWorldviewClassification = {
 
 export function classifyEncounterWorldview(source: EncounterScheduleSource): EncounterWorldviewClassification {
   const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
+  const derivedProfile = isRecord(source.derived_character_profile) ? source.derived_character_profile : {};
+  const derivedLifeContext = isRecord(source.derived_life_context) ? source.derived_life_context : {};
   const context = [
     text(source.world_era), text(source.setting_era), text(source.intro),
     text(source.title), text(source.occupation), text(source.race), text(source.style),
     ...(Array.isArray(source.tags) ? source.tags.filter((value): value is string => typeof value === "string") : []),
-    text(source.schedule_description), text(source.private_info), JSON.stringify(profile),
+    text(source.schedule_description), text(source.private_info),
+    JSON.stringify(profile), JSON.stringify(derivedProfile), JSON.stringify(derivedLifeContext),
   ].join(" ");
   const modern = source.modern_setting_compatible === true || source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
   const cultivation = CULTIVATION_PATTERN.test(context);
