@@ -10130,7 +10130,6 @@ async function loadEncounterScheduleTestTools(){
     let profileTargetAvailable=false;
     let profileJobStatus='unknown';
     let profileTargetName='';
-    let profileTargetId='';
     let profileStatusError=false;
     try{
       const {data:profileData,error:profileError}=await client.functions.invoke('character-profile-organization-worker',{body:{mode:'status'}});
@@ -10139,7 +10138,6 @@ async function loadEncounterScheduleTestTools(){
       profileTargetAvailable=!!profileData.next_character_id;
       profileJobStatus=String(profileData.profile_job_status||'missing');
       profileTargetName=String(profileData.next_character_name||'角色');
-      profileTargetId=String(profileData.next_character_id||'');
       if(profileStatus)profileStatus.textContent=!profileTargetAvailable
         ?'目前沒有待生成行程的公開角色。'
         :profileReady
