@@ -126,7 +126,7 @@
       <button class="city-location-backdrop" type="button" data-action="city-close" aria-label="關閉地點資訊"></button>
       <div class="city-location-glass">
         <div class="city-location-header" role="group" aria-label="場景標題列">
-          <div class="city-location-title-row"><span class="city-location-scene-icon city-location-title-icon" id="cityMapPlaceIcon" aria-hidden="true">☕</span><h2 id="cityMapPlaceTitle">咖啡廳</h2><span class="city-location-open-inline"><i></i><span>營業中</span></span></div>
+          <div class="city-location-title-row"><span class="city-location-scene-icon city-location-title-icon" id="cityMapPlaceIcon" aria-hidden="true">☕</span><h2 id="cityMapPlaceTitle">咖啡廳</h2><span class="city-location-subtitle" id="cityMapPlaceSubtitle"></span></div>
           <button type="button" class="city-location-close" data-action="city-close" aria-label="關閉場景視窗">×</button>
         </div>
         <div class="city-location-rule"></div>
@@ -241,6 +241,10 @@
  locationModal=$('cityMapPeople');
  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
  const cityPlaceNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園'};
+ const cityPlaceSubtitles={
+ airport:'航廈・出境',commercial:'商務・辦公','night-bar':'夜生活・樂團','live-house':'LIVE・展演',apartment:'住宅・日常','department-store':'購物・餐飲',bookstore:'閱讀・選書',cafe:'咖啡・甜點',park:'綠地・廣場',
+ waterfront:'河岸・碼頭',harbor:'河岸・碼頭','office-building':'商務・辦公',university:'教室・校園','performance-venue':'LIVE・展覽','luxury-apartment':'私宅・高級住宅','convenience-store':'便利・日常','private-club':'私人・娛樂','luxury-club':'私人・娛樂'
+ };
  const cityVenueScenes={
  airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
  commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
@@ -527,6 +531,7 @@
  if(venueInfo)venueInfo.hidden=false;
  const title=$('cityMapPlaceTitle');
  if(title){title.textContent=name;title.style.display='block';title.style.visibility='visible';}
+ const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent=cityPlaceSubtitles[place]||'';
  const placeIcon=$('cityMapPlaceIcon');
  if(placeIcon)placeIcon.textContent=scene.icon;
  const renderVenue=()=>{
@@ -537,6 +542,7 @@
  };
  const latestEventMarkup=latestNotice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
  if(title){title.textContent=cityPlaceNames[place]||name;title.style.display='block';title.style.visibility='visible';}
+ const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent=cityPlaceSubtitles[place]||'';
  if(placeIcon)placeIcon.textContent=latestScene.icon;
  const target=$('cityMapPresenceList');
  if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(latestScene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(latestScene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(latestNotice.label)+'</span><div class="city-location-news-items">'+latestEventMarkup+'</div></div>'+flightMarkup;
