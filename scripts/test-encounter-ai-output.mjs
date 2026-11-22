@@ -108,6 +108,7 @@ const publishedSceneResolverMigration = fs.readFileSync("supabase/migrations/202
 const sceneDescriptionMigration = fs.readFileSync("supabase/migrations/20261118074713_encounter_schedule_scene_descriptions.sql", "utf8");
 const compactScheduleMigration = fs.readFileSync("supabase/migrations/20261119000100_encounter_schedule_compact_output.sql", "utf8");
 const strictHourlyScheduleMigration = fs.readFileSync("supabase/migrations/20261119000900_encounter_schedule_strict_hourly_options.sql", "utf8");
+const naturalLocationScheduleMigration = fs.readFileSync("supabase/migrations/20261122140000_encounter_schedule_natural_locations_and_rain_fallbacks.sql", "utf8");
 const replay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
 const weatherSync = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
 const weatherModule = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
@@ -157,7 +158,7 @@ assert.match(scheduleGeneration, /不輸出 no_matching_location、special_event
 assert.match(scheduleGeneration, /行程以角色自身日常活動為準/);
 assert.match(scheduleGeneration, /地點是否能對應地圖由系統自行判斷/);
 assert.match(scheduleGeneration, /不得向模型提供任何地圖地點建議/);
-assert.match(scheduleGeneration, /characterCount <= 8/);
+assert.match(scheduleGeneration, /characterCount <= 20/);
 assert.doesNotMatch(scheduleGeneration, /sceneSuggestionText|目前地圖可用地點範例|AI 只會看到少量現有場景/);
 assert.match(scheduleGeneration, /scene_description/);
 assert.match(scheduleGeneration, /options 為 2–3 個選項/);
@@ -285,7 +286,10 @@ assert.match(endpoint, /ENCOUNTER_LOCATION_LABELS/);
 assert.doesNotMatch(sessionCreator, /character_stories/);
 assert.match(scheduleGeneration, /24 個逐小時時段/);
 assert.match(scheduleGeneration, /每個時段必須提供 2–3 個選項/);
-assert.match(scheduleGeneration, /10–30 個中文字/);
+assert.match(scheduleGeneration, /8–30 個中文字/);
+assert.match(naturalLocationScheduleMigration, /NOT BETWEEN 1 AND 20/);
+assert.match(naturalLocationScheduleMigration, /NOT BETWEEN 8 AND 30/);
+assert.match(naturalLocationScheduleMigration, /schedule_hourly_option_rain_fallback_missing/);
 assert.doesNotMatch(scheduleGeneration, /greeting_pool_count_invalid|relationship_greetings/);
 assert.match(endpoint, /目前好感度/);
 assert.match(evaluationWorker, /POYOZZ_DEFAULT_CHAT_MODEL/);
