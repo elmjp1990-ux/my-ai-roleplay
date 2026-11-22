@@ -3,6 +3,7 @@ name: Chat Storage API retry E2E (local only)
 on:
   pull_request:
     paths:
+      - 'deno.json'
       - "scripts/test-chat-storage-api-retry-e2e.ts"
       - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
       - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
