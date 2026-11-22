@@ -282,7 +282,8 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
-  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe''';
+  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || chr(10) ||
+    '                 ''department-store'', ''bookstore'', ''cafe''';
   v_new := '''commercial'', ''airport'', ''university'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
