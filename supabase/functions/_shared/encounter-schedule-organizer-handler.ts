@@ -672,7 +672,14 @@ export async function handleEncounterScheduleOrganizer(
       }
       const profile = asRow(profileData);
       const lifeContext = asRow(profile.life_context);
-      if (!profileData || Object.keys(lifeContext).length !== 7) {
+      const lifeContextKeys = [
+        "work_environment", "residence_environment", "daily_routines", "interests_and_leisure",
+        "social_circles", "recurring_places", "environmental_constraints",
+      ];
+      const lifeContextReady = profile.schema_version === "1.1" &&
+        Object.keys(lifeContext).length === lifeContextKeys.length &&
+        lifeContextKeys.every((key) => Object.prototype.hasOwnProperty.call(lifeContext, key));
+      if (!profileData || !lifeContextReady) {
         return json({
           status: "profile_required",
           error: "character_profile_not_ready",
