@@ -198,7 +198,25 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
   if (normalizeEncounterSceneKey("客戶家") !== "apartment") throw new Error("customer home must resolve to the apartment scene");
   if (normalizeEncounterSceneKey("街頭") !== "shopping-street") throw new Error("street must resolve to the existing street scene family");
-  if (normalizeEncounterSceneKey("超商") !== "shopping-street") throw new Error("convenience store must retain a valid shopping-district scene key");
+  if (normalizeEncounterSceneKey("便利商店") !== null || normalizeEncounterSceneKey("超商") !== null) {
+    throw new Error("convenience stores must remain unmatched until a dedicated scene is added");
+  }
+  if (normalizeEncounterSceneKey("江邊堤防") !== null) {
+    throw new Error("river embankment must remain unmatched until a suitable scene exists");
+  }
+  for (const location of ["308公寓", "頂樓加蓋", "頂樓出租屋", "一般公寓", "臥室", "房間", "住所"]) {
+    if (normalizeEncounterSceneKey(location) !== "apartment") {
+      throw new Error(location + " must resolve to the 308 apartment scene");
+    }
+  }
+  for (const location of ["Live House", "練團室", "排練室", "錄音室", "音樂工作室"]) {
+    if (normalizeEncounterSceneKey(location) !== "live-house") {
+      throw new Error(location + " must resolve to Live House");
+    }
+  }
+  if (normalizeEncounterSceneKey("私人工作室", "在地下樂團團練並排練新歌") !== "live-house") {
+    throw new Error("music activity keywords must resolve to Live House even when the place name is generic");
+  }
   if (normalizeEncounterSceneKey("小吃店") !== "restaurant") throw new Error("small eatery must resolve to restaurant");
 });
 
