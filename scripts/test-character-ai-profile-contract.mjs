@@ -8,6 +8,7 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
 const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
 const manualProfileMigration = fs.readFileSync("supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql", "utf8");
+const manualScheduleClaimMigration = fs.readFileSync("supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
@@ -191,6 +192,14 @@ assert.match(manualProfileMigration, /IF v_job\.status = 'failed' THEN[\s\S]*RET
   "Manual Profile UI must not automatically retry a terminal failure");
 assert.match(manualProfileMigration, /GRANT EXECUTE ON FUNCTION public\.claim_next_encounter_character_profile_job\(uuid\)[\s\S]*TO service_role/,
   "Only the service role may execute the privileged Profile claim RPC");
+const manualCandidates = manualScheduleClaimMigration.slice(
+  manualScheduleClaimMigration.indexOf("WITH candidates AS"),
+  manualScheduleClaimMigration.indexOf("claimed AS"),
+);
+assert.match(manualCandidates, /p_force IS NOT TRUE OR j\.author_id = p_actor_user_id/,
+  "The actual manual schedule candidate selection must be scoped to the current author, not only the preflight count");
+assert.match(manualScheduleClaimMigration, /COMMENT ON FUNCTION public\.claim_encounter_schedule_batch/,
+  "The author-scoped manual schedule claim behavior must be documented in the migration");
 assert.match(worker, /auth: \["user", "secret:default"\]/,
   "Profile worker must accept authenticated manual users and a separate internal secret mode");
 assert.match(worker, /ctx\.authMode === "user"/,
