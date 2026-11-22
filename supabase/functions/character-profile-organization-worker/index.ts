@@ -10,7 +10,7 @@ import {
   validateCharacterProfileSourcePayload,
   type CharacterProfileSourcePayload,
 } from "../_shared/character-profile-organization.ts";
-import { recordAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MAX_BATCH = 1;
@@ -68,6 +68,20 @@ class ProfileGenerationError extends Error {
     this.name = "ProfileGenerationError";
     this.metadata = metadata;
   }
+}
+
+function profileFailureStage(error: unknown): string {
+  const code = safeCode(error, "profile_generation_failed");
+  if (code === "provider_request_timeout" || code === "provider_outcome_unknown" ||
+      code === "provider_fallback_exhausted") return "provider_request";
+  if (code === "provider_response_too_large" || code.startsWith("openrouter_http_") ||
+      code.startsWith("provider_")) return "provider_response";
+  if (code === "model_content_missing" || code === "model_json_invalid") return "output_parsing";
+  if (code.startsWith("profile_schema_invalid_")) return "output_validation";
+  if (code === "profile_persistence_failed_after_generation") return "profile_persistence";
+  if (code.startsWith("source_") || code === "source_payload_invalid") return "source_validation";
+  if (code.includes("author") || code.includes("claimed_job")) return "job_validation";
+  return "worker_validation";
 }
 
 async function readBoundedResponseText(response: Response): Promise<string> {
@@ -493,6 +507,8 @@ export default {
 
     for (const item of items) {
       let usageRecorded = false;
+      let diagnosticId: string | null = null;
+      let generatedMetadata: ProfileUsageMetadata | null = null;
       try {
         if (!item.character_id || !item.author_id || !item.source_hash ||
           !item.lease_token || !Number.isSafeInteger(item.lease_generation) ||
@@ -506,13 +522,18 @@ export default {
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
         if (isManualUser) manualAiCallStarted = true;
         const generated = await generateProfile(item, apiKey);
-        await recordAiGenerationDiagnostic(supabase, {
+        generatedMetadata = generated;
+        // A valid provider response is only "received" until the derived Profile
+        // has actually been committed. Persistence failures must not look successful.
+        diagnosticId = await recordAiGenerationDiagnostic(supabase, {
           generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
           sourceRef: item.source_hash, model: generated.model, provider: generated.provider,
           requestId: generated.requestId, httpStatus: generated.httpStatus, finishReason: generated.finishReason,
           responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
-          rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed, rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
-          refusalText: generated.refusalText, usage: generated.usage, status: "completed",
+          rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed,
+          rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
+          refusalText: generated.refusalText, usage: generated.usage, status: "received",
+          metadata: { persistence_status: "pending" },
         });
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
@@ -520,26 +541,69 @@ export default {
         // Retry persistence with the same in-memory profile; never regenerate here.
         const status = await completeProfileWithRetry(supabase, item, generated.profile);
         if (status === "completed") {
+          await updateAiGenerationDiagnostic(supabase, diagnosticId, {
+            status: "completed", failureStage: null, failureCode: null,
+            metadata: { persistence_status: "completed" },
+          });
           summary.completed++;
           if (isManualUser) manualProfilePreview = generated.profile;
-        } else if (status === "stale_source") summary.stale++;
-        else summary.stale++;
+        } else {
+          const completionCode = status === "stale_source"
+            ? "profile_source_changed_before_save" : "profile_completion_not_committed";
+          await updateAiGenerationDiagnostic(supabase, diagnosticId, {
+            status: "failed", failureStage: "profile_persistence", failureCode: completionCode,
+            metadata: { persistence_status: status || "empty_result" },
+          });
+          if (status === "stale_source") summary.stale++;
+          else summary.failed++;
+        }
       } catch (error) {
         const code = safeCode(error, "profile_generation_failed");
         if (isManualUser) manualFailureCode = code;
-        if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
-          const failedUsage = error instanceof ProfileGenerationError ? error.metadata : null;
-          if (failedUsage) await recordAiGenerationDiagnostic(supabase, {
+        const failedMetadata = error instanceof ProfileGenerationError ? error.metadata : generatedMetadata;
+        const failureStage = generatedMetadata ? "profile_persistence" : profileFailureStage(error);
+        const validationErrors = code.startsWith("profile_schema_invalid_")
+          ? [code] : code === "model_json_invalid" ? ["model_json_invalid"] : [];
+        const diagnosticUpdate = {
+          status: "failed" as const,
+          failureStage,
+          failureCode: code,
+          validationErrors,
+          metadata: {
+            ai_call_started: manualAiCallStarted,
+            persistence_failed_after_generation: !!generatedMetadata,
+          },
+        };
+        if (diagnosticId) {
+          await updateAiGenerationDiagnostic(supabase, diagnosticId, diagnosticUpdate);
+        } else if (item.character_id && item.author_id && item.source_hash) {
+          await recordAiGenerationDiagnostic(supabase, {
             generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
-            sourceRef: item.source_hash, model: failedUsage.model, provider: failedUsage.provider,
-            requestId: failedUsage.requestId, httpStatus: failedUsage.httpStatus,
-            finishReason: failedUsage.finishReason, responseContentType: failedUsage.responseContentType,
-            responseBodyLength: failedUsage.responseBodyLength, rawResponseBody: failedUsage.rawResponseBody,
-            responseParsed: failedUsage.responseParsed, rawOutputText: failedUsage.rawOutputText, refusalText: failedUsage.refusalText,
-            usage: failedUsage.usage, status: "failed", failureStage: "profile_output_validation", failureCode: code,
-            validationErrors: code.startsWith("profile_schema_invalid_") ? [code] : code === "model_json_invalid" ? ["model_json_invalid"] : [],
+            sourceRef: item.source_hash,
+            model: failedMetadata?.model || CHARACTER_PROFILE_MODEL,
+            provider: failedMetadata?.provider || null,
+            requestId: failedMetadata?.requestId || null,
+            httpStatus: failedMetadata?.httpStatus ?? null,
+            finishReason: failedMetadata?.finishReason || null,
+            responseContentType: failedMetadata?.responseContentType || null,
+            responseBodyLength: failedMetadata?.responseBodyLength ?? null,
+            responseParsed: failedMetadata?.responseParsed ?? null,
+            rawResponseBody: failedMetadata?.rawResponseBody || null,
+            rawOutputText: failedMetadata?.rawOutputText || null,
+            refusalText: failedMetadata?.refusalText || null,
+            usage: failedMetadata?.usage || {},
+            status: "failed",
+            failureStage,
+            failureCode: code,
+            validationErrors,
+            metadata: {
+              ai_call_started: manualAiCallStarted,
+              persistence_failed_after_generation: !!generatedMetadata,
+            },
           });
-          await recordProfileUsage(supabase, item, failedUsage, "failed", code);
+        }
+        if (!usageRecorded && failedMetadata) {
+          await recordProfileUsage(supabase, item, failedMetadata, "failed", code);
           usageRecorded = true;
         }
         const { data: failureStatus, error: failureError } = await supabase.rpc(
