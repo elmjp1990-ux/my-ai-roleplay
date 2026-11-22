@@ -32,7 +32,9 @@ const validOutput = JSON.stringify({
 });
 
 function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" = "success") {
-  const calls = { provider: 0, claim: 0, publish: 0, usage: 0, output: 0 };
+  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null } = {
+    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null,
+  };
   const admin = {
     from(table: string) {
       let action = "select";
@@ -77,11 +79,13 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
       };
       return query;
     },
-    async rpc(name: string) {
+    async rpc(name: string, args?: Record<string, unknown>) {
       if (name === "get_next_encounter_schedule_character_for_author") {
+        calls.nextSelectorAuthor = String(args?.p_author_id || "");
         return { data: { character_id: characterId, character_name: "測試角色" }, error: null };
       }
       if (name === "claim_encounter_schedule_batch") {
+        calls.claimAuthor = String(args?.p_actor_user_id || "");
         calls.claim++;
         return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [source] }, error: null };
       }
@@ -157,6 +161,9 @@ Deno.test("manual POST mock executes authenticated AI-to-publish happy path with
   }
   if (mock.calls.output !== 1 || mock.calls.usage !== 1) {
     throw new Error("Expected raw output and usage audit persistence: " + JSON.stringify(mock.calls));
+  }
+  if (mock.calls.nextSelectorAuthor !== userId || mock.calls.claimAuthor !== userId) {
+    throw new Error("Manual Profile preflight and schedule claim must use the verified caller ID: " + JSON.stringify(mock.calls));
   }
 });
 
