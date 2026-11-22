@@ -197,7 +197,10 @@ Deno.test("classifies activity space independently from scene location", () => {
     const actual = classifyEncounterActivitySpace(activity, location, requestedOutdoor);
     if (actual !== expected) throw new Error(activity + " classified as " + actual + " instead of " + expected);
   }
-  if (normalizeEncounterSceneKey("客戶家") !== "apartment") throw new Error("customer home must resolve to the apartment scene");
+  if (normalizeEncounterSceneKey("客戶家") !== "apartment" ||
+      normalizeEncounterSceneKey("客戶家", "前往客戶的高級公寓拜訪") !== "luxury-apartment") {
+    throw new Error("customer homes must resolve to L by default and K when luxury context is explicit");
+  }
   if (normalizeEncounterSceneKey("街頭") !== "shopping-street") throw new Error("street must resolve to the existing street scene family");
   if (normalizeEncounterSceneKey("便利商店") !== "convenience-store" || normalizeEncounterSceneKey("超商") !== "convenience-store") {
     throw new Error("convenience stores must resolve to fixed scene M");
