@@ -254,6 +254,42 @@ Deno.test("infers modern map compatibility from contemporary character context",
   }
 });
 
+Deno.test("recognizes contemporary musician settings and saved Profile context", () => {
+  const musician = source(id1, {
+    name: "陳曜司",
+    intro: "午夜兩點的地下 Livehouse，演出剛結束。",
+    world_era: "地下搖滾樂團的首席吉他手",
+    race: "人類",
+    modern_setting_compatible: false,
+    time_travel_explicit: false,
+    schedule_description: "晚上前往固定駐演的地下 Livehouse 試音，結束後騎重機回頂樓出租屋，偶爾到宵夜攤吃東西。",
+  });
+  const classification = classifyEncounterWorldview(musician);
+  if (classification.category !== "modern" || !classification.modern_map_compatible) {
+    throw new Error("contemporary musician context was incorrectly held for review: " + JSON.stringify(classification));
+  }
+
+  const profileOnlySignal = source(id1, {
+    name: "測試角色",
+    intro: "一位神秘旅人。",
+    world_era: "",
+    modern_setting_compatible: false,
+    time_travel_explicit: false,
+    schedule_description: "",
+    personality_profile: {},
+    derived_character_profile: {
+      identity_background: { status: "populated", items: [{ content: "現代地下樂團的吉他手，固定在 Live House 演出。" }] },
+    },
+    derived_life_context: {
+      daily_routines: { status: "populated", items: [{ content: "騎重機回出租屋，深夜吃宵夜。" }] },
+    },
+  });
+  const profileClassification = classifyEncounterWorldview(profileOnlySignal);
+  if (!profileClassification.modern_map_compatible || profileClassification.category !== "modern") {
+    throw new Error("saved derived Character AI Profile was ignored during worldview classification");
+  }
+});
+
 Deno.test("classifies worldviews locally and keeps species separate from era", () => {
   const modernVampire = source(id1, {
     race: "吸血鬼",
