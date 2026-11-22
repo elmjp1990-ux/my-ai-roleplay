@@ -11,6 +11,7 @@ const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 assert.match(route, /handleEncounterScheduleOrganizer/);
 assert.match(route, /270_000/);
 assert.match(route, /body\.mode !== "manual"/);
+assert.match(route, /VERCEL_ENV === "production"/);
 assert.match(route, /process\.env\[name\]/);
 assert.doesNotMatch(route, /Deno\./);
 assert.match(handler, /export async function handleEncounterScheduleOrganizer/);
