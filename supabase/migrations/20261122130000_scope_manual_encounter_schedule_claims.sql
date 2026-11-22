@@ -25,6 +25,9 @@ BEGIN
   IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
+  IF p_force IS TRUE AND p_actor_user_id IS NULL THEN
+    RAISE EXCEPTION 'manual_actor_required' USING ERRCODE = '22023';
+  END IF;
 
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext('poyozz_encounter_schedule_batch')::bigint);
 
@@ -37,14 +40,16 @@ BEGIN
       updated_at = v_now
   WHERE status = 'processing'
     AND lease_expires_at IS NOT NULL
-    AND lease_expires_at < v_now;
+    AND lease_expires_at < v_now
+    AND (p_force IS NOT TRUE OR author_id = p_actor_user_id);
 
   UPDATE public.encounter_schedule_batch_runs
   SET status = 'needs_reconciliation',
       failure_code = COALESCE(failure_code, 'worker_lease_expired'),
       updated_at = v_now
   WHERE status = 'processing'
-    AND started_at < v_now - interval '20 minutes';
+    AND started_at < v_now - interval '20 minutes'
+    AND (p_force IS NOT TRUE OR actor_user_id = p_actor_user_id);
 
   SELECT COUNT(DISTINCT j.character_id), MIN(j.queued_at)
   INTO v_pending_count, v_oldest
