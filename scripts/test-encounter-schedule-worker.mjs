@@ -184,7 +184,7 @@ assert.doesNotMatch(generator, /scene_catalog/);
 assert.match(generator, /行程以角色自身日常活動為準/);
 assert.match(generator, /ENCOUNTER_SCHEDULE_MAX_HOURLY_BLOCKS_PER_DAY = 24/);
 assert.match(generator, /weekday 與 holiday 各自必須完整輸出 24 個逐小時時段/);
-assert.match(generator, /activity 與 rain_fallback_activity 各 10–30 個中文字/);
+assert.match(generator, /activity 與 rain_fallback_activity 各 8–30 個中文字/);
 assert.match(generator, /每個時段必須提供 2–3 個選項/);
 assert.match(generator, /不同時段獨立抽取/);
 assert.match(generator, /每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100/);
