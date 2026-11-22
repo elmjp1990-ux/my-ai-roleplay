@@ -27,6 +27,7 @@ on:
       - "supabase/functions/_shared/encounter-schedule-organizer-handler.ts"
       - "api/encounter-schedule-organizer.ts"
       - "package.json"
+      - "tsconfig.json"
       - "scripts/test-vercel-encounter-schedule-route.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
