@@ -13,24 +13,20 @@ export const ENCOUNTER_SPECIAL_EVENT_KEYS = [
 ] as const;
 
 export const ENCOUNTER_SCENE_KEYS = [
-  "airport", "commercial", "night-bar", "live-house", "apartment",
-  "department-store", "bookstore", "cafe", "park", "shopping-street",
-  "night-market", "restaurant", "university", "hospital", "gym", "cinema",
-  "museum", "hotel", "train-station", "library", "theater", "art-gallery",
-  "community-center", "music-studio", "bakery", "coworking-space",
+  "waterfront", "commercial", "airport", "university", "park",
+  "shopping-street", "department-store", "hospital", "night-bar", "live-house",
+  "luxury-apartment", "apartment", "convenience-store", "private-club",
 ] as const;
 
-export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [
-  "shopping-street", "night-market", "restaurant", "university", "hospital",
-  "gym", "cinema", "museum", "hotel", "train-station", "library", "theater",
-  "art-gallery", "community-center", "music-studio", "bakery", "coworking-space",
-] as const;
+// Scene anchors are fixed A–N map locations. Dynamic content belongs inside
+// these locations and must never create additional map markers.
+export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [] as const;
 
-
-const OUTDOOR_SCENE_KEYS = new Set(["park", "shopping-street", "night-market"]);
+const OUTDOOR_SCENE_KEYS = new Set(["waterfront", "park", "shopping-street"]);
 const RAIN_FALLBACK_SCENE_KEYS = new Set([
-  "airport", "commercial", "night-bar", "live-house", "apartment",
-  "department-store", "bookstore", "cafe",
+  "commercial", "airport", "university", "department-store", "hospital",
+  "night-bar", "live-house", "luxury-apartment", "apartment",
+  "convenience-store", "private-club",
 ]);
 const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館|上班族|辦公室|公司職員|大學校園|現代醫院|現代學校|手機|網路|社群|公寓|都市|城市生活|地下\s*Live\s*House|Live\s*House|地下樂團|地下搖滾|搖滾樂團|獨立樂團|樂團主唱|主吉他手|吉他手|貝斯手|鼓手|練團室|錄音室|效果器|重機|機車|出租屋|頂樓出租屋|租屋處|宵夜攤|冰美式|試音|樂器行|live\s*music|rock\s*band|guitarist|bassist|drummer|motorcycle|rented\s*apartment/i;
 const CULTIVATION_PATTERN = /修仙|仙俠|修真|修煉|靈根|金丹|元嬰|渡劫|宗門|仙界|魔界|靈氣|劍修|丹修|道君|仙尊|cultivation|xianxia|xianxia/i;
@@ -41,43 +37,29 @@ const FANTASY_PATTERN = /奇幻|魔法|魔法世界|精靈王國|龍族|魔物|�
 const ALTERNATE_PATTERN = /架空世界|架空王國|虛構王國|平行世界|異世界/i;
 const SUPERNATURAL_SPECIES_PATTERN = /吸血鬼|狼人|精靈|天使|惡魔|人魚|龍族|妖精|獸人|vampire|werewolf|elf|elves|angel|demon|mermaid|dragon/i;
 const SCENE_DISPLAY_NAMES: Record<string, string> = {
-  airport: "機場", commercial: "公司", "night-bar": "酒吧",
-  "live-house": "Live House", apartment: "住家", "department-store": "百貨公司",
-  bookstore: "書店", cafe: "咖啡廳", park: "公園", "shopping-street": "商店街",
-  "night-market": "夜市", restaurant: "餐廳", university: "大學",
-  hospital: "醫院", gym: "健身房", cinema: "電影院", museum: "博物館",
-  hotel: "飯店", "train-station": "車站", library: "圖書館",
-  theater: "劇院", "art-gallery": "藝廊", "community-center": "社區中心",
-  "music-studio": "音樂工作室", bakery: "麵包店", "coworking-space": "共享辦公室",
+  waterfront: "水岸港區", commercial: "辦公大樓", airport: "機場",
+  university: "校園", park: "中央公園", "shopping-street": "商店街",
+  "department-store": "百貨公司", hospital: "中央醫院", "night-bar": "夜間酒吧",
+  "live-house": "展演空間", "luxury-apartment": "高級公寓", apartment: "308公寓",
+  "convenience-store": "便利商店", "private-club": "高級會所",
 };
 const SCENE_ALIASES: Record<string, string> = {
-  bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar",
+  bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar", 夜間酒吧: "night-bar", 歸途: "night-bar",
   公司: "commercial", 代辦所: "commercial", 商辦: "commercial", 辦公大樓: "commercial", 辦公室: "commercial", 企業大樓: "commercial",
-  咖啡店: "cafe", 咖啡廳: "cafe", cafe: "cafe",
-  書店: "bookstore", bookstore: "bookstore",
-  百貨: "department-store", 百貨公司: "department-store", department: "department-store",
-  公園: "park", park: "park",
   機場: "airport", airport: "airport",
-  公寓: "apartment", 住宅: "apartment", apartment: "apartment",
-  livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house",
-  購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street",
-  夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
-  餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant", 小吃店: "restaurant",
-  客戶家: "apartment", 街頭: "shopping-street", 街道: "shopping-street",
-  大學: "university", 學校: "university", 校園: "university",
-  醫院: "hospital", 診所: "hospital",
-  健身房: "gym", 健身中心: "gym",
-  電影院: "cinema", 影城: "cinema",
-  博物館: "museum", 美術館: "museum", 展覽館: "museum",
-  飯店: "hotel", 旅館: "hotel",
-  車站: "train-station", 火車站: "train-station", 捷運站: "train-station", 高鐵站: "train-station", "train station": "train-station",
-  圖書館: "library",
-  劇院: "theater", 劇場: "theater",
-  藝廊: "art-gallery", 畫廊: "art-gallery", "art gallery": "art-gallery",
-  社區中心: "community-center", 活動中心: "community-center", "community center": "community-center",
-  音樂工作室: "music-studio", 錄音室: "music-studio", "music studio": "music-studio",
-  麵包店: "bakery", 烘焙坊: "bakery",
-  共享辦公室: "coworking-space", 共同工作空間: "coworking-space", "co-working space": "coworking-space", "coworking space": "coworking-space",
+  公園: "park", park: "park",
+  公寓: "apartment", 住宅: "apartment", apartment: "apartment", 住所: "apartment", 客戶家: "apartment",
+  高級公寓: "luxury-apartment", 豪宅: "luxury-apartment", 別墅: "luxury-apartment",
+  livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house", 展演空間: "live-house",
+  購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street", 街頭: "shopping-street", 街道: "shopping-street",
+  咖啡店: "shopping-street", 咖啡廳: "shopping-street", cafe: "shopping-street", 書店: "shopping-street", bookstore: "shopping-street",
+  花店: "shopping-street", 路邊攤: "shopping-street", 小吃攤: "shopping-street", 小吃店: "shopping-street",
+  百貨: "department-store", 百貨公司: "department-store", department: "department-store", 餐廳: "department-store", 餐館: "department-store",
+  大學: "university", 學校: "university", 校園: "university", university: "university",
+  醫院: "hospital", 中央醫院: "hospital", 診所: "hospital",
+  便利商店: "convenience-store", 超商: "convenience-store", convenience: "convenience-store",
+  江邊堤防: "waterfront", 河堤: "waterfront", 河岸: "waterfront", 水岸港區: "waterfront", 海港: "waterfront",
+  高級會所: "private-club", 私人會所: "private-club", privateclub: "private-club",
 };
 
 type RecordValue = Record<string, unknown>;
@@ -196,22 +178,31 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  // Explicit residential locations always use the 308 apartment scene,
-  // even when the activity mentions music or playing an instrument at home.
-  if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) return null;
+  // Residential types are distinct fixed anchors: luxury residences use K,
+  // while ordinary homes and the existing 308 building use L.
+  if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) {
+    return "luxury-apartment";
+  }
   if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
     return "apartment";
   }
 
-  // Locations that explicitly name a music venue, rehearsal space or music shop
-  // use Live House; the original natural-language location is never rewritten.
-  if (/(live[\s-]*house|livehouse|練團室|排練室|彩排室|錄音室|音樂工作室|樂器行|樂器店|音樂展演|現場音樂|展演廳)/i.test(compact)) {
+  // Explicit fixed destinations take precedence over incidental activity keywords.
+  if (/(夜間酒吧|酒吧|酒館|夜店|歸途)/i.test(compact)) return "night-bar";
+  if (/(高級會所|私人會所|高級俱樂部|私人俱樂部)/i.test(compact)) return "private-club";
+  if (/(便利商店|超商)/i.test(compact)) return "convenience-store";
+  if (/(江邊堤防|河堤|河岸|水岸|海港|港區)/i.test(compact)) return "waterfront";
+  if (/(中央醫院|醫院|診所)/i.test(compact)) return "hospital";
+  if (/(校園|大學|學校)/i.test(compact)) return "university";
+  if (/(百貨公司|百貨|餐廳|餐館)/i.test(compact)) return "department-store";
+  if (/(商業大樓|辦公大樓|公司|代辦所|辦公室|企業大樓)/i.test(compact)) return "commercial";
+  if (/(便利商店|超商|咖啡廳|咖啡店|書店|花店|路邊攤|小吃攤|小吃店|商店街|購物街)/i.test(compact)) return "shopping-street";
+
+  // Named performance venues and rehearsal spaces use J; a night bar explicitly
+  // named above stays at I even when the activity mentions a band or live music.
+  if (/(live[\s-]*house|livehouse|練團室|排練室|彩排室|錄音室|音樂工作室|樂器行|樂器店|音樂展演|現場音樂|展演廳|展演空間)/i.test(compact)) {
     return "live-house";
   }
-
-  // Convenience stores and river embankments intentionally remain unmapped
-  // until POYOZZ adds suitable scenes.
-  if (/(便利商店|超商|江邊堤防)/i.test(compact)) return null;
 
   // A generic alley after a show belongs to the Live House event context;
   // an ordinary alley remains part of the existing street scene.
