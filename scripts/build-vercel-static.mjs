@@ -37,6 +37,36 @@ const bundledHandler = await import(pathToFileURL(path.join(generatedApiDir, 'en
 if (typeof bundledHandler.handleEncounterScheduleOrganizer !== 'function') {
   throw new Error('Encounter schedule handler bundle failed its runtime export smoke test');
 }
+// Compile and invoke the actual API route with a synthetic GET request. This
+// proves the route + local bundle can be loaded together while exiting before
+// auth, database, or provider work; GET must return 405.
+const routeSmokePath = path.join(generatedApiDir, 'encounter-schedule-route-smoke.mjs');
+await build({
+  entryPoints: [path.join(root, 'api/encounter-schedule-organizer.ts')],
+  outfile: routeSmokePath,
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  packages: 'external',
+  target: 'node20',
+  sourcemap: false,
+});
+const routeModule = await import(pathToFileURL(routeSmokePath).href);
+if (typeof routeModule.default !== 'function') {
+  throw new Error('Encounter schedule API route failed its runtime import smoke test');
+}
+const smokeResponse = {
+  statusCode: 0,
+  payload: null,
+  setHeader() {},
+  status(code) { this.statusCode = code; return this; },
+  json(payload) { this.payload = payload; return this; },
+};
+await routeModule.default({ method: 'GET', headers: {}, url: '/api/encounter-schedule-organizer' }, smokeResponse);
+if (smokeResponse.statusCode !== 405 || smokeResponse.payload?.error !== 'method_not_allowed') {
+  throw new Error('Encounter schedule API route GET smoke test did not stop safely with 405');
+}
+fs.rmSync(routeSmokePath, { force: true });
 
 // Explicit deployment allowlist. Keep repository tooling, SQL, drafts, and unused
 // source assets in GitHub, but do not publish them as Vercel static files.
