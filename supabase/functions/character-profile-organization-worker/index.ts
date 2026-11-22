@@ -405,16 +405,25 @@ export default {
           return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
         }
         const profile = profileResult.data && typeof profileResult.data === "object" &&
-          !Array.isArray(profileResult.data) ? profileResult.data : null;
+          !Array.isArray(profileResult.data) ? profileResult.data as Record<string, unknown> : null;
+        const lifeContext = profile?.life_context && typeof profile.life_context === "object" &&
+          !Array.isArray(profile.life_context) ? profile.life_context as Record<string, unknown> : null;
+        const lifeContextKeys = [
+          "work_environment", "residence_environment", "daily_routines", "interests_and_leisure",
+          "social_circles", "recurring_places", "environmental_constraints",
+        ];
+        const profileReady = !!profile && profile.schema_version === "1.1" && !!lifeContext &&
+          Object.keys(lifeContext).length === lifeContextKeys.length &&
+          lifeContextKeys.every((key) => Object.prototype.hasOwnProperty.call(lifeContext, key));
         return Response.json({
           status: "available",
           next_character_id: nextJob.character_id,
           next_character_name: characterResult.data?.name || "角色",
-          profile_ready: !!profile,
+          profile_ready: profileReady,
           profile_job_status: jobResult.data?.status || "missing",
           profile_error_code: jobResult.data?.last_error_code || null,
           profile_updated_at: jobResult.data?.updated_at || null,
-          profile_preview: profile,
+          profile_preview: profileReady ? profile : null,
           model: CHARACTER_PROFILE_MODEL,
         });
       }
