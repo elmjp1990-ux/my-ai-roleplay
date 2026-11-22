@@ -716,13 +716,23 @@ export async function handleEncounterScheduleOrganizer(
         p_author_id: source.author_id,
       });
       if (profileError) {
-        console.warn("Character life context unavailable; using original creator sources:", profileError.message);
-        return source;
+        console.warn("Character AI Profile read failed:", profileError.message);
+        return mode === "manual" ? { ...source, profile_read_error: true } : source;
       }
       const profile = profileData && typeof profileData === "object" && !Array.isArray(profileData)
         ? profileData as Record<string, unknown> : {};
       const lifeContext = profile.life_context && typeof profile.life_context === "object" && !Array.isArray(profile.life_context)
         ? profile.life_context : null;
+      const lifeContextKeys = [
+        "work_environment", "residence_environment", "daily_routines", "interests_and_leisure",
+        "social_circles", "recurring_places", "environmental_constraints",
+      ];
+      const lifeContextReady = profile.schema_version === "1.1" && !!lifeContext &&
+        Object.keys(asRow(lifeContext)).length === lifeContextKeys.length &&
+        lifeContextKeys.every((key) => Object.prototype.hasOwnProperty.call(asRow(lifeContext), key));
+      if (!profileData || !lifeContextReady) {
+        return mode === "manual" ? { ...source, profile_read_error: true } : source;
+      }
       const profileSections = [
         "identity_background", "core_personality", "inner_motivations",
         "emotional_response_patterns", "relationship_dynamics", "behavior_and_agency",
@@ -739,11 +749,24 @@ export async function handleEncounterScheduleOrganizer(
         derived_character_profile: derivedCharacterProfile,
       };
     } catch (error) {
-      console.warn("Character life context read failed; using original creator sources:",
+      console.warn("Character AI Profile read failed:",
         error instanceof Error ? error.message : "unknown_error");
-      return source;
+      return mode === "manual" ? { ...source, profile_read_error: true } : source;
     }
   }));
+
+  if (mode === "manual" && enrichedSources.some((source) => source.profile_read_error === true)) {
+    const released = await failBatch(admin, batchId, leaseToken, "character_profile_not_ready", true);
+    if (!released) {
+      return json({ error: "schedule_profile_gate_release_failed", ai_called: false }, 503);
+    }
+    return json({
+      status: "profile_required",
+      error: "character_profile_not_ready",
+      ai_called: false,
+      schedule_job_released: true,
+    }, 409);
+  }
 
   const { data: sceneCatalogData, error: sceneCatalogError } = await admin.rpc("get_encounter_scene_catalog");
   // Scene metadata is only an optional exact-name hint. A catalog read failure
