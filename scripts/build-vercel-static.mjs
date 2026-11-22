@@ -1,8 +1,26 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { build } from 'esbuild';
 
 const root = process.cwd();
 const outputDir = path.join(root, 'dist');
+const generatedApiDir = path.join(root, 'api', '_generated');
+
+// Vercel's function tracer previously left the Supabase shared TypeScript
+// handler as a runtime import outside the function bundle. Bundle the complete
+// local handler graph into the API directory before Vercel collects functions.
+fs.mkdirSync(generatedApiDir, { recursive: true });
+await build({
+  entryPoints: [path.join(root, 'supabase/functions/_shared/encounter-schedule-organizer-handler.ts')],
+  outfile: path.join(generatedApiDir, 'encounter-schedule-organizer-handler.mjs'),
+  bundle: true,
+  platform: 'node',
+  format: 'esm',
+  packages: 'external',
+  target: 'node20',
+  sourcemap: false,
+  metafile: true,
+});
 
 // Explicit deployment allowlist. Keep repository tooling, SQL, drafts, and unused
 // source assets in GitHub, but do not publish them as Vercel static files.
