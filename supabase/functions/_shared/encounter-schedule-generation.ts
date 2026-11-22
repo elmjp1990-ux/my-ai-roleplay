@@ -53,6 +53,7 @@ const SCENE_ALIASES: Record<string, string> = {
   livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house", 展演空間: "live-house",
   購物街: "shopping-street", 商店街: "shopping-street", 逛街商圈: "shopping-street", 街頭: "shopping-street", 街道: "shopping-street", "night-market": "shopping-street", "夜市": "shopping-street",
   咖啡店: "shopping-street", 咖啡廳: "shopping-street", cafe: "shopping-street", 書店: "shopping-street", bookstore: "shopping-street",
+  二手樂器行: "shopping-street", 樂器行: "shopping-street", 樂器店: "shopping-street",
   花店: "shopping-street", 路邊攤: "shopping-street", 小吃攤: "shopping-street", 小吃店: "shopping-street",
   百貨: "department-store", 百貨公司: "department-store", department: "department-store", restaurant: "department-store", 餐廳: "department-store", 餐館: "department-store",
   大學: "university", 學校: "university", 校園: "university", university: "university",
@@ -200,11 +201,11 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   if (/(校園|大學|學校)/i.test(compact)) return "university";
   if (/(百貨公司|百貨|餐廳|餐館)/i.test(compact)) return "department-store";
   if (/(商業大樓|辦公大樓|公司|代辦所|辦公室|企業大樓)/i.test(compact)) return "commercial";
-  if (/(便利商店|超商|咖啡廳|咖啡店|書店|花店|路邊攤|小吃攤|小吃店|商店街|購物街)/i.test(compact)) return "shopping-street";
+  if (/(便利商店|超商|咖啡廳|咖啡店|書店|二手樂器行|樂器行|樂器店|花店|路邊攤|小吃攤|小吃店|商店街|購物街)/i.test(compact)) return "shopping-street";
 
   // Named performance venues and rehearsal spaces use J; a night bar explicitly
   // named above stays at I even when the activity mentions a band or live music.
-  if (/(live[\s-]*house|livehouse|練團室|排練室|彩排室|錄音室|音樂工作室|樂器行|樂器店|音樂展演|現場音樂|展演廳|展演空間)/i.test(compact)) {
+  if (/(live[\s-]*house|livehouse|練團室|排練室|彩排室|錄音室|音樂工作室|音樂展演|現場音樂|展演廳|展演空間)/i.test(compact)) {
     return "live-house";
   }
 
