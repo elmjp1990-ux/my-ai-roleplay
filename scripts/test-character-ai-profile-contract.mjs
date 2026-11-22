@@ -312,6 +312,11 @@ assert.ok(worker.includes("provider_response_too_large") && worker.includes("req
 
 assert.ok(worker.includes("updateAiGenerationDiagnostic"),
   "Profile Worker must update the AI diagnostic after persistence completes or fails");
+assert.ok(worker.includes('error_code: "http_429"') && worker.includes("provider_attempts: generated.providerAttempts || []"),
+  "A 429 failover attempt must remain visible in the final Profile generation diagnostic");
+assert.ok(worker.includes("providerAttempts?: Array<Record<string, unknown>>"),
+  "Profile diagnostics must support a compact history of provider attempts");
+
 assert.ok(worker.includes('status: "received"') && worker.includes('metadata: { persistence_status: "pending" }'),
   "A valid provider response must remain received until the Profile is persisted");
 assert.ok(worker.includes('status: "completed", failureStage: null, failureCode: null') &&
