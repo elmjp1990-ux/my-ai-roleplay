@@ -509,6 +509,7 @@ export default {
     const summary = { claimed: items.length, completed: 0, retried: 0, failed: 0, stale: 0 };
     let manualProfilePreview: Record<string, unknown> | null = null;
     let manualFailureCode: string | null = null;
+    let manualAiCallStarted = false;
 
     for (const item of items) {
       let usageRecorded = false;
@@ -523,6 +524,7 @@ export default {
         }
         const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
+        if (isManualUser) manualAiCallStarted = true;
         const generated = await generateProfile(item, apiKey);
         await recordAiGenerationDiagnostic(supabase, {
           generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
@@ -592,7 +594,7 @@ export default {
         model: CHARACTER_PROFILE_MODEL,
         profile_preview: manualProfilePreview,
         error_code: manualFailureCode,
-        ai_called: items.length === 1,
+        ai_called: manualAiCallStarted,
         summary,
       }, { status: summary.failed === 0 ? 200 : 207 });
     }
