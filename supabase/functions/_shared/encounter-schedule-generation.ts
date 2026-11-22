@@ -373,8 +373,8 @@ function validateHourlySchedule(
       }
       weightTotal += Number(weight);
       const locationDescription = text(rawOption.location);
-      const locationKey = normalizeEncounterSceneKey(locationDescription, activity);
       const activity = text(rawOption.activity);
+      const locationKey = normalizeEncounterSceneKey(locationDescription, activity);
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor === true);
       const isOutdoor = activitySpace === "outdoor";
       if (!isValidEncounterLocationLabel(locationDescription)) {
