@@ -7,6 +7,7 @@ const edgeEntry = fs.readFileSync("supabase/functions/encounter-schedule-organiz
 const html = fs.readFileSync("index.html", "utf8");
 const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const tsconfig = JSON.parse(fs.readFileSync("tsconfig.json", "utf8"));
 
 assert.match(route, /handleEncounterScheduleOrganizer/);
 assert.match(route, /270_000/);
@@ -14,7 +15,11 @@ assert.match(route, /setInterval\(\(\) =>/);
 assert.match(route, /res\.write\(" "\)/);
 assert.match(route, /body\.mode !== "manual"/);
 assert.match(route, /VERCEL_ENV === "production"/);
-assert.match(route, /process\.env\[name\]/);
+assert.match(route, /runtimeProcess\.env\[name\]/);
+assert.match(route, /runtimeProcess\.env\.VERCEL_ENV/);
+assert.equal(tsconfig.compilerOptions.allowImportingTsExtensions, true);
+assert.equal(tsconfig.compilerOptions.noEmit, true);
+assert.ok(tsconfig.include.includes("api/encounter-schedule-organizer.ts"));
 assert.doesNotMatch(route, /Deno\./);
 assert.match(handler, /export async function handleEncounterScheduleOrganizer/);
 assert.match(handler, /providerTimeoutMs = 100_000/);
