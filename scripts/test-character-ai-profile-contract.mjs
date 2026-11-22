@@ -182,6 +182,10 @@ assert.ok(
   "Profile prerequisite must be checked before the schedule batch claim",
 );
 assert.match(manualProfileMigration, /claim_next_encounter_character_profile_job/, "Manual Profile claim RPC must exist");
+assert.match(manualProfileMigration, /schema_version' = '1\.1'[\s\S]*life_context/,
+  "A current Profile must include schema 1.1 and its structured life context before schedule generation");
+assert.match(worker, /profile\.schema_version === "1\.1"[\s\S]*lifeContextKeys\.every/,
+  "The manual status endpoint must expose readiness only for a complete current Profile");
 assert.match(manualProfileMigration, /j\.author_id = p_author_id/, "Manual Profile claims must be scoped to the authenticated author");
 assert.match(manualProfileMigration, /j\.status = 'pending'/, "Manual Profile step must target only the next pending schedule character");
 assert.match(manualProfileMigration, /c\.visibility = 'public'[\s\S]*c\.review_status = 'approved'[\s\S]*c\.rights_confirmed IS TRUE[\s\S]*c\.deleted_at IS NULL/,
