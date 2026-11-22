@@ -7,6 +7,7 @@ const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profil
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
 const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
+const manualProfileMigration = fs.readFileSync("supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
 const worker = fs.readFileSync("supabase/functions/character-profile-organization-worker/index.ts", "utf8");
 const providerPolicy = fs.readFileSync("supabase/functions/_shared/openrouter-provider-policy.ts", "utf8");
@@ -173,6 +174,41 @@ assert.match(storyTurn, /get_character_ai_profile_for_chat/,
 assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
   "Private-derived evidence must join the server-side output leak guard");
 assert.match(scheduleOrganizer, /get_character_ai_profile_for_chat/, "Schedule worker must read the saved current profile without generating a second profile");
+assert.match(scheduleOrganizer, /character_profile_not_ready/, "Manual schedule generation must stop before claiming a schedule job when the current Profile is missing");
+assert.match(scheduleOrganizer, /schedule_job_claimed: false/, "A missing Profile must not leave a claimed schedule lease");
+assert.ok(
+  scheduleOrganizer.indexOf("character_profile_not_ready") < scheduleOrganizer.indexOf('admin.rpc("claim_encounter_schedule_batch"'),
+  "Profile prerequisite must be checked before the schedule batch claim",
+);
+assert.match(manualProfileMigration, /claim_next_encounter_character_profile_job/, "Manual Profile claim RPC must exist");
+assert.match(manualProfileMigration, /j\.author_id = p_author_id/, "Manual Profile claims must be scoped to the authenticated author");
+assert.match(manualProfileMigration, /j\.status = 'pending'/, "Manual Profile step must target only the next pending schedule character");
+assert.match(manualProfileMigration, /c\.visibility = 'public'[\s\S]*c\.review_status = 'approved'[\s\S]*c\.rights_confirmed IS TRUE[\s\S]*c\.deleted_at IS NULL/,
+  "Manual Profile step must use the same public character eligibility gate as schedule generation");
+assert.match(manualProfileMigration, /pg_try_advisory_xact_lock\(748293, 20261107\)/,
+  "Manual Profile and the future worker must share the same serialization lock");
+assert.match(manualProfileMigration, /IF v_job\.status = 'failed' THEN[\s\S]*RETURN jsonb_build_object\([\s\S]*'status', 'failed'/,
+  "Manual Profile UI must not automatically retry a terminal failure");
+assert.match(manualProfileMigration, /GRANT EXECUTE ON FUNCTION public\.claim_next_encounter_character_profile_job\(uuid\)[\s\S]*TO service_role/,
+  "Only the service role may execute the privileged Profile claim RPC");
+assert.match(worker, /auth: \["user", "secret:default"\]/,
+  "Profile worker must accept authenticated manual users and a separate internal secret mode");
+assert.match(worker, /ctx\.authMode === "user"/,
+  "Manual Profile mode must distinguish user JWT calls from internal worker calls");
+assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/,
+  "Manual Profile generation must be disabled outside the configured TEST environment");
+assert.match(worker, /claim_next_encounter_character_profile_job/,
+  "Manual Profile mode must use the author-scoped claim RPC");
+assert.match(worker, /item\.author_id !== authorId/,
+  "Manual Profile worker must verify that the claimed job belongs to the caller");
+assert.match(frontend, /data-action="organize-character-profile"/,
+  "TEST tools must expose the first manual Profile step");
+assert.match(frontend, /data-action="organize-encounter-schedules"/,
+  "TEST tools must expose the second manual schedule step");
+assert.match(frontend, /character-profile-organization-worker/,
+  "TEST UI must read and trigger the Profile worker");
+assert.match(frontend, /profileReady && !profileStatusError/,
+  "Schedule button must stay disabled until the current Profile is ready");
 assert.match(scheduleGeneration, /character_life_context/, "Schedule prompt must receive the saved structured life context");
 assert.match(scheduleGeneration, /不得為取得生活環境而在行程生成階段再次呼叫分析 AI/, "Schedule prompt must not request another life-context analysis call");
 assert.match(storyTurn, /CHAR_AI_PROFILE/,
