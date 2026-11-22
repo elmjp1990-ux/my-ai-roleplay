@@ -293,7 +293,7 @@ BEGIN
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
   v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
-  v_new := '''commercial'', ''airport'', ''university'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
+  v_new := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space'', ''luxury-apartment'', ''convenience-store'', ''private-club''';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
   IF v_count <> 1 THEN
