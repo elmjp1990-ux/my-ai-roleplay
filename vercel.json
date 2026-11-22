@@ -8,5 +8,10 @@
       "feat/encounter-ai-integration-clean": false,
       "fix/mobile-chat-keyboard-viewport": false
     }
+  },
+  "functions": {
+    "api/encounter-schedule-organizer.ts": {
+      "maxDuration": 300
+    }
   }
 }
