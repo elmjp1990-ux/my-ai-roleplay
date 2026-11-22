@@ -297,6 +297,14 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
 type ScheduleRuntimeEnvironment = { get(name: string): string | undefined };
 type SupabaseClientFactory = (url: string, key: string, options?: any) => any;
 
+/** Explicit seams for deterministic, network-free integration tests. Production
+ * callers omit this argument and retain the real provider and diagnostics. */
+export type EncounterScheduleHandlerTestDependencies = {
+  requestOpenRouterChatCompletion?: typeof requestOpenRouterChatCompletion;
+  recordAiGenerationDiagnostic?: typeof recordAiGenerationDiagnostic;
+  updateAiGenerationDiagnostic?: typeof updateAiGenerationDiagnostic;
+};
+
 /**
  * Shared Encounter schedule handler.
  * Supabase Edge Functions use the 100s provider timeout; Vercel uses 270s.
@@ -306,7 +314,11 @@ export async function handleEncounterScheduleOrganizer(
   env: ScheduleRuntimeEnvironment,
   createClient: SupabaseClientFactory,
   providerTimeoutMs = 100_000,
+  testDependencies: EncounterScheduleHandlerTestDependencies = {},
 ): Promise<Response> {
+  const requestProvider = testDependencies.requestOpenRouterChatCompletion ?? requestOpenRouterChatCompletion;
+  const recordDiagnostic = testDependencies.recordAiGenerationDiagnostic ?? recordAiGenerationDiagnostic;
+  const updateDiagnostic = testDependencies.updateAiGenerationDiagnostic ?? updateAiGenerationDiagnostic;
   const ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = Math.min(
     270_000,
     Math.max(1_000, Math.floor(Number(providerTimeoutMs) || 100_000)),
@@ -745,12 +757,12 @@ export async function handleEncounterScheduleOrganizer(
     let providerDurationMs = 0;
     const providerStartedAt = Date.now();
     try {
-      const providerResponse = await requestOpenRouterChatCompletion({
+      const providerResponse = await requestProvider({
         messages: characterPrompt.messages, apiKey: openRouterKey, model: POYOZZ_DEFAULT_CHAT_MODEL,
         timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS, temperature: 0.35, responseFormat: { type: "json_object" },
       });
       providerDurationMs = providerResponse.durationMs;
-      diagnosticId = await recordAiGenerationDiagnostic(admin, {
+      diagnosticId = await recordDiagnostic(admin, {
         generationType: "encounter_schedule", userId: actorUserId, characterId: source.character_id,
         sourceRef: batchId, model: providerResponse.model, provider: providerResponse.provider,
         requestId: providerResponse.requestId, httpStatus: providerResponse.httpStatus,
@@ -769,12 +781,12 @@ export async function handleEncounterScheduleOrganizer(
         admin, batchId, source.character_id, actorUserId, providerResponse,
       );
       if (!rawOutputId) {
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "diagnostic_persistence", failureCode: "schedule_raw_output_persist_failed" });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "diagnostic_persistence", failureCode: "schedule_raw_output_persist_failed" });
         return { sourceId: source.character_id, failureCode: "schedule_raw_output_persist_failed", retryable: false, ambiguous: false };
       }
       if (providerResponse.result.kind !== "generated") {
         const result = providerResponse.result;
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: result.kind === "provider_error" ? result.code : result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output" });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_response", failureCode: result.kind === "provider_error" ? result.code : result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output" });
         const failureCode = result.kind === "provider_error" ? result.code :
           result.kind === "content_rejected" ? "schedule_content_rejected" : "schedule_empty_output";
         await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode);
@@ -788,7 +800,7 @@ export async function handleEncounterScheduleOrganizer(
       let decodedValue: unknown;
       try { decodedValue = JSON.parse(providerResponse.result.text); }
       catch {
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_parsing", failureCode: "schedule_output_json_invalid", validationErrors: ["invalid_json"] });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_parsing", failureCode: "schedule_output_json_invalid", validationErrors: ["invalid_json"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_json_invalid", ["invalid_json"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_json_invalid", source.character_id, {
           output_shape_error: "invalid_json",
@@ -796,7 +808,7 @@ export async function handleEncounterScheduleOrganizer(
         return { sourceId: source.character_id, failureCode: "schedule_output_json_invalid", retryable: false, ambiguous: false };
       }
       if (!decodedValue || typeof decodedValue !== "object" || Array.isArray(decodedValue)) {
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_output_root_invalid", validationErrors: ["schedule_output_root_invalid"] });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_output_root_invalid", validationErrors: ["schedule_output_root_invalid"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_output_root_invalid", ["schedule_output_root_invalid"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_output_root_invalid", source.character_id, {
           output_root_type: Array.isArray(decodedValue) ? "array" : decodedValue === null ? "null" : typeof decodedValue,
@@ -818,7 +830,7 @@ export async function handleEncounterScheduleOrganizer(
         const failureCode = !Array.isArray(characters) ? "schedule_output_characters_invalid" :
           characters.length !== 1 ? "schedule_single_character_count_invalid" :
           !Array.isArray(scenes) ? "schedule_output_scenes_invalid" : "schedule_output_unknown_root_fields";
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode, validationErrors: [failureCode], metadata: outputDiagnostics });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode, validationErrors: [failureCode], metadata: outputDiagnostics });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", failureCode, source.character_id, {
           ...outputDiagnostics,
@@ -828,18 +840,18 @@ export async function handleEncounterScheduleOrganizer(
       }
       const character = asRow(characters[0]);
       if (asText(character.character_id) !== source.character_id) {
-        await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_character_identity_mismatch", validationErrors: ["character_identity_mismatch"] });
+        await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "output_validation", failureCode: "schedule_character_identity_mismatch", validationErrors: ["character_identity_mismatch"] });
         await updateRawGenerationOutput(admin, rawOutputId, "failed", "schedule_character_identity_mismatch", ["character_identity_mismatch"]);
         await recordBatchUsage(admin, batchId, providerResponse, "failed", "schedule_character_identity_mismatch", source.character_id);
         return { sourceId: source.character_id, failureCode: "schedule_character_identity_mismatch", retryable: false, ambiguous: false };
       }
-      await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null, metadata: { validated_character_count: 1, scene_count: scenes.length } });
+      await updateDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null, metadata: { validated_character_count: 1, scene_count: scenes.length } });
       return { sourceId: source.character_id, providerResponse, rawOutputId, character, scenes };
     } catch (error) {
       const measuredProviderDurationMs = providerDurationMs || Date.now() - providerStartedAt;
       const failureCode = error instanceof Error && error.name === "AbortError"
         ? "schedule_provider_timeout" : "schedule_provider_outcome_unknown";
-      await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_request", failureCode });
+      await updateDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "provider_request", failureCode });
       await updateRawGenerationOutput(admin, rawOutputId, "failed", failureCode, [failureCode]);
       await recordBatchUsage(admin, batchId, {
         provider: "openrouter", requestId: "", usage: {}, httpStatus: 0,
