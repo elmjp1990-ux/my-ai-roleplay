@@ -311,6 +311,14 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-deletion-concurrency-setup.sql
           DATABASE_URL="$DATABASE_URL" bash scripts/test-deletion-concurrency.sh
 
+      - name: Apply Character AI Profile organization queue migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Profile queue and private derived-profile storage are replayed only
+          # in this disposable local Supabase database.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
+
       - name: Apply formal Encounter schedule pipeline migration
         shell: bash
         run: |
@@ -323,6 +331,14 @@ jobs:
             exit 1
           fi
           cat "$LOG_FILE"
+
+      - name: Apply manual Profile-before-schedule claim migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This migration adds only an author-scoped manual claim RPC. It does
+          # not create or activate any cron schedule.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql
 
       - name: Apply formal Encounter evidence and settlement migration
         shell: bash
