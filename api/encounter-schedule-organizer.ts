@@ -33,7 +33,12 @@ export default async function handler(req: any, res: any) {
   }
 
   // This Vercel endpoint is deliberately limited to the authenticated manual
-  // test action. Status, repair, and scheduled dispatch remain on Supabase.
+  // test action. Never allow it to run from a production deployment.
+  if (process.env.VERCEL_ENV === "production") {
+    res.status(403).json({ error: "manual_schedule_trigger_disabled" });
+    return;
+  }
+  // Status, repair, and scheduled dispatch remain on Supabase.
   const body = readBody(req);
   if (body.mode !== "manual") {
     res.status(400).json({ error: "unsupported_mode" });
