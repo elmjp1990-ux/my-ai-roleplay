@@ -266,12 +266,9 @@
  'private-club':{icon:'🥂',heading:'低調而私密的高級會所',description:'接待大廳、包廂與專屬餐飲空間提供隱密而舒適的聚會環境，商務往來與私人邀約都可能在此發生。',eventLabel:'場景亮點',eventTitle:'今晚的私人邀約',eventDescription:'適合商務聚會、私人餐敘、高級娛樂與會員活動。'}
  };
  const renderCitySceneCatalog=(rows)=>{
- const svg=$('cityBuildingLayer');
- if(!svg)return;
  for(const row of (Array.isArray(rows)?rows:[])){
  const key=String(row?.location_key||'').trim();
  if(!Object.prototype.hasOwnProperty.call(cityPlaceNames,key))continue;
- const name=String(row?.display_name||'').trim();
  const previous=cityVenueScenes[key]||{};
  const scene={
  icon:String(row.icon||previous.icon||'📍'),
@@ -281,10 +278,7 @@
  eventTitle:String(row.event_title||previous.eventTitle||''),
  eventDescription:String(row.event_description||previous.eventDescription||'')
  };
- if(name)cityPlaceNames[key]=name;
  cityVenueScenes[key]=scene;
- const marker=svg.querySelector('.city-place-marker[data-place="'+key+'"]');
- if(marker&&name)marker.setAttribute('aria-label',name);
  }
  };
  const loadCitySceneCatalog=async()=>{
