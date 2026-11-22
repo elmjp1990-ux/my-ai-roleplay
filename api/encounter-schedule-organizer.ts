@@ -1,5 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
-import { handleEncounterScheduleOrganizer } from "../supabase/functions/_shared/encounter-schedule-organizer-handler";
+import { handleEncounterScheduleOrganizer } from "../supabase/functions/_shared/encounter-schedule-organizer-handler.ts";
 
 const runtimeProcess = (globalThis as unknown as {
   process: { env: Record<string, string | undefined> };
