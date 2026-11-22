@@ -10,7 +10,7 @@ const generatedApiDir = path.join(root, 'api', '_generated');
 // handler as a runtime import outside the function bundle. Bundle the complete
 // local handler graph into the API directory before Vercel collects functions.
 fs.mkdirSync(generatedApiDir, { recursive: true });
-await build({
+const handlerBuild = await build({
   entryPoints: [path.join(root, 'supabase/functions/_shared/encounter-schedule-organizer-handler.ts')],
   outfile: path.join(generatedApiDir, 'encounter-schedule-organizer-handler.mjs'),
   bundle: true,
@@ -21,6 +21,14 @@ await build({
   sourcemap: false,
   metafile: true,
 });
+const handlerOutput = handlerBuild.metafile.outputs[path.join('api/_generated/encounter-schedule-organizer-handler.mjs')]
+  || Object.entries(handlerBuild.metafile.outputs).find(([file]) => file.endsWith('/api/_generated/encounter-schedule-organizer-handler.mjs'))?.[1];
+if (!handlerOutput || handlerOutput.imports.some((item) => !item.external)) {
+  throw new Error('Encounter schedule handler bundle still contains unresolved local runtime imports');
+}
+if (!fs.existsSync(path.join(generatedApiDir, 'encounter-schedule-organizer-handler.mjs'))) {
+  throw new Error('Encounter schedule handler bundle was not emitted inside api/');
+}
 
 // Explicit deployment allowlist. Keep repository tooling, SQL, drafts, and unused
 // source assets in GitHub, but do not publish them as Vercel static files.
