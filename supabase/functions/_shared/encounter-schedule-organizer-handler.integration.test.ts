@@ -53,6 +53,7 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
             return { data: pendingLookup ? { character_id: characterId } : { source_hash: "test-source-hash" }, error: null };
           }
           if (table === "encounter_schedule_batch_runs" && action === "update") {
+            if (payload?.status === "completed") calls.batchCompletions++;
             return { data: { id: batchId }, error: null };
           }
           if (table === "characters") return { data: { name: "測試角色" }, error: null };
