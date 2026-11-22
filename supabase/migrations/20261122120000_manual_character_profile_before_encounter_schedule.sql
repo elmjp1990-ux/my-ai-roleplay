@@ -70,7 +70,17 @@ BEGIN
     AND p.author_id = p_author_id
     AND p.source_hash = v_hash;
 
-  IF v_profile IS NOT NULL THEN
+  IF v_profile IS NOT NULL
+     AND v_profile ->> 'schema_version' = '1.1'
+     AND jsonb_typeof(v_profile -> 'life_context') = 'object'
+     AND (v_profile -> 'life_context') ?& ARRAY[
+       'work_environment', 'residence_environment', 'daily_routines',
+       'interests_and_leisure', 'social_circles', 'recurring_places',
+       'environmental_constraints'
+     ]
+     AND (
+       SELECT count(*) FROM jsonb_object_keys(v_profile -> 'life_context')
+     ) = 7 THEN
     UPDATE public.character_profile_organization_jobs
     SET status = 'completed',
         source_hash = v_hash,
@@ -132,6 +142,24 @@ BEGIN
 
   IF v_job.status = 'processing' AND v_job.lease_expires_at > now() THEN
     RETURN jsonb_build_object('status', 'busy');
+  END IF;
+
+  IF v_job.status = 'completed' THEN
+    UPDATE public.character_profile_organization_jobs
+    SET status = 'pending',
+        attempt_count = 0,
+        available_at = now(),
+        lease_token = NULL,
+        lease_expires_at = NULL,
+        lease_source_hash = NULL,
+        last_error_code = 'profile_schema_refresh_required',
+        completed_at = NULL,
+        updated_at = now()
+    WHERE character_id = v_character_id;
+    SELECT * INTO v_job
+    FROM public.character_profile_organization_jobs
+    WHERE character_id = v_character_id
+    FOR UPDATE;
   END IF;
 
   -- Ambiguous/terminal failures are not retried by opening the panel or refreshing.
