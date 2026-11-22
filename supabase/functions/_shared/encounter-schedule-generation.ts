@@ -196,12 +196,13 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
-
   // POYOZZ currently groups music-related places and activities under Live House.
-  if (/(live\s*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|music|band|guitar|bass|drummer|performance|rehearsal)/i.test(context)) {
+  // Activity keywords take priority over a generic place label.
+  if (/(live[\s-]*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|music|band|guitar|bass|drummer|performance|rehearsal)/i.test(context)) {
     return "live-house";
   }
+  if (raw === "music-studio") return "live-house";
+  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
 
   // Ordinary residential settings all share the existing 308 apartment scene.
   if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) return null;
