@@ -340,7 +340,6 @@ jobs:
           # This migration adds only an author-scoped manual claim RPC. It does
           # not create or activate any cron schedule.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql
 
       - name: Apply formal Encounter evidence and settlement migration
         shell: bash
@@ -424,6 +423,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000900_encounter_schedule_strict_hourly_options.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001000_fix_encounter_schedule_publisher_jsonb_key_count.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001200_fix_encounter_schedule_null_weather_greeting.sql
+
+      - name: Apply author-scoped manual Encounter schedule claim fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Apply after all schedule migrations that replace the claim function.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql
 
       - name: Apply and verify 14-day AI generation diagnostics retention
         shell: bash
