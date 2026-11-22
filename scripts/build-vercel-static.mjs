@@ -72,6 +72,7 @@ fs.rmSync(routeSmokePath, { force: true });
 // source assets in GitHub, but do not publish them as Vercel static files.
 const runtimeFiles = [
   'index.html',
+  'wallet-ui.js',
   'poyozz-ui.css',
   'memory-capture.js',
   'chat-render-lifecycle.js',
