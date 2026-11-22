@@ -235,6 +235,10 @@ Deno.test("classifies activity space independently from scene location", () => {
 
 Deno.test("maps existing character schedule locations without rewriting natural labels", () => {
   const weekday = hourlyBlocks();
+  weekday[3] = block(3, [
+    option({ weight: 60, location: "頂樓出租屋", activity: "淺眠狀態，偶爾翻身" }),
+    option({ weight: 40, location: "頂樓出租屋", activity: "在床上翻身後繼續熟睡" }),
+  ]);
   weekday[8] = block(8, [
     option({
       weight: 40,
