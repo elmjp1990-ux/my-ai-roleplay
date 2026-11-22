@@ -259,4 +259,40 @@ GRANT EXECUTE ON FUNCTION public.publish_encounter_scene_metadata(jsonb)
 COMMENT ON FUNCTION public.publish_encounter_scene_metadata(jsonb) IS
   'Updates event/news text inside the fourteen fixed A–N scene anchors only. It cannot create, move, rename, activate, or hide map markers.';
 
+
+-- Keep the schedule publisher's canonical-key and rain-fallback validation in
+-- sync with the fixed A–N keys emitted by the TypeScript normalizer.
+DO $
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+  v_count integer;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.publish_encounter_schedule_batch(uuid,uuid,jsonb)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''park'', ''shopping-street'', ''night-market'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
+  v_new := '''waterfront'', ''commercial'', ''airport'', ''university'', ''park'', ''shopping-street'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'fixed_scene_schedule_key_patch_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
+  v_old := '''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'', ''department-store'', ''bookstore'', ''cafe'', ''restaurant'', ''university'', ''hospital'', ''gym'', ''cinema'', ''museum'', ''hotel'', ''train-station'', ''library'', ''theater'', ''art-gallery'', ''community-center'', ''music-studio'', ''bakery'', ''coworking-space''';
+  v_new := '''commercial'', ''airport'', ''university'', ''department-store'', ''hospital'', ''night-bar'', ''live-house'', ''luxury-apartment'', ''apartment'', ''convenience-store'', ''private-club''';
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
+    / pg_catalog.length(v_old) INTO v_count;
+  IF v_count <> 2 THEN
+    RAISE EXCEPTION 'fixed_scene_rain_fallback_patch_unexpected: %', v_count;
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
+  EXECUTE v_definition;
+END;
+$;
+
 COMMIT;
