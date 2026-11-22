@@ -10197,8 +10197,16 @@ document.addEventListener('click',async event=>{
   const status=document.getElementById('encounterScheduleTestStatus');
   if(status)status.textContent='正在整理公開角色行程，請稍候…';
   try{
-    const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'manual'}});
-    if(error)throw error;
+    const {data:authData,error:authError}=await window.mySupabase.auth.getSession();
+    const accessToken=authData?.session?.access_token;
+    if(authError||!accessToken)throw new Error('unauthorized');
+    const response=await fetch('/api/encounter-schedule-organizer',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+accessToken},
+      body:JSON.stringify({mode:'manual'})
+    });
+    const data=await response.json().catch(()=>({error:'invalid_response'}));
+    if(!response.ok)throw new Error(String(data?.error||'schedule_request_failed'));
     const state=String(data?.status||'unknown');
     if(state==='completed'||state==='partial'){
       window.PoyozzCityMap?.refreshScenes?.();
