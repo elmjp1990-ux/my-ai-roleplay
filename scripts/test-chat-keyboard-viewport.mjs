@@ -6,10 +6,10 @@ const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
 const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
-const match = html.match(/<script id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/script>/);
+const source = fs.readFileSync("chat-keyboard-viewport.js", "utf8");
 assert.ok(style, "keyboard viewport CSS must be present");
-assert.ok(match, "keyboard viewport controller must be present");
-const source = match[1];
+assert.match(html, /<script src="\.\/chat-keyboard-viewport\.js"><\/script>/,
+  "keyboard viewport controller must be loaded from its dedicated runtime module");
 assert.doesNotThrow(() => new Function(source), "keyboard viewport controller must parse");
 
 assert.match(style, /body\.conversation main/);
