@@ -306,6 +306,13 @@ async function generateProfile(
         throw new ProfileGenerationError("profile_schema_invalid_" + validation.errors[0], metadata);
       }
       return { ...metadata, profile: parsed as Record<string, unknown> };
+    } catch (error) {
+      // Include earlier safe failover attempts (for example DeepInfra 429)
+      // even when the later provider also fails.
+      if (error instanceof ProfileGenerationError) {
+        error.metadata.providerAttempts = providerAttempts;
+      }
+      throw error;
     } finally {
       clearTimeout(timeout);
     }
