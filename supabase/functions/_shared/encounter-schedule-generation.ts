@@ -196,9 +196,10 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  // POYOZZ currently groups music-related places and activities under Live House.
-  // Activity keywords take priority over a generic place label.
-  if (/(live[\s-]*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|music|band|guitar|bass|drummer|performance|rehearsal)/i.test(context)) {
+  // POYOZZ groups music-related places and the surrounding event flow under Live House.
+  // Include post-show terms so locations such as an alley after a performance still
+  // use the venue background; the natural-language location remains unchanged.
+  if (/(live[\s-]*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|散場|演出結束|表演結束|演出後|表演後|演唱會後|演出完|表演完|收拾器材|搬器材|樂團聚會|band|guitar|bass|drummer|performance|rehearsal|after\\s*(the\\s*)?show)/i.test(context)) {
     return "live-house";
   }
   if (raw === "music-studio") return "live-house";
