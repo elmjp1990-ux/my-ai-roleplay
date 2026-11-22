@@ -32,8 +32,8 @@ const validOutput = JSON.stringify({
 });
 
 function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" = "success") {
-  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null } = {
-    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null,
+  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null; profileContext: boolean } = {
+    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null, profileContext: false,
   };
   const admin = {
     from(table: string) {
@@ -95,11 +95,17 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
         if (mode === "profile_incomplete") {
           return { data: { schema_version: "1.1", life_context: { work_environment: section } }, error: null };
         }
-        return { data: { schema_version: "1.1", life_context: {
-          work_environment: section, residence_environment: section, daily_routines: section,
-          interests_and_leisure: section, social_circles: section, recurring_places: section,
-          environmental_constraints: section,
-        } }, error: null };
+        return { data: {
+          schema_version: "1.1",
+          core_personality: { status: "populated", items: [{ content: "做事細心，重視承諾" }] },
+          inner_motivations: { status: "populated", items: [{ content: "希望透過工作建立安全感" }] },
+          behavior_and_agency: { status: "populated", items: [{ content: "遇到問題會主動處理" }] },
+          life_context: {
+            work_environment: section, residence_environment: section, daily_routines: section,
+            interests_and_leisure: section, social_circles: section, recurring_places: section,
+            environmental_constraints: section,
+          },
+        }, error: null };
       }
       if (name === "get_encounter_scene_catalog") return { data: [], error: null };
       if (name === "publish_encounter_schedule_batch") {
@@ -122,8 +128,11 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
   };
   const env = { get: (key: string) => envValues[key] };
   const dependencies = {
-    requestOpenRouterChatCompletion: async () => {
+    requestOpenRouterChatCompletion: async (input: any) => {
       calls.provider++;
+      const userMessage = input.messages?.find((message: any) => message.role === "user")?.content;
+      const promptPayload = typeof userMessage === "string" ? JSON.parse(userMessage) : {};
+      calls.profileContext = !!promptPayload.characters?.[0]?.character_ai_profile?.core_personality?.items?.length;
       return {
         result: { kind: "generated" as const, text: mode === "invalid_ai_output" ? "{invalid-json" : validOutput },
         provider: "mock", model: "mock-model", usage: {}, httpStatus: 200,
@@ -164,6 +173,9 @@ Deno.test("manual POST mock executes authenticated AI-to-publish happy path with
   }
   if (mock.calls.nextSelectorAuthor !== userId || mock.calls.claimAuthor !== userId) {
     throw new Error("Manual Profile preflight and schedule claim must use the verified caller ID: " + JSON.stringify(mock.calls));
+  }
+  if (!mock.calls.profileContext) {
+    throw new Error("Schedule AI prompt did not receive the saved derived Character AI Profile: " + JSON.stringify(mock.calls));
   }
 });
 
