@@ -172,23 +172,50 @@ export function classifyEncounterActivitySpace(
   return requestedOutdoor ? "outdoor" : "indoor";
 }
 
-export function normalizeEncounterSceneKey(value: unknown, activityValue: unknown = ""): string | null {
+function collectResidentialProfileContext(value: unknown, depth = 0): string[] {
+  if (depth > 5 || value == null) return [];
+  if (typeof value === "string") return [value];
+  if (Array.isArray(value)) return value.flatMap((item) => collectResidentialProfileContext(item, depth + 1));
+  if (!isRecord(value)) return [];
+  const values: string[] = [];
+  for (const [key, nested] of Object.entries(value)) {
+    if (/(residen|housing|living_environment|home_environment|居住|住所|住處|住宅|生活環境|家庭環境)/i.test(key)) {
+      values.push(...collectResidentialProfileContext(nested, depth + 1));
+    } else if (isRecord(nested) || Array.isArray(nested)) {
+      values.push(...collectResidentialProfileContext(nested, depth + 1));
+    }
+  }
+  return values;
+}
+
+function hasExplicitLuxuryResidenceContext(value: unknown): boolean {
+  const context = text(value).normalize("NFKC").replace(/\s+/g, "");
+  return /(高級公寓|豪華公寓|豪宅|別墅|莊園|頂樓豪宅|頂級住宅|penthouse|mansion|villa|estate)/i.test(context);
+}
+
+export function normalizeEncounterSceneKey(
+  value: unknown,
+  activityValue: unknown = "",
+  characterResidentialContext: unknown = "",
+): string | null {
   const original = text(value).normalize("NFKC");
   const raw = original.toLocaleLowerCase();
   const compact = raw.replace(/\s+/g, "");
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  // Residential types are distinct fixed anchors: luxury residences use K,
-  // while ordinary homes and the existing 308 building use L. Customer homes
-  // follow the available context when it explicitly identifies a luxury residence.
-  if (/客戶家/.test(compact) && /(豪宅|別墅|莊園|豪華住宅|高級住宅|豪華公寓|高級公寓|頂級住宅)/i.test(activity)) {
+  // Explicit luxury destinations use K. Generic rooms use K only when the
+  // character's own residence is explicitly identified as luxury; otherwise L.
+  const luxuryResidencePattern = /(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i;
+  if (/客戶家/.test(compact) && luxuryResidencePattern.test(activity)) {
     return "luxury-apartment";
   }
-  if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) {
+  if (luxuryResidencePattern.test(compact)) return "luxury-apartment";
+  if (/(臥室|臥房|客廳|書房|廚房|陽台|房間|房內|bedroom|livingroom|studyroom|kitchen|balcony)/i.test(compact) &&
+      hasExplicitLuxuryResidenceContext(characterResidentialContext)) {
     return "luxury-apartment";
   }
-  if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
+  if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|客廳|書房|廚房|陽台|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
     return "apartment";
   }
 
@@ -346,6 +373,7 @@ function validateHourlySchedule(
   value: unknown,
   errors: string[],
   label: string,
+  characterResidentialContext: string,
 ): ScheduleTimeBlock[] | null {
   // Enforce weighted alternatives for every hour, not merely a daily minimum.
   if (!Array.isArray(value) || value.length !== 24) {
@@ -390,7 +418,7 @@ function validateHourlySchedule(
       weightTotal += Number(weight);
       const locationDescription = text(rawOption.location);
       const activity = text(rawOption.activity);
-      const locationKey = normalizeEncounterSceneKey(locationDescription, activity);
+      const locationKey = normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext);
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor === true);
       const isOutdoor = activitySpace === "outdoor";
       if (!isValidEncounterLocationLabel(locationDescription)) {
@@ -411,7 +439,7 @@ function validateHourlySchedule(
       }
       if (hasRainFallback) {
         const rainLocationDescription = text(rawOption.rain_fallback_location);
-        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity);
+        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext);
         rainActivity = text(rawOption.rain_fallback_activity);
         if (!isValidEncounterLocationLabel(rainLocationDescription) ||
           (rainLocationKey !== null && !RAIN_FALLBACK_SCENE_KEYS.has(rainLocationKey)) ||
@@ -622,8 +650,16 @@ export function parseEncounterScheduleBatchOutput(
       errors.push(id + "_day_type_variants_invalid");
       continue;
     }
-    const weekday = validateHourlySchedule(item.variants.weekday, errors, id + "_weekday");
-    const holiday = validateHourlySchedule(item.variants.holiday, errors, id + "_holiday");
+    const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
+    const residenceContext = [
+      ...collectResidentialProfileContext(source.derived_life_context),
+      ...collectResidentialProfileContext(source.derived_character_profile),
+      ...collectResidentialProfileContext(profile),
+      ...[text(source.intro), text(source.schedule_description), text(source.private_info)]
+        .filter((value) => /(?:居住|住在|住於|住所|住處|自宅|自己的家|家中)/.test(value) && hasExplicitLuxuryResidenceContext(value)),
+    ].join(" ");
+    const weekday = validateHourlySchedule(item.variants.weekday, errors, id + "_weekday", residenceContext);
+    const holiday = validateHourlySchedule(item.variants.holiday, errors, id + "_holiday", residenceContext);
     const scheduleSlots = [
       ...(weekday ?? []).flatMap((block) => block.options),
       ...(holiday ?? []).flatMap((block) => block.options),
