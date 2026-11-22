@@ -272,7 +272,7 @@
  const previous=cityVenueScenes[key]||{};
  const scene={
  icon:String(row.icon||previous.icon||'📍'),
- heading:String(row.heading||name||previous.heading||''),
+ heading:String(row.heading||previous.heading||''),
  description:String(row.description||previous.description||''),
  eventLabel:String(row.event_label||previous.eventLabel||'場景亮點'),
  eventTitle:String(row.event_title||previous.eventTitle||''),
