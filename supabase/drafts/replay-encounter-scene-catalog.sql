@@ -160,7 +160,7 @@ BEGIN
   WHERE location_key = 'shopping-street';
   IF NOT FOUND
      OR v_catalog.is_dynamic IS NOT FALSE
-     OR v_catalog.character_count <> 3
+     OR v_catalog.character_count <> 2
      OR v_catalog.display_name <> '商店街'
      OR v_catalog.event_title <> '本週街區活動已更新' THEN
     RAISE EXCEPTION 'fixed shopping-street event metadata was not returned by the scene catalog';
@@ -183,7 +183,7 @@ BEGIN
   WHERE location_key = 'shopping-street';
   IF NOT FOUND
      OR v_catalog.is_dynamic IS NOT FALSE
-     OR v_catalog.character_count <> 3
+     OR v_catalog.character_count <> 2
      OR v_catalog.marker_x <> 672
      OR v_catalog.marker_y <> 646 THEN
     RAISE EXCEPTION 'shopping-street must remain a fixed scene independent of character count';
@@ -218,7 +218,7 @@ DECLARE
   v_catalog record;
 BEGIN
   SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'shopping-street';
-  IF NOT FOUND OR v_catalog.character_count <> 3 THEN
+  IF NOT FOUND OR v_catalog.character_count <> 2 THEN
     RAISE EXCEPTION 'internal schedule generation must include NSFW-backed public scenes';
   END IF;
 END;
