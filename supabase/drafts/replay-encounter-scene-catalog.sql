@@ -1,5 +1,5 @@
 -- Disposable local-only replay for generalized Encounter scene metadata and legacy placeholders.
--- Latest PR #267 coverage: v9 modern-setting inference schedule source hash, manual enqueue, dynamic marker cap, and fallback-only background metadata.
+-- Latest PR #267 coverage: v9 modern-setting inference schedule source hash, manual enqueue, fixed A–N anchors, fixed-scene event updates, and fallback-only background metadata.
 -- All synthetic rows and registry writes are rolled back. Never run against Hosted Supabase.
 
 BEGIN;
