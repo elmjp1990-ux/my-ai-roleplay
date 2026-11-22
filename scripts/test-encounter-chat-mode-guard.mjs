@@ -17,6 +17,7 @@ assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
+const keyboardViewport = fs.readFileSync("chat-keyboard-viewport.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 assert.doesNotMatch(frontend, /data-action="start-new-story"/);
 assert.match(frontend, /const encounterHasStarted = s\.encounterMode && \(s\.messages \|\| \[\]\)\.some\(message =>/);
@@ -500,9 +501,9 @@ assert.match(encounterPresentation, /\(r\+g\+b\)\/3>=140&&Math\.max\(r,g,b\)-Mat
 assert.match(encounterPresentation, /encounter-auto-bg-fallback\{mix-blend-mode:normal!important/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.chat-heading/);
 assert.match(encounterPresentation, /processEncounterSpriteBackdrop/);
-assert.match(frontend, /const visibleHeight = Number\(viewport\?\.height\) \|\| layoutHeight;/);
-assert.match(frontend, /--poyozz-visual-viewport-top/);
-assert.match(frontend, /root\.style\.removeProperty\('--encounter-keyboard-offset'\)/);
+assert.match(keyboardViewport, /const visibleHeight = Number\(viewport\?\.height\) \|\| layoutHeight;/);
+assert.match(keyboardViewport, /--poyozz-visual-viewport-top/);
+assert.match(keyboardViewport, /root\.style\.removeProperty\('--encounter-keyboard-offset'\)/);
 assert.doesNotMatch(encounterPresentation, /bottom:var\(--encounter-keyboard-offset,0px\)!important/);
 assert.doesNotMatch(frontend, /encounter-end','結束相遇/);
 assert.match(frontend, /data-action="encounter-end-prompt"/);
