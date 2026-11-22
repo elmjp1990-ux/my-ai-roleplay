@@ -717,7 +717,7 @@ export async function handleEncounterScheduleOrganizer(
       });
       if (profileError) {
         console.warn("Character AI Profile read failed:", profileError.message);
-        return mode === "manual" ? { ...source, profile_read_error: true } : source;
+        return { ...source, profile_read_error: true };
       }
       const profile = profileData && typeof profileData === "object" && !Array.isArray(profileData)
         ? profileData as Record<string, unknown> : {};
@@ -755,7 +755,7 @@ export async function handleEncounterScheduleOrganizer(
     }
   }));
 
-  if (mode === "manual" && enrichedSources.some((source) => source.profile_read_error === true)) {
+  if (enrichedSources.some((source) => source.profile_read_error === true)) {
     const released = await failBatch(admin, batchId, leaseToken, "character_profile_not_ready", true);
     if (!released) {
       return json({ error: "schedule_profile_gate_release_failed", ai_called: false }, 503);
