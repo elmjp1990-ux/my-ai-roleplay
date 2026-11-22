@@ -254,6 +254,61 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
 });
 
+Deno.test("uses structured character residence context for generic residential rooms", () => {
+  const luxuryContext = "角色長期居住於高級公寓";
+  if (normalizeEncounterSceneKey("臥室", "", luxuryContext) !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("客廳", "", luxuryContext) !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("書房", "", luxuryContext) !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("廚房", "", luxuryContext) !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("陽台", "", luxuryContext) !== "luxury-apartment") {
+    throw new Error("generic rooms in an explicitly luxury residence must resolve to K");
+  }
+  if (normalizeEncounterSceneKey("臥室", "", "角色住在一般出租公寓") !== "apartment" ||
+      normalizeEncounterSceneKey("臥室") !== "apartment" ||
+      normalizeEncounterSceneKey("頂樓出租屋", "", luxuryContext) !== "apartment") {
+    throw new Error("ordinary or explicitly rented residences must remain at L");
+  }
+  if (normalizeEncounterSceneKey("客戶家", "前往客戶的高級公寓拜訪", luxuryContext) !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("客戶家", "前往客戶家拜訪", luxuryContext) !== "apartment") {
+    throw new Error("customer home must be classified from the customer's explicit context, not the character's residence");
+  }
+
+  const blocks = hourlyBlocks();
+  blocks[10] = block(10, [
+    option({ weight: 60, location: "臥室", activity: "在臥室整理衣物並準備出門" }),
+    option({ weight: 40, location: "客廳", activity: "在客廳閱讀資料並喝咖啡" }),
+  ]);
+  const luxuryRole = source(id1, {
+    derived_life_context: {
+      residence: { status: "populated", items: [{ content: "角色長期居住於高級公寓" }] },
+    },
+  });
+  const parsedLuxury = result(
+    [{ character_id: id1, placement: "modern_map", variants: variants(blocks) }],
+    [luxuryRole],
+  );
+  if (!parsedLuxury.ok ||
+      parsedLuxury.characters[0].variants.weekday[10].options[0].location_key !== "luxury-apartment" ||
+      parsedLuxury.characters[0].variants.weekday[10].options[1].location_key !== "luxury-apartment") {
+    throw new Error("parser must apply structured luxury residence context to generic rooms: " + parsedLuxury.errors.join(","));
+  }
+
+  const ordinaryRole = source(id1, {
+    derived_life_context: {
+      residence: { status: "populated", items: [{ content: "角色居住於一般出租公寓" }] },
+    },
+  });
+  const parsedOrdinary = result(
+    [{ character_id: id1, placement: "modern_map", variants: variants(blocks) }],
+    [ordinaryRole],
+  );
+  if (!parsedOrdinary.ok ||
+      parsedOrdinary.characters[0].variants.weekday[10].options[0].location_key !== "apartment" ||
+      parsedOrdinary.characters[0].variants.weekday[10].options[1].location_key !== "apartment") {
+    throw new Error("ordinary residence context must keep generic rooms at L");
+  }
+});
+
 Deno.test("maps existing character schedule locations without rewriting natural labels", () => {
   const weekday = hourlyBlocks();
   weekday[3] = block(3, [
