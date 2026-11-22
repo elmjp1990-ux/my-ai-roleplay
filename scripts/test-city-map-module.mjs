@@ -157,7 +157,8 @@ assert.match(cityMap, /data-place="night-bar" transform="translate\(632 294\)"/,
   'Existing I night-bar marker coordinates must remain unchanged.');
 assert.match(cityMap, /data-place="apartment" transform="translate\(666 440\)"/,
   'Existing L 308 apartment marker coordinates must remain unchanged.');
-assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
+assert.match(cityMap, /cityVenueScenes\[key\]=scene;/);
+assert.doesNotMatch(cityMap, /cityPlaceNames\[key\]=name|marker\.setAttribute\('aria-label',name\)/, 'Scene catalog updates must not rename or move fixed map anchors.');
 assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
 
 assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
