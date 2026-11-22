@@ -78,6 +78,9 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
       return query;
     },
     async rpc(name: string) {
+      if (name === "get_next_encounter_schedule_character_for_author") {
+        return { data: { character_id: characterId, character_name: "測試角色" }, error: null };
+      }
       if (name === "claim_encounter_schedule_batch") {
         calls.claim++;
         return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [source] }, error: null };
