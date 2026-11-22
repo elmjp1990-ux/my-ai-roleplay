@@ -81,12 +81,12 @@ for (const contract of [
   assert.ok(cityMap.includes(contract), 'Extracted city-map behavior is missing: ' + contract);
 }
 
-const sceneLoaderDeclaration = cityMap.indexOf('const loadCityDynamicScenes=async()=>');
+const sceneLoaderDeclaration = cityMap.indexOf('const loadCitySceneCatalog=async()=>');
 const weatherLoaderDeclaration = cityMap.indexOf('const loadCityWeather=async()=>');
-const sceneLoaderInvocation = cityMap.indexOf('void loadCityDynamicScenes();');
+const sceneLoaderInvocation = cityMap.indexOf('void loadCitySceneCatalog();');
 const weatherLoaderInvocation = cityMap.indexOf('void loadCityWeather();');
 assert.ok(sceneLoaderDeclaration >= 0 && sceneLoaderInvocation > sceneLoaderDeclaration,
-  'Dynamic scene loader must be initialized before invocation.');
+  'Scene catalog loader must be initialized before invocation.');
 assert.ok(weatherLoaderDeclaration >= 0 && weatherLoaderInvocation > weatherLoaderDeclaration,
   'Weather loader must be initialized before invocation.');
 
@@ -130,7 +130,7 @@ assert.match(cityMap, /activeVenueRefresh=renderVenue/);
 assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
 assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
 
-assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("const cityPlaceAliases"),
+assert.ok(cityMap.indexOf("void loadCitySceneCatalog();") > cityMap.indexOf("const cityPlaceAliases"),
   "scene catalog loading must start after place aliases and names are initialized");
 
 assert.match(cityMap, /get_encounter_city_weather/);
