@@ -264,7 +264,7 @@ assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organi
 
 assert.match(html, /id="encounterScheduleTestTools"/);
 assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'status'\}\}\)/);
-assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}\)/);
+assert.match(html, /fetch\('\/api\/encounter-schedule-organizer'/);
 assert.match(html, /loadEncounterScheduleRepairOutputs/);
 assert.match(html, /mode:'repair_list'/);
 assert.match(html, /mode:'repair'/);
