@@ -566,8 +566,8 @@ export async function handleEncounterScheduleOrganizer(
         })),
       });
     }
-    if (mode === "repair_hide") return await handleScheduleRepairHide(admin, actorUserId, body);
-    return await handleScheduleRepair(admin, actorUserId, body);
+    if (mode === "repair_hide") return await handleScheduleRepairHide(admin, authData.user.id, body);
+    return await handleScheduleRepair(admin, authData.user.id, body);
   }
 
   if (!openRouterKey) return json({ error: "openrouter_not_configured" }, 503);
