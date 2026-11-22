@@ -123,18 +123,29 @@ assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("co
 
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
-assert.match(cityMap, /MAX_DYNAMIC_SCENE_MARKERS=3/);
-assert.match(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
-assert.match(cityMap, /data-dynamic-scene/);
-assert.match(cityMap, /cityPlaceAliases\[key\]=\[key\]/);
-assert.match(cityMap, /row\.event_label/);
-assert.match(cityMap, /row\.is_dynamic!==true/);
-assert.match(cityMap, /builtInMarker\.setAttribute\('aria-label',name\)/);
-assert.doesNotMatch(cityMap, /glyph\.replaceWith\(textGlyph\)/);
-assert.equal((cityMap.match(/class="city-marker-glyph city-marker-emoji\"/g)||[]).length,9, 'Built-in markers render color emoji immediately.');
-
-assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
-assert.match(cityMap, /if\(row\.is_dynamic!==true\)[\s\S]*?continue;/);
+assert.doesNotMatch(cityMap, /MAX_DYNAMIC_SCENE_MARKERS|data-dynamic-scene|cityDynamicSceneMarkers|createElementNS\\(CITY_MAP_SVG_NS/);
+assert.doesNotMatch(cityMap, /Math\\.hypot\\(point\\.x-x,point\\.y-y\\)<120/);
+assert.match(cityMap, /cityPlaceAliases\\[key\\]=\\[key\\]/);
+assert.match(cityMap, /row\\.event_label/);
+assert.match(cityMap, /Object\\.prototype\\.hasOwnProperty\\.call\\(cityPlaceNames,key\\)/);
+assert.doesNotMatch(cityMap, /row\\.is_dynamic!==true/);
+assert.doesNotMatch(cityMap, /builtInMarker\\.setAttribute/);
+assert.doesNotMatch(cityMap, /glyph\\.replaceWith\\(textGlyph\\)/);
+assert.equal((cityMap.match(/class="city-place-marker is-available"/g)||[]).length,14,
+  'The city map must render exactly fourteen fixed A–N scene anchors.');
+for (const key of [
+  'waterfront','commercial','airport','university','park','shopping-street',
+  'department-store','hospital','night-bar','live-house','luxury-apartment',
+  'apartment','convenience-store','private-club'
+]) {
+  assert.match(cityMap, new RegExp('data-place="' + key + '"'),
+    'Fixed A–N map anchor is missing: ' + key);
+}
+assert.match(cityMap, /data-place="night-bar" transform="translate\\(632 294\\)"/,
+  'Existing I night-bar marker coordinates must remain unchanged.');
+assert.match(cityMap, /data-place="apartment" transform="translate\\(666 440\\)"/,
+  'Existing L 308 apartment marker coordinates must remain unchanged.');
+assert.match(cityMap, /cityPlaceNames\\[key\\]=name;\\s*cityVenueScenes\\[key\\]=scene;/);
 assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
 
 assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
@@ -260,7 +271,7 @@ assert.match(cityMap, /const cityPlaceSubtitles=\{/,
   'Scene subtitle labels must be centralized by canonical scene key.');
 assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=cityPlaceSubtitles\[place\]\|\|''/,
   'Scene subtitle must update with the selected scene and clear when no label exists.');
-for (const key of ['airport','commercial','night-bar','live-house','apartment','department-store','bookstore','cafe','park','waterfront','harbor','office-building','university','performance-venue','luxury-apartment','convenience-store','private-club','luxury-club']) {
+for (const key of ['waterfront','commercial','airport','university','park','shopping-street','department-store','hospital','night-bar','live-house','luxury-apartment','apartment','convenience-store','private-club']) {
   assert.match(cityMap, new RegExp("(?:['\\\"])?"+key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')+"(?:['\\\"])?\\s*:"),
     'Scene subtitle map must include '+key+'.');
 }
