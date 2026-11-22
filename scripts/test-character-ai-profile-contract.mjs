@@ -189,6 +189,8 @@ assert.ok(
   "Profile prerequisite must be checked before the schedule batch claim",
 );
 assert.match(manualProfileMigration, /get_next_encounter_schedule_character_for_author/, "The exact next eligible schedule target must have one shared selector");
+assert.ok(manualProfileMigration.includes("AND (CASE") && manualProfileMigration.includes("END) THEN"),
+  "Profile readiness CASE must be parenthesized as an explicit boolean predicate for PL/pgSQL");
 assert.ok(manualProfileMigration.includes("AS $function$") && manualProfileMigration.includes("$function$;"),
   "Manual Profile selector SQL must use a valid tagged dollar-quoted function body");
 
