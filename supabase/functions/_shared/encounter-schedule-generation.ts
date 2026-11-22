@@ -202,6 +202,10 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
     return "live-house";
   }
   if (raw === "music-studio") return "live-house";
+  // Food stalls belong to the existing restaurant scene; alleys and street
+  // corners use the existing shopping-street scene rather than failing lookup.
+  if (/(路邊攤|小吃攤|攤販|早餐店|便當店|麵店|食堂|餐館|餐廳)/i.test(compact)) return "restaurant";
+  if (/(後巷|巷弄|巷口|街角|人行道|路邊|街道|街頭)/i.test(compact)) return "shopping-street";
   if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
 
   // Ordinary residential settings all share the existing 308 apartment scene.
