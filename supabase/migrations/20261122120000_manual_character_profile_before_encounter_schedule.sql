@@ -72,15 +72,16 @@ BEGIN
 
   IF v_profile IS NOT NULL
      AND v_profile ->> 'schema_version' = '1.1'
-     AND jsonb_typeof(v_profile -> 'life_context') = 'object'
-     AND (v_profile -> 'life_context') ?& ARRAY[
-       'work_environment', 'residence_environment', 'daily_routines',
-       'interests_and_leisure', 'social_circles', 'recurring_places',
-       'environmental_constraints'
-     ]
-     AND (
-       SELECT count(*) FROM jsonb_object_keys(v_profile -> 'life_context')
-     ) = 7 THEN
+     AND CASE
+       WHEN jsonb_typeof(v_profile -> 'life_context') = 'object' THEN
+         (v_profile -> 'life_context') ?& ARRAY[
+           'work_environment', 'residence_environment', 'daily_routines',
+           'interests_and_leisure', 'social_circles', 'recurring_places',
+           'environmental_constraints'
+         ]
+         AND (SELECT count(*) FROM jsonb_object_keys(v_profile -> 'life_context')) = 7
+       ELSE false
+     END THEN
     UPDATE public.character_profile_organization_jobs
     SET status = 'completed',
         source_hash = v_hash,
