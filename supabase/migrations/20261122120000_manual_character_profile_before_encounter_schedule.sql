@@ -49,7 +49,7 @@ DECLARE
   v_job public.character_profile_organization_jobs%ROWTYPE;
   v_lease uuid;
 BEGIN
-  IF COALESCE(auth.jwt() ->> 'role', '') <> 'service_role' THEN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
   IF p_author_id IS NULL THEN
