@@ -262,7 +262,7 @@ COMMENT ON FUNCTION public.publish_encounter_scene_metadata(jsonb) IS
 
 -- Keep the schedule publisher's canonical-key and rain-fallback validation in
 -- sync with the fixed A–N keys emitted by the TypeScript normalizer.
-DO $
+DO $fixed_scene_publisher_patch$
 DECLARE
   v_definition text;
   v_old text;
@@ -303,6 +303,6 @@ BEGIN
 
   EXECUTE v_definition;
 END;
-$;
+$fixed_scene_publisher_patch$;
 
 COMMIT;
