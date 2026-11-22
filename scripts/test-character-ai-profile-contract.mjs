@@ -181,6 +181,11 @@ assert.ok(
   scheduleOrganizer.indexOf("character_profile_not_ready") < scheduleOrganizer.indexOf('admin.rpc("claim_encounter_schedule_batch"'),
   "Profile prerequisite must be checked before the schedule batch claim",
 );
+assert.match(manualProfileMigration, /get_next_encounter_schedule_character_for_author/, "The exact next eligible schedule target must have one shared selector");
+assert.match(worker, /get_next_encounter_schedule_character_for_author/,
+  "Profile status and Profile claim must use the shared next-role selector");
+assert.match(scheduleOrganizer, /get_next_encounter_schedule_character_for_author/,
+  "Schedule preflight must use the same next-role selector as Profile generation");
 assert.match(manualProfileMigration, /claim_next_encounter_character_profile_job/, "Manual Profile claim RPC must exist");
 assert.match(manualProfileMigration, /schema_version' = '1\.1'[\s\S]*life_context/,
   "A current Profile must include schema 1.1 and its structured life context before schedule generation");
