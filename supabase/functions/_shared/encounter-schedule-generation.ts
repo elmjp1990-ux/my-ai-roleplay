@@ -149,7 +149,7 @@ const text = (value: unknown): string => typeof value === "string" ? value.trim(
 const isValidEncounterLocationLabel = (value: string): boolean => {
   const label = value.trim().normalize("NFKC");
   const characterCount = Array.from(label.replace(/\s/g, "")).length;
-  return characterCount > 0 && characterCount <= 8 && !/[或、／\\/|，,;；]/.test(label);
+  return characterCount > 0 && characterCount <= 20 && !/[或、／\\/|，,;；]/.test(label);
 };
 const isUuid = (value: unknown): value is string =>
   typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -196,26 +196,46 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  // POYOZZ groups music-related places and the surrounding event flow under Live House.
-  // Include post-show terms so locations such as an alley after a performance still
-  // use the venue background; the natural-language location remains unchanged.
-  if (/(live[\s-]*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|散場|演出結束|表演結束|演出後|表演後|演唱會後|演出完|表演完|收拾器材|搬器材|樂團聚會|band|guitar|bass|drummer|performance|rehearsal|after\\s*(the\\s*)?show)/i.test(context)) {
-    return "live-house";
-  }
-  if (raw === "music-studio") return "live-house";
-  // Food stalls belong to the existing restaurant scene; alleys and street
-  // corners use the existing shopping-street scene rather than failing lookup.
-  if (/(路邊攤|小吃攤|攤販|早餐店|便當店)/i.test(compact)) return "shopping-street";
-  if (/(麵店|食堂|餐館|餐廳)/i.test(compact)) return "restaurant";
-  if (/(後巷|巷弄|巷口|街角|人行道|路邊|街道|街頭)/i.test(compact)) return "shopping-street";
-  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
-
-  // Ordinary residential settings all share the existing 308 apartment scene.
+  // Explicit residential locations always use the 308 apartment scene,
+  // even when the activity mentions music or playing an instrument at home.
   if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) return null;
   if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
     return "apartment";
   }
 
+  // Locations that explicitly name a music venue, rehearsal space or music shop
+  // use Live House; the original natural-language location is never rewritten.
+  if (/(live[\s-]*house|livehouse|練團室|排練室|彩排室|錄音室|音樂工作室|樂器行|樂器店|音樂展演|現場音樂|展演廳)/i.test(compact)) {
+    return "live-house";
+  }
+
+  // Convenience stores and river embankments intentionally remain unmapped
+  // until POYOZZ adds suitable scenes.
+  if (/(便利商店|超商|江邊堤防)/i.test(compact)) return null;
+
+  // A generic alley after a show belongs to the Live House event context;
+  // an ordinary alley remains part of the existing street scene.
+  if (/(後巷|巷弄|巷口|街角)/i.test(compact)) {
+    if (/(散場|演出結束|表演結束|演出後|表演後|演唱會後|演出完|表演完|收拾器材|搬器材|樂團聚會|演出|表演|團練|練團|排練|彩排)/i.test(context)) {
+      return "live-house";
+    }
+    return "shopping-street";
+  }
+
+  // Known street-side food stalls use the existing street scene, even if the
+  // activity mentions a later performance. Small eateries remain natural labels.
+  if (/(路邊攤|小吃攤|攤販|早餐店|便當店)/i.test(compact)) return "shopping-street";
+  if (/(麵店|食堂|餐館|餐廳|小吃店)/i.test(compact)) return null;
+  if (/(人行道|路邊|街道|街頭)/i.test(compact)) return "shopping-street";
+
+  // For generic or otherwise unmapped places, music and performance context
+  // can select the Live House background. A residential or explicit shop label
+  // above always takes precedence.
+  if (/(live[\s-]*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|散場|演出結束|表演結束|演出後|表演後|演唱會後|演出完|表演完|收拾器材|搬器材|樂團聚會|music|band|guitar|bass|drummer|performance|rehearsal)/i.test(context)) {
+    return "live-house";
+  }
+
+  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
   return SCENE_ALIASES[raw] || SCENE_ALIASES[original] || null;
 }
 
@@ -516,7 +536,7 @@ export function buildEncounterScheduleBatchMessages(
     "若輸入包含 character_ai_profile，必須讀取先前角色資料整理 AI 已保存的身份背景、核心個性、內在動機、情緒反應、關係互動、行為主動性、知識界線、說話風格與角色一致性規則，作為推演日常活動、工作內容及社交場景的主要參考；author_character_profile 是作者原始設定，若與整理結果有差異，以作者明示內容為準。unknowns 與 source_conflicts 代表尚未確認，不可自行補造，也不可將 AI 推論寫成作者明示。公開 activity 不得揭露私密資訊。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
-    "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 8 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
+    "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 20 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時不得使用機場，應依角色背景自行推導合理地點。",
     "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。必須按小時逐一輸出，完整包含 00、01、02、03、04、05、06、07、08、09、10、11、12、13、14、15、16、17、18、19、20、21、22、23 共 24 格；不可因角色睡眠、休息、待命、沒有工作或某時段不重要而省略。完成草稿後，輸出前先自我檢查兩種 day_type 的時段清單：每種均為 24 格、每格恰好 1 小時、起訖連續且從 00:00 開始至隔日 00:00 結束，沒有缺漏、重複、重疊或跨時段合併；若檢查失敗，必須先修正完整 JSON 再輸出。每個時段必須提供 2–3 個選項，不得少於 2 個或多於 3 個；即使固定工作或睡眠，也必須提出至少兩種符合角色背景的合理活動或情境，不得用單一選項 100% 規避機率，也不可為湊數虛構不合理活動。每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 10–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率，依角色日常發生可能性設定，不可全部固定相同權重。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
