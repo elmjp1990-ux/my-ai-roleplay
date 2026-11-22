@@ -172,16 +172,21 @@ export function classifyEncounterActivitySpace(
   return requestedOutdoor ? "outdoor" : "indoor";
 }
 
-function collectResidentialProfileContext(value: unknown, depth = 0): string[] {
-  if (depth > 5 || value == null) return [];
-  if (typeof value === "string") return [value];
-  if (Array.isArray(value)) return value.flatMap((item) => collectResidentialProfileContext(item, depth + 1));
+function collectAllTextValues(value: unknown, depth = 0): string[] {
+  if (depth > 6 || value == null) return [];
+  if (typeof value === "string" || typeof value === "number") return [String(value)];
+  if (Array.isArray(value)) return value.flatMap((item) => collectAllTextValues(item, depth + 1));
   if (!isRecord(value)) return [];
+  return Object.values(value).flatMap((nested) => collectAllTextValues(nested, depth + 1));
+}
+
+function collectResidentialProfileContext(value: unknown, depth = 0): string[] {
+  if (depth > 5 || !isRecord(value)) return [];
   const values: string[] = [];
   for (const [key, nested] of Object.entries(value)) {
     if (/(residen|housing|living_environment|home_environment|居住|住所|住處|住宅|生活環境|家庭環境)/i.test(key)) {
-      values.push(...collectResidentialProfileContext(nested, depth + 1));
-    } else if (isRecord(nested) || Array.isArray(nested)) {
+      values.push(...collectAllTextValues(nested));
+    } else if (isRecord(nested)) {
       values.push(...collectResidentialProfileContext(nested, depth + 1));
     }
   }
