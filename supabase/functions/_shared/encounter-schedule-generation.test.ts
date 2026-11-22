@@ -233,6 +233,48 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
 });
 
+Deno.test("maps existing character schedule locations without rewriting natural labels", () => {
+  const weekday = hourlyBlocks();
+  weekday[8] = block(8, [
+    option({
+      weight: 40,
+      location: "Livehouse",
+      activity: "在地下Livehouse進行試音，調整監聽耳機和吉他音量",
+      is_outdoor: false,
+      rain_fallback_location: "便利商店",
+      rain_fallback_activity: "改在便利商店內買飲料並等雨勢變小",
+    }),
+    option({
+      weight: 30,
+      location: "頂樓出租屋",
+      activity: "躺在床上休息，用吉他隨意彈些和弦打發時間",
+    }),
+    option({
+      weight: 30,
+      location: "後巷",
+      activity: "演出結束後靠在紅磚牆邊抽菸，讓夜風慢慢吹散菸霧",
+      is_outdoor: true,
+      rain_fallback_location: "練團室",
+      rain_fallback_activity: "改到練團室角落休息並整理器材",
+    }),
+  ]);
+  const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(weekday) }]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const options = parsed.characters[0].variants.weekday.slots[8].options;
+  if (options[0].location_key !== "live-house" || options[0].location_description !== "Livehouse") {
+    throw new Error("Livehouse label must map to Live House without rewriting the original label");
+  }
+  if (options[0].rain_fallback_location_key !== null) {
+    throw new Error("unmapped convenience-store rain fallback must remain a valid natural location");
+  }
+  if (options[1].location_key !== "apartment" || options[1].location_description !== "頂樓出租屋") {
+    throw new Error("residential location must stay in the apartment scene even when the activity mentions guitar");
+  }
+  if (options[2].location_key !== "live-house" || options[2].location_description !== "後巷") {
+    throw new Error("post-show alley must use Live House while preserving its natural location");
+  }
+});
+
 Deno.test("keeps free natural-language locations and applies system scene matching", () => {
   const blocks = hourlyBlocks();
   blocks[8] = block(8, [
