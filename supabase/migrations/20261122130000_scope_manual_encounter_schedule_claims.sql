@@ -60,6 +60,7 @@ BEGIN
   WHERE j.status IN ('pending', 'failed', 'needs_reconciliation')
     AND (p_force IS NOT TRUE OR j.author_id = p_actor_user_id)
     AND (p_force IS TRUE OR j.available_at <= v_now)
+    AND c.author_id = j.author_id
     AND c.visibility = 'public'
     AND c.review_status = 'approved'
     AND c.rights_confirmed IS TRUE
