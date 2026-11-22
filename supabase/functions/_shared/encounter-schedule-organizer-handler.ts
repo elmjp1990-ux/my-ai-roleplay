@@ -784,6 +784,7 @@ export async function handleEncounterScheduleOrganizer(
   const rawScenesByKey = new Map<string, unknown>();
   const providerResponses: Array<{ sourceId: string; providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>> }> = [];
   const failedCharacterIds = new Set<string>();
+  const reviewRequiredCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
   const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
   const rawOutputIdByCharacter = new Map<string, string>();
@@ -800,12 +801,20 @@ export async function handleEncounterScheduleOrganizer(
       source.worldview_review_decision,
     );
     if (disposition === "generate") return true;
-    rawCharacters.push({
-      character_id: source.character_id,
-      placement: disposition === "needs_review" ? "needs_review" : "no_matching_location",
-      variants: { weekday: [], holiday: [] },
-      special_events: [],
-    });
+    if (disposition === "needs_review") {
+      // Review-only roles are deliberately not represented as parser output.
+      // They are moved to the durable needs_review queue state after any
+      // publishable characters in this lease have been committed.
+      reviewRequiredCharacterIds.add(source.character_id);
+    } else {
+      // Known non-modern roles are completed as unplaced without an AI call.
+      rawCharacters.push({
+        character_id: source.character_id,
+        placement: "no_matching_location",
+        variants: { weekday: [], holiday: [] },
+        special_events: [],
+      });
+    }
     characterDiagnosticsById.set(source.character_id, {
       worldview_category: classification.category,
       worldview_confidence: classification.confidence,
@@ -960,7 +969,7 @@ export async function handleEncounterScheduleOrganizer(
     scenes: Array<Record<string, unknown>>;
   }> = [];
   for (const source of enrichedSources) {
-    if (failedCharacterIds.has(source.character_id)) continue;
+    if (failedCharacterIds.has(source.character_id) || reviewRequiredCharacterIds.has(source.character_id)) continue;
     const matches = rawCharacters.filter((item) => asText(asRow(item).character_id) === source.character_id);
     if (matches.length !== 1) {
       failedCharacterIds.add(source.character_id);
@@ -1095,6 +1104,30 @@ export async function handleEncounterScheduleOrganizer(
     }
   }
 
+  if (reviewRequiredCharacterIds.size > 0) {
+    const reviewIds = [...reviewRequiredCharacterIds];
+    const reviewedAt = new Date().toISOString();
+    const { error: reviewUpdateError } = await admin
+      .from("encounter_schedule_generation_jobs")
+      .update({
+        status: "needs_review",
+        lease_token: null,
+        lease_expires_at: null,
+        last_error_code: "worldview_manual_review_required",
+        updated_at: reviewedAt,
+      })
+      .eq("lease_token", leaseToken)
+      .eq("status", "processing")
+      .in("character_id", reviewIds);
+    if (reviewUpdateError) {
+      for (const characterId of reviewIds) {
+        failedCharacterIds.add(characterId);
+        validationErrors.push(characterId + ":worldview_review_state_persist_failed");
+      }
+      console.warn("Encounter worldview review state update failed:", reviewUpdateError.message);
+    }
+  }
+
   const { count: remainingCount, error: remainingError } = await admin
     .from("encounter_schedule_generation_jobs")
     .select("character_id", { count: "exact", head: true })
@@ -1102,6 +1135,26 @@ export async function handleEncounterScheduleOrganizer(
     .eq("status", "processing");
   if (remainingError) ambiguousPublishFailure = true;
   const remaining = Number(remainingCount || 0);
+  // A review-only batch has no publisher call to close its batch ledger.
+  // Once all review jobs have left the processing lease, close the batch
+  // explicitly without marking the reviewed characters as failed.
+  if (remaining === 0 && reviewRequiredCharacterIds.size > 0 &&
+      failedCharacterIds.size === 0 && !ambiguousPublishFailure && !ambiguousProviderFailure) {
+    const completedAt = new Date().toISOString();
+    const { data: completedBatch, error: completeBatchError } = await admin
+      .from("encounter_schedule_batch_runs")
+      .update({ status: "completed", completed_at: completedAt, updated_at: completedAt })
+      .eq("id", batchId)
+      .eq("lease_token", leaseToken)
+      .eq("status", "processing")
+      .select("id")
+      .maybeSingle();
+    if (completeBatchError || !completedBatch) {
+      ambiguousPublishFailure = true;
+      console.warn("Encounter review-only batch finalization failed:",
+        completeBatchError?.message || "batch_not_updated");
+    }
+  }
   if (remaining > 0 || ambiguousPublishFailure || failedCharacterIds.size > 0) {
     const failed = await failBatch(
       admin,
@@ -1138,6 +1191,7 @@ export async function handleEncounterScheduleOrganizer(
     published_character_count: publishedCharacterCount,
     unplaced_character_count: unplacedCharacterCount,
     skipped_private_character_count: skippedCharacterCount,
+    needs_review_character_count: reviewRequiredCharacterIds.size,
     failed_character_count: partial ? Math.max(remaining, failedCharacterIds.size) : 0,
     validation_errors: validationErrors.slice(0, 30),
     scene_publish_status: scenePublishStatus,
