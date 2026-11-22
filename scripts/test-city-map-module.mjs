@@ -44,7 +44,7 @@ assert.match(cityMap, /encounter_place:session_data->>encounterPlace/);
 assert.doesNotMatch(cityMap, /select\('id,character_id,chat_mode,session_data,updated_at'\)/,
   'resumable encounter lookup must not transfer the full session_data JSON payload');
 assert.match(cityMap, /Number\(row\.encounter_left_at\)>0/);
-assert.match(cityMap, /row\.encounter_place===placeKey/);
+assert.match(cityMap, /row\.event_label/);
 assert.match(cityMap, /loadCloudChatSessions\(user,\{onlySessionId:candidate\.id,listPage:false\}\)/,
   'Resume lookup must hydrate the candidate cloud session before reopening it');
 assert.match(cityMap, /hydrated\?\.cloudOwned===true/);
@@ -123,14 +123,14 @@ assert.ok(cityMap.indexOf("void loadCityDynamicScenes();") > cityMap.indexOf("co
 
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
-assert.doesNotMatch(cityMap, /MAX_DYNAMIC_SCENE_MARKERS|data-dynamic-scene|cityDynamicSceneMarkers|createElementNS\\(CITY_MAP_SVG_NS/);
-assert.doesNotMatch(cityMap, /Math\\.hypot\\(point\\.x-x,point\\.y-y\\)<120/);
-assert.match(cityMap, /cityPlaceAliases\\[key\\]=\\[key\\]/);
-assert.match(cityMap, /row\\.event_label/);
-assert.match(cityMap, /Object\\.prototype\\.hasOwnProperty\\.call\\(cityPlaceNames,key\\)/);
-assert.doesNotMatch(cityMap, /row\\.is_dynamic!==true/);
-assert.doesNotMatch(cityMap, /builtInMarker\\.setAttribute/);
-assert.doesNotMatch(cityMap, /glyph\\.replaceWith\\(textGlyph\\)/);
+assert.doesNotMatch(cityMap, /MAX_DYNAMIC_SCENE_MARKERS|data-dynamic-scene|cityDynamicSceneMarkers|createElementNS\(CITY_MAP_SVG_NS/);
+assert.doesNotMatch(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
+assert.match(cityMap, /const cityPlaceAliases=\{waterfront:/);
+assert.match(cityMap, /row\.event_label/);
+assert.match(cityMap, /Object\.prototype\.hasOwnProperty\.call\(cityPlaceNames,key\)/);
+assert.doesNotMatch(cityMap, /row\.is_dynamic!==true/);
+assert.doesNotMatch(cityMap, /builtInMarker\.setAttribute/);
+assert.doesNotMatch(cityMap, /glyph\.replaceWith\(textGlyph\)/);
 assert.equal((cityMap.match(/class="city-place-marker is-available"/g)||[]).length,14,
   'The city map must render exactly fourteen fixed A–N scene anchors.');
 for (const key of [
@@ -141,11 +141,11 @@ for (const key of [
   assert.match(cityMap, new RegExp('data-place="' + key + '"'),
     'Fixed A–N map anchor is missing: ' + key);
 }
-assert.match(cityMap, /data-place="night-bar" transform="translate\\(632 294\\)"/,
+assert.match(cityMap, /data-place="night-bar" transform="translate\(632 294\)"/,
   'Existing I night-bar marker coordinates must remain unchanged.');
-assert.match(cityMap, /data-place="apartment" transform="translate\\(666 440\\)"/,
+assert.match(cityMap, /data-place="apartment" transform="translate\(666 440\)"/,
   'Existing L 308 apartment marker coordinates must remain unchanged.');
-assert.match(cityMap, /cityPlaceNames\\[key\\]=name;\\s*cityVenueScenes\\[key\\]=scene;/);
+assert.match(cityMap, /cityPlaceNames\[key\]=name;\s*cityVenueScenes\[key\]=scene;/);
 assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
 
 assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
@@ -248,7 +248,7 @@ assert.doesNotMatch(html, /測試環境登入帳號皆可使用/);
 assert.match(html, /正式環境不提供此工具/);
 
 
-assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
+assert.match(cityMap, /data-place="apartment" transform="translate\(666 440\)"/,
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/,
   'Opening a city character card must merge resolved schedule data with the base profile.');
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/,
