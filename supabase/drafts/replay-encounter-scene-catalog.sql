@@ -9,7 +9,7 @@ BEGIN;
 INSERT INTO public.encounter_scene_backgrounds (
   location_key, display_name, asset_path, is_active, sort_order
 ) VALUES (
-  'restaurant', 'Replay-only restaurant background metadata',
+  'shopping-street', 'Replay-only shopping street background metadata',
   './encounter-default-scene.webp', true, 999
 );
 
@@ -39,15 +39,15 @@ INSERT INTO public.character_schedules (
    0, true, 'legacy', 'primary', 100, '', false),
   ('00000000-0000-4000-8000-000000000027'::uuid,
    '00000000-0000-4000-8000-000000000022'::uuid,
-   'any', '09:00', '17:00', 'restaurant', '在餐廳工作與接待客人',
+   'any', '09:00', '17:00', 'shopping-street', '在餐廳工作與接待客人',
    100, true, 'manual', 'primary', 100, '', false),
   ('00000000-0000-4000-8000-000000000028'::uuid,
    '00000000-0000-4000-8000-000000000024'::uuid,
-   'any', '09:00', '17:00', 'restaurant', '在餐廳準備餐點與服務',
+   'any', '09:00', '17:00', 'shopping-street', '在餐廳準備餐點與服務',
    100, true, 'manual', 'primary', 100, '', false),
   ('00000000-0000-4000-8000-000000000033'::uuid,
    '00000000-0000-4000-8000-000000000031'::uuid,
-   'any', '09:00', '17:00', 'restaurant', '在餐廳工作與接待客人',
+   'any', '09:00', '17:00', 'shopping-street', '在餐廳工作與接待客人',
    100, true, 'manual', 'primary', 100, '', false);
 -- Keep replica mode for the synthetic author IDs and their job rows; the whole test rolls back.
 
@@ -108,18 +108,18 @@ BEGIN
   v_result := public.publish_encounter_scene_metadata(
     jsonb_build_array(
       jsonb_build_object(
-        'location_key', 'restaurant',
-        'display_name', '城市餐廳',
-        'icon', '🍽️',
-        'heading', '讓香氣與交談交織的日常',
-        'description', '開放式廚房傳來食材與鍋具的聲響，靠窗座位適合慢慢用餐，吧台則能看見廚師準備每一道料理。工作、聚餐與偶然相遇都能自然發生。',
+        'location_key', 'shopping-street',
+        'display_name', '商店街',
+        'icon', '🛍️',
+        'heading', '街邊店家交織的生活街區',
+        'description', '小吃攤、花店、咖啡廳與各式街邊店沿街排列，從白天採買到夜晚散步，都能遇見城市的日常風景。',
         'event_label', '最新消息',
-        'event_title', '本週季節菜單已更新',
-        'event_description', '週末晚間將推出主廚限定套餐與小型料理分享。'
+        'event_title', '本週街區活動已更新',
+        'event_description', '本週末將有街頭表演與臨時市集活動。'
       ),
       jsonb_build_object(
         'location_key', 'live-house',
-        'display_name', 'Live House／音樂酒吧',
+        'display_name', '展演空間',
         'icon', '🎸',
         'heading', '讓音樂填滿整個夜晚',
         'description', '舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',
@@ -130,18 +130,18 @@ BEGIN
     )
   );
   IF COALESCE((v_result->>'published_scene_count')::integer, 0) <> 2 THEN
-    RAISE EXCEPTION 'shared dynamic scene and built-in Live House copy should both publish';
+    RAISE EXCEPTION 'fixed shopping-street and Live House event copy should both publish';
   END IF;
 
   SELECT * INTO v_catalog
   FROM public.get_encounter_scene_catalog()
-  WHERE location_key = 'restaurant';
+  WHERE location_key = 'shopping-street';
   IF NOT FOUND
-     OR v_catalog.is_dynamic IS NOT TRUE
+     OR v_catalog.is_dynamic IS NOT FALSE
      OR v_catalog.character_count <> 3
-     OR v_catalog.display_name <> '城市餐廳'
-     OR v_catalog.event_title <> '本週季節菜單已更新' THEN
-    RAISE EXCEPTION 'published dynamic scene metadata was not returned by the scene catalog';
+     OR v_catalog.display_name <> '商店街'
+     OR v_catalog.event_title <> '本週街區活動已更新' THEN
+    RAISE EXCEPTION 'fixed shopping-street event metadata was not returned by the scene catalog';
   END IF;
 
   SELECT * INTO v_catalog
@@ -149,9 +149,22 @@ BEGIN
   WHERE location_key = 'live-house';
   IF NOT FOUND
      OR v_catalog.is_dynamic IS NOT FALSE
-     OR v_catalog.display_name <> 'Live House／音樂酒吧'
-     OR v_catalog.event_title <> '本週演出時刻表已更新' THEN
-    RAISE EXCEPTION 'AI-updated built-in Live House scene copy was not returned by the scene catalog';
+     OR v_catalog.display_name <> '展演空間'
+     OR v_catalog.event_title <> '本週演出時刻表已更新'
+     OR v_catalog.marker_x <> 862
+     OR v_catalog.marker_y <> 410 THEN
+    RAISE EXCEPTION 'fixed Live House event metadata or marker coordinates changed';
+  END IF;
+
+  SELECT * INTO v_catalog
+  FROM public.get_encounter_scene_catalog()
+  WHERE location_key = 'shopping-street';
+  IF NOT FOUND
+     OR v_catalog.is_dynamic IS NOT FALSE
+     OR v_catalog.character_count <> 3
+     OR v_catalog.marker_x <> 672
+     OR v_catalog.marker_y <> 646 THEN
+    RAISE EXCEPTION 'shopping-street must remain a fixed scene independent of character count';
   END IF;
 END;
 $dynamic_scene_publish$;
@@ -164,7 +177,7 @@ DECLARE
   v_catalog record;
   v_schedule_count integer;
 BEGIN
-  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'restaurant';
+  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'shopping-street';
   IF NOT FOUND OR v_catalog.character_count <> 2 THEN
     RAISE EXCEPTION 'non-adult viewer must not see NSFW character scene counts';
   END IF;
@@ -182,7 +195,7 @@ DO $internal_schedule_view$
 DECLARE
   v_catalog record;
 BEGIN
-  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'restaurant';
+  SELECT * INTO v_catalog FROM public.get_encounter_scene_catalog() WHERE location_key = 'shopping-street';
   IF NOT FOUND OR v_catalog.character_count <> 3 THEN
     RAISE EXCEPTION 'internal schedule generation must include NSFW-backed public scenes';
   END IF;
