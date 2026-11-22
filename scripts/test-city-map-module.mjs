@@ -210,7 +210,8 @@ assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMe
   'the AI receives active scene display names as optional examples, never as a whitelist');
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
-assert.match(scheduleOrganizer, /ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000/);
+assert.match(scheduleOrganizer, /providerTimeoutMs = 100_000/);
+assert.match(scheduleOrganizer, /Math\\.min\\(\\s*270_000/);
 assert.match(scheduleOrganizer, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
 assert.match(scheduleOrganizer, /provider_duration_ms/);
 assert.match(scheduleOrganizer, /let providerDurationMs = 0/);
