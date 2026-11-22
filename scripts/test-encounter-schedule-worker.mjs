@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 
-const worker = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const worker = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
 const batchSemantics = fs.readFileSync("supabase/migrations/20261117133525_encounter_schedule_batch_semantics.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
@@ -97,7 +97,8 @@ assert.match(manualRetryGuard, /\.eq\("status", "pending"\)/);
 assert.match(html, /const canRun=pending>0&&!blocked/);
 assert.match(html, /失敗紀錄已保留，不會自動重試/);
 assert.match(worker, /ENCOUNTER_SCHEDULE_TEST_MODE/);
-assert.match(worker, /ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS = 100_000/);
+assert.match(worker, /providerTimeoutMs = 100_000/);
+assert.match(worker, /Math\\.min\\(\\s*270_000/);
 assert.match(worker, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
 assert.match(worker, /provider_duration_ms: Number\(providerResponse\?\.durationMs \|\| diagnostics\.provider_duration_ms \|\| 0\)/);
 assert.match(worker, /provider_duration_ms: measuredProviderDurationMs/);
@@ -122,7 +123,7 @@ assert.ok(
   "Missing provider secret must not claim or lock schedule jobs",
 );
 assert.ok(
-  worker.indexOf('if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true"') <
+  worker.indexOf('if (env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true"') <
     worker.indexOf('p_force: mode === "manual"'),
   "Manual force path must remain test-environment gated",
 );
