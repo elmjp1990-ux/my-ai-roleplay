@@ -223,9 +223,9 @@ Deno.test("classifies activity space independently from scene location", () => {
   if (normalizeEncounterSceneKey("後巷", "在後巷散步") !== "shopping-street") {
     throw new Error("an alley without music or post-show context must remain a street scene");
   }
-  if (normalizeEncounterSceneKey("小吃店") !== "restaurant" ||
-      normalizeEncounterSceneKey("路邊攤") !== "restaurant") {
-    throw new Error("small eateries and roadside food stalls must resolve to restaurant");
+  if (normalizeEncounterSceneKey("小吃店") !== null ||
+      normalizeEncounterSceneKey("路邊攤") !== "shopping-street") {
+    throw new Error("unavailable small-eatery scenes stay unmapped while roadside stalls use the existing street scene");
   }
   if (normalizeEncounterSceneKey("後巷") !== "shopping-street" ||
       normalizeEncounterSceneKey("巷口") !== "shopping-street") {
