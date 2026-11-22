@@ -10206,7 +10206,7 @@ document.addEventListener('click',async event=>{
       body:JSON.stringify({mode:'manual'})
     });
     const data=await response.json().catch(()=>({error:'invalid_response'}));
-    if(!response.ok)throw new Error(String(data?.error||'schedule_request_failed'));
+    if(!response.ok||data?.error)throw new Error(String(data?.error||'schedule_request_failed'));
     const state=String(data?.status||'unknown');
     if(state==='completed'||state==='partial'){
       window.PoyozzCityMap?.refreshScenes?.();
