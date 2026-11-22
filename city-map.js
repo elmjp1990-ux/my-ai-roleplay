@@ -256,8 +256,6 @@
  'live-house':{icon:'🎸',heading:'讓音樂填滿整個夜晚',description:'舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',eventLabel:'場景亮點',eventTitle:'演出開始前',eventDescription:'適合樂團演出、後台相遇、樂迷交流或散場後的續攤情節。'},
  apartment:{icon:'🏠',heading:'308 公寓的日常與秘密',description:'熟悉的電梯聲、走廊燈光與各自緊閉的房門，讓這裡既有生活感，也保留鄰居之間尚未說出口的故事。',eventLabel:'場景亮點',eventTitle:'走廊裡的偶然碰面',eventDescription:'適合鄰居日常、借物、深夜返家或逐漸熟悉彼此的生活故事。'},
  'department-store':{icon:'🛍️',heading:'從精品櫥窗到美食樓層',description:'明亮的中庭連接各式品牌櫃位、服飾樓層與餐飲空間。人潮來去，購物、約會與臨時起意的行程都能在這裡展開。',eventLabel:'場景亮點',eventTitle:'中庭的週末人潮',eventDescription:'適合約會逛街、挑選禮物、偶遇熟人或在美食樓層稍作停留。'},
- bookstore:{icon:'📚',heading:'在書頁之間慢下腳步',description:'木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。',eventLabel:'場景亮點',eventTitle:'同一本書的選擇',eventDescription:'適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。'},
- cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
  park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'},
  waterfront:{icon:'🌊',heading:'沿著河岸與港灣散步',description:'河堤步道、碼頭與水岸景觀連接城市不同區域，白天適合散步與吹風，夜晚則能欣賞水面與城市燈光。',eventLabel:'場景亮點',eventTitle:'水岸邊的偶遇',eventDescription:'適合散步、談心、看夜景或在河堤旁短暫停留。'},
  university:{icon:'🎓',heading:'校園裡的日常與青春',description:'教學大樓、圖書館、操場與校園廣場構成日常動線，下課鐘聲與社團活動讓不同故事在此交會。',eventLabel:'場景亮點',eventTitle:'下課後的校園時光',eventDescription:'適合課堂、社團、校園活動、圖書館自習與同學間的相遇。'},
