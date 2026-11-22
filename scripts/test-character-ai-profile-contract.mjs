@@ -14,7 +14,7 @@ const workerCore = fs.readFileSync("supabase/functions/_shared/character-profile
 const coreUtils = fs.readFileSync("core-utils.js", "utf8");
 const storyTurn = fs.readFileSync("supabase/functions/chat-turn/index.ts", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
-const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 
 assert.equal(schema.$schema, "https://json-schema.org/draft/2020-12/schema");
 assert.equal(schema.properties.schema_version.const, "1.1");
