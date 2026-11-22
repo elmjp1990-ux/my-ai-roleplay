@@ -55,6 +55,7 @@ type ProfileUsageMetadata = {
   responseContentType?: string | null;
   responseBodyLength?: number | null;
   responseParsed?: boolean | null;
+  providerAttempts?: Array<Record<string, unknown>>;
 };
 
 type GeneratedProfile = ProfileUsageMetadata & {
@@ -144,6 +145,7 @@ async function generateProfile(
   apiKey: string,
 ): Promise<GeneratedProfile> {
   const messages = buildCharacterProfileMessages(item.source_payload);
+  const providerAttempts: Array<Record<string, unknown>> = [];
   for (const provider of APPROVED_OPENROUTER_PROVIDERS) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
@@ -187,6 +189,7 @@ async function generateProfile(
       // safely use the next approved provider once. Generic 5xx responses are
       // treated as ambiguous and are not retried.
       if (response.status === 429 && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
+        providerAttempts.push({ provider, outcome: "retryable_provider_error", error_code: "http_429", http_status: 429, request_id: response.headers.get("x-request-id") });
         await response.body?.cancel();
         continue;
       }
@@ -287,6 +290,7 @@ async function generateProfile(
         responseContentType: response.headers.get("content-type") || "",
         responseBodyLength: responseText.length,
         responseParsed: true,
+        providerAttempts,
       };
       if (typeof content !== "string" || !content.trim()) {
         throw new ProfileGenerationError("model_content_missing", metadata);
@@ -533,7 +537,7 @@ export default {
           rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed,
           rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
           refusalText: generated.refusalText, usage: generated.usage, status: "received",
-          metadata: { persistence_status: "pending" },
+          metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [] },
         });
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
@@ -599,6 +603,7 @@ export default {
             metadata: {
               ai_call_started: manualAiCallStarted,
               persistence_failed_after_generation: !!generatedMetadata,
+              provider_attempts: failedMetadata?.providerAttempts || [],
             },
           });
         }
