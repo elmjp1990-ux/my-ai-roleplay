@@ -115,7 +115,7 @@ const cityMap = fs.readFileSync("city-map.js", "utf8");
 assert.match(cityMap, /key=String\(user\.uid\)\+\x27:\x27\+characterKey/, "Affinity cache must be isolated by signed-in user");
 const evaluationWorker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
 const evaluationScheduler = fs.readFileSync("supabase/drafts/schedule-encounter-evaluation-worker.sql", "utf8");
-const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 
 assert.equal((pipeline.match(/^BEGIN;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction start");
 assert.equal((pipeline.match(/^COMMIT;$/gm) || []).length, 1, "Encounter SQL draft must contain one transaction end");
