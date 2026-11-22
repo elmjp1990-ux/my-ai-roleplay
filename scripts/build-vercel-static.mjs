@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 const root = process.cwd();
@@ -28,6 +29,13 @@ if (!handlerOutput || handlerOutput.imports.some((item) => !item.external)) {
 }
 if (!fs.existsSync(path.join(generatedApiDir, 'encounter-schedule-organizer-handler.mjs'))) {
   throw new Error('Encounter schedule handler bundle was not emitted inside api/');
+}
+// Load the emitted ESM artifact in Node exactly as the Vercel Function will.
+// Importing the module is safe: provider/database work starts only when the
+// exported request handler is called.
+const bundledHandler = await import(pathToFileURL(path.join(generatedApiDir, 'encounter-schedule-organizer-handler.mjs')).href);
+if (typeof bundledHandler.handleEncounterScheduleOrganizer !== 'function') {
+  throw new Error('Encounter schedule handler bundle failed its runtime export smoke test');
 }
 
 // Explicit deployment allowlist. Keep repository tooling, SQL, drafts, and unused
