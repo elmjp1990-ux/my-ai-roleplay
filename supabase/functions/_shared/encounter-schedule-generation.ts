@@ -47,7 +47,7 @@ const SCENE_ALIASES: Record<string, string> = {
   bar: "night-bar", pub: "night-bar", 酒吧: "night-bar", 酒館: "night-bar", 夜店: "night-bar", 夜間酒吧: "night-bar", 歸途: "night-bar",
   公司: "commercial", 代辦所: "commercial", 商辦: "commercial", 辦公大樓: "commercial", 辦公室: "commercial", 企業大樓: "commercial",
   機場: "airport", airport: "airport",
-  公園: "park", park: "park",
+  公園: "park", 中央公園: "park", park: "park",
   公寓: "apartment", 住宅: "apartment", apartment: "apartment", 住所: "apartment", 客戶家: "apartment",
   高級公寓: "luxury-apartment", 豪宅: "luxury-apartment", 別墅: "luxury-apartment",
   livehouse: "live-house", "live house": "live-house", 現場音樂: "live-house", 音樂展演: "live-house", 展演廳: "live-house", 展演空間: "live-house",
