@@ -267,7 +267,7 @@ Deno.test("maps existing character schedule locations without rewriting natural 
   ]);
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(weekday) }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
-  const options = parsed.characters[0].variants.weekday.slots[8].options;
+  const options = parsed.characters[0].variants.weekday[8].options;
   if (options[0].location_key !== "live-house" || options[0].location_description !== "Livehouse") {
     throw new Error("Livehouse label must map to Live House without rewriting the original label");
   }
