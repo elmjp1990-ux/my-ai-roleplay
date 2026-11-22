@@ -402,7 +402,7 @@ function validateHourlySchedule(
       if (!isValidEncounterLocationLabel(locationDescription)) {
         errors.push(blockLabel + "_option_" + optionIndex + "_location_invalid");
       }
-      if (Array.from(activity).length < 10 || Array.from(activity).length > 30) {
+      if (Array.from(activity).length < 8 || Array.from(activity).length > 30) {
         errors.push(blockLabel + "_option_" + optionIndex + "_activity_length_invalid");
       }
       if (typeof rawOption.is_outdoor !== "boolean") {
@@ -421,7 +421,7 @@ function validateHourlySchedule(
         rainActivity = text(rawOption.rain_fallback_activity);
         if (!isValidEncounterLocationLabel(rainLocationDescription) ||
           (rainLocationKey !== null && !RAIN_FALLBACK_SCENE_KEYS.has(rainLocationKey)) ||
-          Array.from(rainActivity).length < 10 || Array.from(rainActivity).length > 30) {
+          Array.from(rainActivity).length < 8 || Array.from(rainActivity).length > 30) {
           errors.push(blockLabel + "_option_" + optionIndex + "_rain_fallback_invalid");
         }
       }
@@ -540,10 +540,10 @@ export function buildEncounterScheduleBatchMessages(
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
     "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 20 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時不得使用機場，應依角色背景自行推導合理地點。",
-    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。必須按小時逐一輸出，完整包含 00、01、02、03、04、05、06、07、08、09、10、11、12、13、14、15、16、17、18、19、20、21、22、23 共 24 格；不可因角色睡眠、休息、待命、沒有工作或某時段不重要而省略。完成草稿後，輸出前先自我檢查兩種 day_type 的時段清單：每種均為 24 格、每格恰好 1 小時、起訖連續且從 00:00 開始至隔日 00:00 結束，沒有缺漏、重複、重疊或跨時段合併；若檢查失敗，必須先修正完整 JSON 再輸出。每個時段必須提供 2–3 個選項，不得少於 2 個或多於 3 個；即使固定工作或睡眠，也必須提出至少兩種符合角色背景的合理活動或情境，不得用單一選項 100% 規避機率，也不可為湊數虛構不合理活動。每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 10–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率，依角色日常發生可能性設定，不可全部固定相同權重。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
+    "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。必須按小時逐一輸出，完整包含 00、01、02、03、04、05、06、07、08、09、10、11、12、13、14、15、16、17、18、19、20、21、22、23 共 24 格；不可因角色睡眠、休息、待命、沒有工作或某時段不重要而省略。完成草稿後，輸出前先自我檢查兩種 day_type 的時段清單：每種均為 24 格、每格恰好 1 小時、起訖連續且從 00:00 開始至隔日 00:00 結束，沒有缺漏、重複、重疊或跨時段合併；若檢查失敗，必須先修正完整 JSON 再輸出。每個時段必須提供 2–3 個選項，不得少於 2 個或多於 3 個；即使固定工作或睡眠，也必須提出至少兩種符合角色背景的合理活動或情境，不得用單一選項 100% 規避機率，也不可為湊數虛構不合理活動。每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 8–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率，依角色日常發生可能性設定，不可全部固定相同權重。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
     "行程只分 weekday 與 holiday；節日、國定假日與補班日由系統依台灣日曆映射到相應日期類型，不要另外生成 special_events，也不可自行推算角色生日。",
-    "戶外時段必須提供合理的雨天替代地點與替代行為，雨天行為也限制 10–30 個中文字；優先選擇室內場所。室內時段通常可將 rain_fallback_location 與 rain_fallback_activity 設為 null，但若角色在雨天改變活動或選擇不出門，AI 也可提供合理備案。雨天備案不必強制對應現有地圖場景；無法媒合時保留自然地點描述並由系統留空場景 key。是否戶外及地點對應何種系統場景，由系統判斷。",
+    "戶外時段必須提供合理的雨天替代地點與替代行為，雨天行為也限制 8–30 個中文字；優先選擇室內場所。室內時段通常可將 rain_fallback_location 與 rain_fallback_activity 設為 null，但若角色在雨天改變活動或選擇不出門，AI 也可提供合理備案。雨天備案不必強制對應現有地圖場景；無法媒合時保留自然地點描述並由系統留空場景 key。是否戶外及地點對應何種系統場景，由系統判斷。",
     "is_outdoor 必須依活動實際發生的空間判斷，不能只看地點名稱；地點描述與活動空間是兩個獨立欄位。客戶家維修、搬家、清潔等工作發生在室內；餐廳／小吃店用餐、超商內購物或結帳都屬室內。POYOZZ 特別規則：角色在自己公寓陽台抽菸仍判定為室內，地點使用住所。計程車內送客屬車內活動，is_outdoor=false，地點可寫「街頭」，不可錯掛在餐廳，也不可建立或要求計程車場景；角色下車後在街頭道別或步行才判定為戶外。不得因地點對應到街道或商圈就把車內／店內活動標為戶外。",
 
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
