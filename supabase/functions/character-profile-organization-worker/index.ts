@@ -350,7 +350,7 @@ async function recordProfileUsage(
 }
 
 export default {
-  fetch: withSupabase({ auth: "secret:default" }, async (request, ctx) => {
+  fetch: withSupabase({ auth: ["user", "secret:default"] }, async (request, ctx) => {
     if (request.method !== "POST") {
       return Response.json({ error: "method_not_allowed" }, { status: 405 });
     }
@@ -358,23 +358,134 @@ export default {
     if (!supabase) {
       return Response.json({ error: "worker_admin_context_missing" }, { status: 500 });
     }
+
+    let body: Record<string, unknown> = {};
+    try {
+      const parsed = await request.json();
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) body = parsed;
+    } catch {
+      return Response.json({ error: "invalid_json" }, { status: 400 });
+    }
+    const mode = typeof body.mode === "string" ? body.mode : "scheduled";
+    const isManualUser = ctx.authMode === "user";
+    const authorId = isManualUser
+      ? String((ctx.userClaims as any)?.id || (ctx.userClaims as any)?.sub || "")
+      : "";
+
+    if (isManualUser) {
+      if (Deno.env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || !authorId) {
+        return Response.json({ error: "manual_profile_trigger_disabled" }, { status: 403 });
+      }
+      if (mode === "status") {
+        const { data: nextJob, error: nextError } = await supabase
+          .from("encounter_schedule_generation_jobs")
+          .select("character_id")
+          .eq("author_id", authorId)
+          .eq("status", "pending")
+          .order("queued_at", { ascending: true })
+          .order("character_id", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (nextError) return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
+        if (!nextJob?.character_id) {
+          return Response.json({ status: "no_pending_schedule_jobs", profile_ready: false });
+        }
+        const [characterResult, profileResult, jobResult] = await Promise.all([
+          supabase.from("characters").select("name")
+            .eq("id", nextJob.character_id).eq("author_id", authorId).maybeSingle(),
+          supabase.rpc("get_character_ai_profile_for_chat", {
+            p_character_id: nextJob.character_id,
+            p_author_id: authorId,
+          }),
+          supabase.from("character_profile_organization_jobs")
+            .select("status,last_error_code,updated_at")
+            .eq("character_id", nextJob.character_id).eq("author_id", authorId).maybeSingle(),
+        ]);
+        if (characterResult.error || profileResult.error || jobResult.error) {
+          return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
+        }
+        const profile = profileResult.data && typeof profileResult.data === "object" &&
+          !Array.isArray(profileResult.data) ? profileResult.data : null;
+        return Response.json({
+          status: "available",
+          next_character_id: nextJob.character_id,
+          next_character_name: characterResult.data?.name || "角色",
+          profile_ready: !!profile,
+          profile_job_status: jobResult.data?.status || "missing",
+          profile_error_code: jobResult.data?.last_error_code || null,
+          profile_updated_at: jobResult.data?.updated_at || null,
+          profile_preview: profile,
+          model: CHARACTER_PROFILE_MODEL,
+        });
+      }
+      if (mode !== "manual") {
+        return Response.json({ error: "manual_profile_mode_only" }, { status: 403 });
+      }
+    } else if (mode !== "scheduled") {
+      return Response.json({ error: "scheduled_profile_worker_only" }, { status: 403 });
+    }
+
     const apiKey = Deno.env.get("OPENROUTER_API_KEY");
     if (!apiKey) {
       return Response.json({ error: "profile_worker_provider_key_missing" }, { status: 503 });
     }
 
-    const { data, error } = await supabase.rpc("claim_character_profile_organization_jobs", {
-      p_limit: MAX_BATCH,
-    });
-    if (error) {
-      return Response.json({
-        error: "profile_job_claim_failed",
-        code: safeCode(error, "claim_failed"),
-      }, { status: 500 });
+    let items: WorkItem[] = [];
+    let manualCharacterName = "";
+    if (isManualUser) {
+      const { data: claim, error } = await supabase.rpc("claim_next_encounter_character_profile_job", {
+        p_author_id: authorId,
+      });
+      if (error) {
+        return Response.json({
+          error: "profile_job_claim_failed",
+          code: safeCode(error, "claim_failed"),
+        }, { status: 500 });
+      }
+      const claimRow = claim && typeof claim === "object" ? claim as Record<string, unknown> : {};
+      const claimStatus = String(claimRow.status || "not_ready");
+      if (claimStatus === "already_completed") {
+        return Response.json({
+          status: "already_completed",
+          character_id: claimRow.character_id || null,
+          character_name: claimRow.character_name || "角色",
+          profile_preview: claimRow.profile || null,
+          model: CHARACTER_PROFILE_MODEL,
+          ai_called: false,
+        });
+      }
+      if (claimStatus !== "claimed") {
+        return Response.json({
+          status: claimStatus,
+          character_id: claimRow.character_id || null,
+          character_name: claimRow.character_name || null,
+          error_code: claimRow.error_code || null,
+          job_status: claimRow.job_status || null,
+          available_at: claimRow.available_at || null,
+          ai_called: false,
+        }, { status: claimStatus === "no_pending_schedule_jobs" ? 200 : 409 });
+      }
+      const item = claimRow.item && typeof claimRow.item === "object"
+        ? claimRow.item as WorkItem : null;
+      if (!item) return Response.json({ error: "claimed_job_invalid" }, { status: 503 });
+      items = [item];
+      manualCharacterName = String(claimRow.character_name || "角色");
+    } else {
+      const { data, error } = await supabase.rpc("claim_character_profile_organization_jobs", {
+        p_limit: MAX_BATCH,
+      });
+      if (error) {
+        return Response.json({
+          error: "profile_job_claim_failed",
+          code: safeCode(error, "claim_failed"),
+        }, { status: 500 });
+      }
+      items = (Array.isArray(data) ? data : []).slice(0, MAX_BATCH) as WorkItem[];
     }
 
-    const items = (Array.isArray(data) ? data : []).slice(0, MAX_BATCH) as WorkItem[];
     const summary = { claimed: items.length, completed: 0, retried: 0, failed: 0, stale: 0 };
+    let manualProfilePreview: Record<string, unknown> | null = null;
+    let manualFailureCode: string | null = null;
 
     for (const item of items) {
       let usageRecorded = false;
@@ -383,6 +494,9 @@ export default {
           !item.lease_token || !Number.isSafeInteger(item.lease_generation) ||
           !item.source_payload || typeof item.source_payload !== "object") {
           throw new Error("claimed_job_invalid");
+        }
+        if (isManualUser && item.author_id !== authorId) {
+          throw new Error("manual_profile_author_mismatch");
         }
         const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
@@ -400,11 +514,14 @@ export default {
         // The provider has already completed and may have billed this request.
         // Retry persistence with the same in-memory profile; never regenerate here.
         const status = await completeProfileWithRetry(supabase, item, generated.profile);
-        if (status === "completed") summary.completed++;
-        else if (status === "stale_source") summary.stale++;
+        if (status === "completed") {
+          summary.completed++;
+          if (isManualUser) manualProfilePreview = generated.profile;
+        } else if (status === "stale_source") summary.stale++;
         else summary.stale++;
       } catch (error) {
         const code = safeCode(error, "profile_generation_failed");
+        if (isManualUser) manualFailureCode = code;
         if (!usageRecorded && item.character_id && item.author_id && item.source_hash) {
           const failedUsage = error instanceof ProfileGenerationError ? error.metadata : null;
           if (failedUsage) await recordAiGenerationDiagnostic(supabase, {
@@ -440,6 +557,21 @@ export default {
           summary.failed++;
         }
       }
+    }
+
+    if (isManualUser) {
+      const completed = summary.completed === 1 && !!manualProfilePreview;
+      return Response.json({
+        status: completed ? "completed" : summary.failed ? "failed" : summary.stale ? "stale_source" : "not_completed",
+        ok: completed,
+        character_id: items[0]?.character_id || null,
+        character_name: manualCharacterName || "角色",
+        model: CHARACTER_PROFILE_MODEL,
+        profile_preview: manualProfilePreview,
+        error_code: manualFailureCode,
+        ai_called: items.length === 1,
+        summary,
+      }, { status: summary.failed === 0 ? 200 : 207 });
     }
 
     return Response.json({ ok: summary.failed === 0, summary }, {
