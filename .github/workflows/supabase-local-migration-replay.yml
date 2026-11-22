@@ -318,6 +318,7 @@ jobs:
           # Profile queue and private derived-profile storage are replayed only
           # in this disposable local Supabase database.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119160000_character_profile_life_context_version.sql
 
       - name: Apply formal Encounter schedule pipeline migration
         shell: bash
