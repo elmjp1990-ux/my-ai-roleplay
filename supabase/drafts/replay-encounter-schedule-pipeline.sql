@@ -28,8 +28,11 @@ BEGIN
   ) INTO v_definition;
   IF pg_catalog.strpos(v_definition, 'NOT BETWEEN 2 AND 3') = 0
      OR pg_catalog.strpos(v_definition, 'v_multi_option_hours < 8') > 0
-     OR pg_catalog.strpos(v_definition, 'NOT BETWEEN 1 AND 4') = 0 THEN
-    RAISE EXCEPTION 'strict_hourly_schedule_output_contract_not_installed';
+     OR pg_catalog.strpos(v_definition, 'NOT BETWEEN 1 AND 20') = 0
+     OR pg_catalog.strpos(v_definition, 'NOT BETWEEN 8 AND 30') = 0
+     OR pg_catalog.strpos(v_definition, 'rain_fallback_activity'' IS NULL') = 0
+     OR pg_catalog.strpos(v_definition, 'schedule_hourly_option_unexpected_rain_fallback') > 0 THEN
+    RAISE EXCEPTION 'natural_location_and_rain_fallback_contract_not_installed';
   END IF;
 END;
 $strict_schedule_output_contract$;
