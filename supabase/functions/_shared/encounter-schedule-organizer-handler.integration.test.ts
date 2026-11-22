@@ -31,9 +31,9 @@ const validOutput = JSON.stringify({
   scenes: [],
 });
 
-function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" = "success") {
-  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null; profileContext: boolean } = {
-    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null, profileContext: false,
+function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "profile_missing" | "profile_incomplete" | "profile_disappears" = "success") {
+  const calls: { provider: number; claim: number; publish: number; usage: number; output: number; nextSelectorAuthor: string | null; claimAuthor: string | null; profileContext: boolean; profileRead: number; release: number } = {
+    provider: 0, claim: 0, publish: 0, usage: 0, output: 0, nextSelectorAuthor: null, claimAuthor: null, profileContext: false, profileRead: 0, release: 0,
   };
   const admin = {
     from(table: string) {
@@ -90,7 +90,9 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
         return { data: { status: "claimed", batch_id: batchId, lease_token: leaseToken, characters: [source] }, error: null };
       }
       if (name === "get_character_ai_profile_for_chat") {
-        if (mode === "profile_missing") return { data: null, error: null };
+        calls.profileRead++;
+        if (mode === "profile_missing" ||
+            (mode === "profile_disappears" && calls.profileRead > 1)) return { data: null, error: null };
         const section = { status: "not_provided", items: [] };
         if (mode === "profile_incomplete") {
           return { data: { schema_version: "1.1", life_context: { work_environment: section } }, error: null };
@@ -114,7 +116,7 @@ function createMock(mode: "success" | "publish_error" | "invalid_ai_output" | "p
           ? { data: null, error: { message: "mock_publish_failure" } }
           : { data: { status: "completed", published_character_count: 1, unplaced_character_count: 0 }, error: null };
       }
-      if (name === "fail_encounter_schedule_batch") return { data: true, error: null };
+      if (name === "fail_encounter_schedule_batch") { calls.release++; return { data: true, error: null }; }
       throw new Error("Unexpected RPC: " + name);
     },
   };
@@ -235,5 +237,17 @@ Deno.test("manual POST rejects incomplete Profile life-context schema before sch
   if (response.status !== 409 || body.error !== "character_profile_not_ready" ||
       mock.calls.claim !== 0 || mock.calls.provider !== 0 || mock.calls.publish !== 0) {
     throw new Error("Incomplete Profile reached schedule generation: " + JSON.stringify({ body, calls: mock.calls }));
+  }
+});
+
+
+Deno.test("manual POST releases the schedule lease without AI if Profile becomes stale after preflight", async () => {
+  const mock = createMock("profile_disappears");
+  const response = await invoke(mock);
+  const body = await response.json();
+  if (response.status !== 409 || body.error !== "character_profile_not_ready" ||
+      body.ai_called !== false || body.schedule_job_released !== true ||
+      mock.calls.claim !== 1 || mock.calls.release !== 1 || mock.calls.provider !== 0) {
+    throw new Error("A stale Profile crossed the post-claim gate: " + JSON.stringify({ body, calls: mock.calls }));
   }
 });
