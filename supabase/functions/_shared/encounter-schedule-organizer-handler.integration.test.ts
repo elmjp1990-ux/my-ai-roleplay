@@ -37,11 +37,12 @@ function createMock(mode: "success" | "publish_error" = "success") {
     from(table: string) {
       let action = "select";
       let payload: any;
+      const filters: Array<[string, unknown]> = [];
       const query: any = {
         select(_columns?: string, options?: any) { action = options?.head ? "count" : action; return query; },
         insert(value: any) { action = "insert"; payload = value; return query; },
         update(value: any) { action = "update"; payload = value; return query; },
-        eq() { return query; }, is() { return query; }, gt() { return query; },
+        eq(column: string, value: unknown) { filters.push([column, value]); return query; }, is(column: string, value: unknown) { filters.push([column, value]); return query; }, gt() { return query; },
         in() { return query; }, order() { return query; }, limit() { return query; },
         not() { return query; },
         async maybeSingle() {
@@ -54,7 +55,11 @@ function createMock(mode: "success" | "publish_error" = "success") {
         },
         then(resolve: any, reject: any) {
           let result: any = { data: null, error: null, count: 0 };
-          if (table === "encounter_schedule_generation_jobs" && action === "count") result.count = 0;
+          if (table === "encounter_schedule_generation_jobs" && action === "count") {
+            const status = filters.find(([column]) => column === "status")?.[1];
+            const pendingQuery = status === "pending";
+            result.count = pendingQuery ? 1 : 0;
+          }
           if (table === "encounter_schedule_generation_usage" && action === "insert") calls.usage++;
           return Promise.resolve(result).then(resolve, reject);
         },
