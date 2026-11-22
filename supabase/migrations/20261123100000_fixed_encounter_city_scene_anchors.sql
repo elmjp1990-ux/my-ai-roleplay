@@ -178,8 +178,10 @@ BEGIN
   IF COALESCE(auth.role(), '') <> 'service_role' THEN
     RAISE EXCEPTION 'service_role_required' USING ERRCODE = '42501';
   END IF;
-  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array'
-     OR jsonb_array_length(p_scenes) > 14 THEN
+  IF jsonb_typeof(p_scenes) IS DISTINCT FROM 'array' THEN
+    RAISE EXCEPTION 'scene_metadata_array_invalid' USING ERRCODE = '22023';
+  END IF;
+  IF jsonb_array_length(p_scenes) > 14 THEN
     RAISE EXCEPTION 'scene_metadata_array_invalid' USING ERRCODE = '22023';
   END IF;
   IF (
