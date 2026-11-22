@@ -258,7 +258,14 @@
  'department-store':{icon:'🛍️',heading:'從精品櫥窗到美食樓層',description:'明亮的中庭連接各式品牌櫃位、服飾樓層與餐飲空間。人潮來去，購物、約會與臨時起意的行程都能在這裡展開。',eventLabel:'場景亮點',eventTitle:'中庭的週末人潮',eventDescription:'適合約會逛街、挑選禮物、偶遇熟人或在美食樓層稍作停留。'},
  bookstore:{icon:'📚',heading:'在書頁之間慢下腳步',description:'木質書架與紙張氣味讓時間放慢。新書展示區、靠窗閱讀座位與安靜的書架轉角，各自藏著不同的相遇方式。',eventLabel:'場景亮點',eventTitle:'同一本書的選擇',eventDescription:'適合交換閱讀心得、尋找某本書、安靜陪伴或從共同興趣開始的故事。'},
  cafe:{icon:'☕',heading:'在城市裡，找個地方歇歇腳',description:'咖啡香從吧台飄向窗邊座位，甜點櫃裡擺著當季蛋糕。這裡適合短暫休息、工作、約會，也適合和某個人慢慢聊起近況。',eventLabel:'場景亮點',eventTitle:'今日甜點的話題',eventDescription:'甜點櫃可作為聊天與約會的情境；實際品項、庫存與活動尚未連接動態資料。'},
- park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'}
+ park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'},
+ waterfront:{icon:'🌊',heading:'沿著河岸與港灣散步',description:'河堤步道、碼頭與水岸景觀連接城市不同區域，白天適合散步與吹風，夜晚則能欣賞水面與城市燈光。',eventLabel:'場景亮點',eventTitle:'水岸邊的偶遇',eventDescription:'適合散步、談心、看夜景或在河堤旁短暫停留。'},
+ university:{icon:'🎓',heading:'校園裡的日常與青春',description:'教學大樓、圖書館、操場與校園廣場構成日常動線，下課鐘聲與社團活動讓不同故事在此交會。',eventLabel:'場景亮點',eventTitle:'下課後的校園時光',eventDescription:'適合課堂、社團、校園活動、圖書館自習與同學間的相遇。'},
+ 'shopping-street':{icon:'🛍️',heading:'街邊店家交織的生活街區',description:'小吃攤、花店、咖啡廳與各式街邊店沿街排列，從白天採買到夜晚散步，都能遇見城市的日常風景。',eventLabel:'場景亮點',eventTitle:'街角的日常活動',eventDescription:'店家活動、臨時攤位與街頭表演可依當期內容更新，不改變固定地點。'},
+ hospital:{icon:'🏥',heading:'城市裡的中央醫院',description:'門診大廳、候診區與院區周邊維持著忙碌而有秩序的節奏，醫療人員、病患與訪客各自有不同的故事。',eventLabel:'場景亮點',eventTitle:'醫院裡的日常',eventDescription:'適合就診、探病、值班、陪伴與醫院周邊的生活情節。'},
+ 'luxury-apartment':{icon:'🏙️',heading:'城市高處的私人居所',description:'門禁、接待大廳與高樓層景觀構成安靜而講究隱私的住宅空間，住戶的日常多半在熟悉的生活圈中展開。',eventLabel:'場景亮點',eventTitle:'大廳裡的偶然相遇',eventDescription:'適合住戶日常、拜訪、鄰里互動或私人生活故事。'},
+ 'convenience-store':{icon:'🏪',heading:'隨時亮著燈的便利商店',description:'明亮的貨架、微波爐與靠窗座位，讓這裡成為城市裡隨時能短暫停留的地方。',eventLabel:'場景亮點',eventTitle:'深夜補給時間',eventDescription:'適合買宵夜、臨時採買、短暫休息或深夜偶遇。'},
+ 'private-club':{icon:'🥂',heading:'低調而私密的高級會所',description:'接待大廳、包廂與專屬餐飲空間提供隱密而舒適的聚會環境，商務往來與私人邀約都可能在此發生。',eventLabel:'場景亮點',eventTitle:'今晚的私人邀約',eventDescription:'適合商務聚會、私人餐敘、高級娛樂與會員活動。'}
  };
  const renderCityDynamicScenes=(rows)=>{
  const svg=$('cityBuildingLayer');
