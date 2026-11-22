@@ -209,27 +209,29 @@ export function normalizeEncounterSceneKey(
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
-  // Explicit luxury destinations use K. Generic rooms use K only when the
-  // character's own residence is explicitly identified as luxury; otherwise L.
+  // Customer-home classification depends on the customer's explicit home
+  // description, not on the character's own residence profile.
   const luxuryResidencePattern = /(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i;
   if (/客戶家/.test(compact) && luxuryResidencePattern.test(activity)) {
     return "luxury-apartment";
   }
+
+  // Canonical keys and exact aliases are authoritative destination labels.
+  // Resolve them before generic residence heuristics and activity inference.
+  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
+  const exactAlias = SCENE_ALIASES[raw] || SCENE_ALIASES[original];
+  if (exactAlias) return exactAlias;
+
+  // Generic rooms use K only when the character's own residence is explicitly
+  // identified as luxury; otherwise ordinary residential labels resolve to L.
   if (luxuryResidencePattern.test(compact)) return "luxury-apartment";
   if (/(臥室|臥房|客廳|書房|廚房|陽台|房間|房內|bedroom|livingroom|studyroom|kitchen|balcony)/i.test(compact) &&
       hasExplicitLuxuryResidenceContext(characterResidentialContext)) {
     return "luxury-apartment";
   }
-  if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|客廳|書房|廚房|陽台|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
+  if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|客廳|書房|廚房|陽台|房間|房內|宿舍|bedroom|apartment|rented\\s*room)/i.test(compact)) {
     return "apartment";
   }
-
-  // Canonical keys and exact aliases are authoritative destination labels.
-  // Resolve them before any activity inference so incidental music/performance
-  // keywords cannot move a character away from a named airport, park, office, etc.
-  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
-  const exactAlias = SCENE_ALIASES[raw] || SCENE_ALIASES[original];
-  if (exactAlias) return exactAlias;
 
   // Explicit fixed destinations take precedence over incidental activity keywords.
   if (/(夜間酒吧|酒吧|酒館|夜店|歸途)/i.test(compact)) return "night-bar";
@@ -268,8 +270,7 @@ export function normalizeEncounterSceneKey(
     return "live-house";
   }
 
-  if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
-  return SCENE_ALIASES[raw] || SCENE_ALIASES[original] || null;
+  return null;
 }
 
 const SLEEPING_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢/;
