@@ -8,7 +8,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = ''
-AS $
+AS $function$
   SELECT jsonb_build_object(
     'character_id', j.character_id,
     'character_name', c.name
@@ -24,7 +24,7 @@ AS $
     AND c.deleted_at IS NULL
   ORDER BY j.queued_at, j.character_id
   LIMIT 1;
-$;
+$function$;
 
 REVOKE ALL ON FUNCTION public.get_next_encounter_schedule_character_for_author(uuid)
   FROM PUBLIC, anon, authenticated;
