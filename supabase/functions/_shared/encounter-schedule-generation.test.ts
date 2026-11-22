@@ -52,7 +52,7 @@ const hourlyBlocks = () => Array.from({ length: 24 }, (_, hour) => {
   if (hour === 17) return block(hour, [
     option({
       weight: 75, location: "公園", activity: "沿著公園步道散步並聽音樂",
-      is_outdoor: true, rain_fallback_location: "咖啡廳", rain_fallback_activity: "改到咖啡廳坐著聽音樂",
+      is_outdoor: true, rain_fallback_location: "便利商店", rain_fallback_activity: "改到便利商店坐著聽音樂",
     }),
     option({ weight: 25, location: "公寓", activity: "留在家中整理房間與生活用品" }),
   ]);
