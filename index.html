@@ -10095,7 +10095,9 @@ async function loadEncounterScheduleTestTools(){
   section.hidden=false;
   const status=section.querySelector('#encounterScheduleTestStatus');
   const button=section.querySelector('[data-action="organize-encounter-schedules"]');
-  if(button){button.disabled=true;button.dataset.aiEnabled='false';}
+  const profileButton=section.querySelector('[data-action="organize-character-profile"]');
+  if(button){button.disabled=true;button.dataset.aiEnabled='false';button.dataset.profileReady='false';}
+  if(profileButton){profileButton.disabled=true;profileButton.dataset.aiEnabled='false';}
   const client=window.mySupabase;
   if(!client){
     if(status)status.textContent='目前無法連線至測試服務。';
@@ -10119,7 +10121,6 @@ async function loadEncounterScheduleTestTools(){
     const failed=Number(data.failed_character_count||0);
     const profileStatus=document.getElementById('characterProfileTestStatus');
     const profilePreview=document.getElementById('characterProfilePreview');
-    const profileButton=section.querySelector('[data-action="organize-character-profile"]');
     let profileReady=false;
     let profileTargetAvailable=false;
     let profileJobStatus='unknown';
