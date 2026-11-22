@@ -494,6 +494,13 @@ jobs:
           $diagnostics_check$;
           SQL
 
+      - name: Apply fixed A–N Encounter city scene anchors
+        shell: bash
+        run: |
+          set -euo pipefail
+          # This migration runs only in the disposable local Supabase database.
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql
+
       - name: Replay hourly weighted Encounter schedules and weather fallback
         shell: bash
         run: |
@@ -518,7 +525,7 @@ jobs:
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-batch-semantics.sql
 
-      - name: Replay dynamic scene catalog and legacy schedule filters
+      - name: Replay fixed A–N scene catalog and legacy schedule filters
         shell: bash
         run: |
           set -euo pipefail
