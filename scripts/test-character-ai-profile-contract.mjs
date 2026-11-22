@@ -176,6 +176,12 @@ assert.match(storyTurn, /get_character_ai_profile_for_chat/,
 assert.match(storyTurn, /collectDerivedPrivateProfileValues/,
   "Private-derived evidence must join the server-side output leak guard");
 assert.match(scheduleOrganizer, /get_character_ai_profile_for_chat/, "Schedule worker must read the saved current profile without generating a second profile");
+assert.match(scheduleOrganizer, /derived_character_profile/,
+  "Schedule handler must attach the saved derived Character AI Profile to the claimed role");
+assert.match(scheduleGeneration, /character_ai_profile: isRecord\(source\.derived_character_profile\)/,
+  "Schedule prompt must receive the saved derived Profile sections, not only raw creator fields");
+assert.match(scheduleGeneration, /unknowns 與 source_conflicts/,
+  "Schedule prompt must treat unknowns and source conflicts as unresolved rather than inventing details");
 assert.match(scheduleOrganizer, /character_profile_not_ready/, "Manual schedule generation must stop before claiming a schedule job when the current Profile is missing");
 assert.match(scheduleOrganizer, /schedule_job_claimed: false/, "A missing Profile must not leave a claimed schedule lease");
 assert.ok(
