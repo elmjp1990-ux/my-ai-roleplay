@@ -23,3 +23,7 @@ verify_jwt = false
 [functions.encounter-evaluation-worker]
 # The worker verifies the exact service-role bearer token before claiming due jobs.
 verify_jwt = false
+
+[functions.character-profile-organization-worker]
+# The worker verifies user JWTs for manual TEST actions and named secret keys for future internal scheduling.
+verify_jwt = false
