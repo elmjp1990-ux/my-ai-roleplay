@@ -199,8 +199,10 @@ BEGIN
 
   FOR v_scene IN SELECT value FROM jsonb_array_elements(p_scenes)
   LOOP
-    IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object'
-       OR (SELECT pg_catalog.count(*) FROM jsonb_object_keys(v_scene)) <> 8 THEN
+    IF jsonb_typeof(v_scene) IS DISTINCT FROM 'object' THEN
+      RAISE EXCEPTION 'scene_metadata_shape_invalid' USING ERRCODE = '22023';
+    END IF;
+    IF (SELECT pg_catalog.count(*) FROM jsonb_object_keys(v_scene)) <> 8 THEN
       RAISE EXCEPTION 'scene_metadata_shape_invalid' USING ERRCODE = '22023';
     END IF;
 
