@@ -32,36 +32,36 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
 
-  v_old := 'IF (v_slot->>''is_outdoor'')::boolean IS TRUE THEN' || E'\\n' ||
-    '            IF COALESCE(v_slot->>''rain_fallback_location_key'', '''') NOT IN (' || E'\\n' ||
-    '              ''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || E'\\n' ||
-    '              ''department-store'', ''bookstore'', ''cafe''' || E'\\n' ||
-    '            )' || E'\\n' ||
-    '                 OR char_length(COALESCE(v_slot->>''rain_fallback_activity'', '''')) NOT BETWEEN 10 AND 30 THEN' || E'\\n' ||
-    '              RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_invalid'' USING ERRCODE = ''22023'';' || E'\\n' ||
-    '            END IF;' || E'\\n' ||
-    '          ELSIF v_slot->>''rain_fallback_location_key'' IS NOT NULL' || E'\\n' ||
-    '             OR v_slot->>''rain_fallback_activity'' IS NOT NULL THEN' || E'\\n' ||
-    '            RAISE EXCEPTION ''schedule_hourly_option_unexpected_rain_fallback'' USING ERRCODE = ''22023'';' || E'\\n' ||
+  v_old := 'IF (v_slot->>''is_outdoor'')::boolean IS TRUE THEN' || chr(10) ||
+    '            IF COALESCE(v_slot->>''rain_fallback_location_key'', '''') NOT IN (' || chr(10) ||
+    '              ''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || chr(10) ||
+    '              ''department-store'', ''bookstore'', ''cafe''' || chr(10) ||
+    '            )' || chr(10) ||
+    '                 OR char_length(COALESCE(v_slot->>''rain_fallback_activity'', '''')) NOT BETWEEN 10 AND 30 THEN' || chr(10) ||
+    '              RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_invalid'' USING ERRCODE = ''22023'';' || chr(10) ||
+    '            END IF;' || chr(10) ||
+    '          ELSIF v_slot->>''rain_fallback_location_key'' IS NOT NULL' || chr(10) ||
+    '             OR v_slot->>''rain_fallback_activity'' IS NOT NULL THEN' || chr(10) ||
+    '            RAISE EXCEPTION ''schedule_hourly_option_unexpected_rain_fallback'' USING ERRCODE = ''22023'';' || chr(10) ||
     '          END IF;';
-  v_new := 'IF (v_slot->>''is_outdoor'')::boolean IS TRUE' || E'\\n' ||
-    '             AND v_slot->>''rain_fallback_activity'' IS NULL THEN' || E'\\n' ||
-    '            RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_missing'' USING ERRCODE = ''22023'';' || E'\\n' ||
-    '          END IF;' || E'\\n' ||
-    '          IF (' || E'\\n' ||
-    '               v_slot->>''rain_fallback_location_key'' IS NOT NULL' || E'\\n' ||
-    '               AND v_slot->>''rain_fallback_location_key'' NOT IN (' || E'\\n' ||
-    '                 ''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || E'\\n' ||
-    '                 ''department-store'', ''bookstore'', ''cafe''' || E'\\n' ||
-    '               )' || E'\\n' ||
-    '             ) OR (' || E'\\n' ||
-    '               v_slot->>''rain_fallback_location_key'' IS NOT NULL' || E'\\n' ||
-    '               AND v_slot->>''rain_fallback_activity'' IS NULL' || E'\\n' ||
-    '             ) OR (' || E'\\n' ||
-    '               v_slot->>''rain_fallback_activity'' IS NOT NULL' || E'\\n' ||
-    '               AND char_length(v_slot->>''rain_fallback_activity'') NOT BETWEEN 8 AND 30' || E'\\n' ||
-    '             ) THEN' || E'\\n' ||
-    '            RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_invalid'' USING ERRCODE = ''22023'';' || E'\\n' ||
+  v_new := 'IF (v_slot->>''is_outdoor'')::boolean IS TRUE' || chr(10) ||
+    '             AND v_slot->>''rain_fallback_activity'' IS NULL THEN' || chr(10) ||
+    '            RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_missing'' USING ERRCODE = ''22023'';' || chr(10) ||
+    '          END IF;' || chr(10) ||
+    '          IF (' || chr(10) ||
+    '               v_slot->>''rain_fallback_location_key'' IS NOT NULL' || chr(10) ||
+    '               AND v_slot->>''rain_fallback_location_key'' NOT IN (' || chr(10) ||
+    '                 ''airport'', ''commercial'', ''night-bar'', ''live-house'', ''apartment'',' || chr(10) ||
+    '                 ''department-store'', ''bookstore'', ''cafe''' || chr(10) ||
+    '               )' || chr(10) ||
+    '             ) OR (' || chr(10) ||
+    '               v_slot->>''rain_fallback_location_key'' IS NOT NULL' || chr(10) ||
+    '               AND v_slot->>''rain_fallback_activity'' IS NULL' || chr(10) ||
+    '             ) OR (' || chr(10) ||
+    '               v_slot->>''rain_fallback_activity'' IS NOT NULL' || chr(10) ||
+    '               AND char_length(v_slot->>''rain_fallback_activity'') NOT BETWEEN 8 AND 30' || chr(10) ||
+    '             ) THEN' || chr(10) ||
+    '            RAISE EXCEPTION ''schedule_hourly_option_rain_fallback_invalid'' USING ERRCODE = ''22023'';' || chr(10) ||
     '          END IF;';
   SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old, '')))
     / pg_catalog.length(v_old) INTO v_count;
