@@ -10085,8 +10085,13 @@ function renderCharacterProfilePreview(profile, characterName, model) {
     const html = content || nested;
     return '<section style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>'+e(label)+' · '+e(section.status||"")+'</strong>'+(html?'<ul class="small" style="margin:5px 0 0;padding-left:20px">'+html+'</ul>':'<p class="small muted" style="margin:4px 0 0">目前沒有可顯示的整理項目</p>')+'</section>';
   }).join("");
+  const unknowns = Array.isArray(profile.unknowns) ? profile.unknowns : [];
+  const conflicts = Array.isArray(profile.source_conflicts) ? profile.source_conflicts : [];
+  const unknownMarkup = '<section style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>待確認的未知資訊 · '+unknowns.length+'</strong>'+(unknowns.length?'<ul class="small" style="margin:5px 0 0;padding-left:20px">'+unknowns.map(item=>'<li>'+e(item)+'</li>').join('')+'</ul>':'<p class="small muted" style="margin:4px 0 0">沒有待確認的未知資訊</p>')+'</section>';
+  const conflictMarkup = '<section style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>來源衝突 · '+conflicts.length+'</strong>'+(conflicts.length?'<ul class="small" style="margin:5px 0 0;padding-left:20px">'+conflicts.map(item=>'<li><strong>'+e(item?.topic||"待釐清項目")+'</strong>：'+e(item?.description||"")+'</li>').join('')+'</ul>':'<p class="small muted" style="margin:4px 0 0">沒有發現來源衝突</p>')+'</section>';
+  const insufficientReason = profile.ooc_rules?.insufficient_source_reason;
   const raw = e(JSON.stringify(profile, null, 2));
-  return '<article class="panel stack" style="padding:12px;gap:8px"><div><strong>'+e(characterName||"角色")+'｜AI 角色資料整理結果</strong><p class="small muted" style="margin:4px 0 0">'+e(model||"DeepSeek V4 Flash 0423")+' · 已保存，可先檢查</p></div>'+summaries+'<details><summary class="small">查看完整 JSON（含來源依據與待釐清項目）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:11px">'+raw+'</pre></details></article>';
+  return '<article class="panel stack" style="padding:12px;gap:8px"><div><strong>'+e(characterName||"角色")+'｜AI 角色資料整理結果</strong><p class="small muted" style="margin:4px 0 0">'+e(model||"DeepSeek V4 Flash 0423")+' · 已保存，可先檢查</p></div>'+summaries+unknownMarkup+conflictMarkup+(insufficientReason?'<p class="small muted">角色一致性規則資料不足：'+e(insufficientReason)+'</p>':'')+'<details><summary class="small">查看完整 JSON（含來源依據與待釐清項目）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:11px">'+raw+'</pre></details></article>';
 }
 
 async function loadEncounterScheduleTestTools(){
