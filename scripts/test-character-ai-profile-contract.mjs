@@ -310,6 +310,23 @@ assert.ok(workerCore.includes("profile_output_too_large") && workerCore.includes
 assert.ok(worker.includes("provider_response_too_large") && worker.includes("requestId: response.headers.get"),
   "Oversized or malformed provider responses must be terminal with a traceable request ID");
 
+assert.ok(worker.includes("updateAiGenerationDiagnostic"),
+  "Profile Worker must update the AI diagnostic after persistence completes or fails");
+assert.ok(worker.includes('status: "received"') && worker.includes('metadata: { persistence_status: "pending" }'),
+  "A valid provider response must remain received until the Profile is persisted");
+assert.ok(worker.includes('status: "completed", failureStage: null, failureCode: null') &&
+  worker.includes('metadata: { persistence_status: "completed" }'),
+  "A Profile diagnostic may be marked completed only after the database completion RPC succeeds");
+assert.ok(worker.includes('failureStage = generatedMetadata ? "profile_persistence" : profileFailureStage(error)'),
+  "The Worker must distinguish provider/output failures from post-generation persistence failures");
+assert.ok(worker.includes('else if (item.character_id && item.author_id && item.source_hash)') &&
+  worker.includes('failureCode: code,\n            validationErrors,'),
+  "Pre-provider validation and claim-item errors must also create a diagnostic record");
+assert.ok(worker.includes('metadata: {\n              ai_call_started: manualAiCallStarted,') &&
+  worker.includes('persistence_failed_after_generation: !!generatedMetadata'),
+  "Failure diagnostics must identify whether AI was called and whether persistence failed afterward");
+
+
 assert.match(coreUtils, /openingMessagePolicy: 'runtime_only_no_profile_refresh'/, "Opening-message edits must be runtime-only");
 assert.match(coreUtils, /const sourceChanged = changed/, "Profile source comparison must remain aligned with the exact database source hash");
 assert.match(coreUtils, /const prev = existingPrivateProfile\?\.personality_profile/, "Profile diff must compare raw persisted values instead of hiding normalization changes");
