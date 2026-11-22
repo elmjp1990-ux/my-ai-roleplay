@@ -463,6 +463,7 @@ export function buildEncounterScheduleBatchMessages(
         : [],
       occupation,
       author_character_profile: characterProfile,
+      character_ai_profile: isRecord(source.derived_character_profile) ? source.derived_character_profile : null,
       character_life_context: isRecord(source.derived_life_context) ? source.derived_life_context : null,
       world_era: text(source.world_era),
       modern_setting_compatible: isEncounterModernMapCompatible(source),
@@ -490,6 +491,7 @@ export function buildEncounterScheduleBatchMessages(
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
     "系統已先完成世界觀分類；本次送入的角色都已由系統判定為現代地圖相容。你不得重新判斷時代、世界觀或地圖資格，也不得輸出 no_matching_location。吸血鬼、狼人、精靈等種族不代表古代；依輸入角色的現代背景推演其日常。必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。",
+    "若輸入包含 character_ai_profile，必須讀取先前角色資料整理 AI 已保存的身份背景、核心個性、內在動機、情緒反應、關係互動、行為主動性、知識界線、說話風格與角色一致性規則，作為推演日常活動、工作內容及社交場景的主要參考；author_character_profile 是作者原始設定，若與整理結果有差異，以作者明示內容為準。unknowns 與 source_conflicts 代表尚未確認，不可自行補造，也不可將 AI 推論寫成作者明示。公開 activity 不得揭露私密資訊。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
     "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 8 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
