@@ -11,6 +11,7 @@ const fileBudgets = {
   'encounter-default-scene.webp': 350_000,
   'index.html': 900_000,
   'wallet-ui.js': 12_000,
+  'chat-keyboard-viewport.js': 8_000,
   'memory-capture.js': 12_000,
   'chat-render-lifecycle.js': 8_000,
   'image-compression.js': 12_000,
@@ -114,6 +115,7 @@ for (const styleAttr of html.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
 const runtimeJs = [
   html,
   fs.readFileSync(path.join(outputDir, 'wallet-ui.js'), 'utf8'),
+  fs.readFileSync(path.join(outputDir, 'chat-keyboard-viewport.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'memory-capture.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'chat-render-lifecycle.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'image-compression.js'), 'utf8'),
