@@ -73,10 +73,11 @@ class ProfileGenerationError extends Error {
 
 function profileFailureStage(error: unknown): string {
   const code = safeCode(error, "profile_generation_failed");
-  if (code === "provider_request_timeout" || code === "provider_outcome_unknown" ||
-      code === "provider_fallback_exhausted") return "provider_request";
-  if (code === "provider_response_too_large" || code.startsWith("openrouter_http_") ||
-      code.startsWith("provider_")) return "provider_response";
+  if (code === "provider_outcome_unknown" && error instanceof ProfileGenerationError &&
+      error.metadata.httpStatus != null) return "provider_response";
+  if (code === "provider_request_timeout" || code === "provider_outcome_unknown") return "provider_request";
+  if (code === "provider_fallback_exhausted" || code === "provider_response_too_large" ||
+      code.startsWith("openrouter_http_") || code.startsWith("provider_")) return "provider_response";
   if (code === "model_content_missing" || code === "model_json_invalid") return "output_parsing";
   if (code.startsWith("profile_schema_invalid_")) return "output_validation";
   if (code === "profile_persistence_failed_after_generation") return "profile_persistence";
