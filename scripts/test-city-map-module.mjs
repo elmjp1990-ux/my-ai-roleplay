@@ -247,3 +247,20 @@ assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*
 assert.match(cityMap, /const isSleepingSchedule=/);
 assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
 assert.match(cityMap, /const left=.*meetControl/);
+
+assert.match(cityMap, /id="cityMapPlaceSubtitle"/,
+  'Scene title row must provide a dedicated subtitle element.');
+assert.doesNotMatch(cityMap, /city-location-open-inline/,
+  'Scene title must not render the redundant open-status label or green dot.');
+assert.doesNotMatch(html, /city-location-open-inline/,
+  'Removed open-status CSS must not remain in the main stylesheet.');
+assert.match(html, /\.city-location-subtitle\{/,
+  'Scene subtitle must use the restrained secondary-text style.');
+assert.match(cityMap, /const cityPlaceSubtitles=\{/,
+  'Scene subtitle labels must be centralized by canonical scene key.');
+assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=cityPlaceSubtitles\[place\]\|\|''/,
+  'Scene subtitle must update with the selected scene and clear when no label exists.');
+for (const key of ['airport','commercial','night-bar','live-house','apartment','department-store','bookstore','cafe','park','waterfront','harbor','office-building','university','performance-venue','luxury-apartment','convenience-store','private-club','luxury-club']) {
+  assert.match(cityMap, new RegExp("(?:['\\\"])?"+key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')+"(?:['\\\"])?\\s*:"),
+    'Scene subtitle map must include '+key+'.');
+}
