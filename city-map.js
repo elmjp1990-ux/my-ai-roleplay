@@ -265,7 +265,7 @@
  'convenience-store':{icon:'🏪',heading:'隨時亮著燈的便利商店',description:'明亮的貨架、微波爐與靠窗座位，讓這裡成為城市裡隨時能短暫停留的地方。',eventLabel:'場景亮點',eventTitle:'深夜補給時間',eventDescription:'適合買宵夜、臨時採買、短暫休息或深夜偶遇。'},
  'private-club':{icon:'🥂',heading:'低調而私密的高級會所',description:'接待大廳、包廂與專屬餐飲空間提供隱密而舒適的聚會環境，商務往來與私人邀約都可能在此發生。',eventLabel:'場景亮點',eventTitle:'今晚的私人邀約',eventDescription:'適合商務聚會、私人餐敘、高級娛樂與會員活動。'}
  };
- const renderCityDynamicScenes=(rows)=>{
+ const renderCitySceneCatalog=(rows)=>{
  const svg=$('cityBuildingLayer');
  if(!svg)return;
  for(const row of (Array.isArray(rows)?rows:[])){
@@ -287,18 +287,18 @@
  if(marker&&name)marker.setAttribute('aria-label',name);
  }
  };
- const loadCityDynamicScenes=async()=>{
+ const loadCitySceneCatalog=async()=>{
  const client=window.mySupabase;
  if(!client)return;
  const cached=readCityMapCache('scenes-v2',CITY_MAP_SCENES_CACHE_TTL_MS);
- if(cached)renderCityDynamicScenes(cached.data);
+ if(cached)renderCitySceneCatalog(cached.data);
  if(cached?.fresh)return;
  try{
  const {data,error}=await client.rpc('get_encounter_scene_catalog');
  if(error)throw error;
  const rows=Array.isArray(data)?data:[];
  writeCityMapCache('scenes-v2',rows);
- renderCityDynamicScenes(rows);
+ renderCitySceneCatalog(rows);
  }catch(error){
  if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
  }
@@ -306,7 +306,7 @@
  activeSceneRefresh=async()=>{
  cityMapMemoryCache.delete('scenes-v2');
  try{sessionStorage.removeItem('poyozz-city-map-scenes-v2-v1');}catch{}
- await loadCityDynamicScenes();
+ await loadCitySceneCatalog();
  if(locationModal&&!locationModal.hidden)activeVenueRefresh?.();
  };
  const applyCityWeather=weather=>{
@@ -388,7 +388,7 @@
  };
  const cityPresenceByPlace={};
  const cityAvatarHydrationPending=new Set();
- void loadCityDynamicScenes();
+ void loadCitySceneCatalog();
  void loadCityWeather();
  const cityScenePageStates=new Map();
  const renderCityPeopleStrip=(place)=>{
