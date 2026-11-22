@@ -64,7 +64,6 @@ const SCENE_ALIASES: Record<string, string> = {
   夜市: "night-market", 夜間市集: "night-market", "night market": "night-market",
   餐廳: "restaurant", 飯店餐廳: "restaurant", 餐館: "restaurant", 小吃店: "restaurant",
   客戶家: "apartment", 街頭: "shopping-street", 街道: "shopping-street",
-  超商: "shopping-street", 便利商店: "shopping-street",
   大學: "university", 學校: "university", 校園: "university",
   醫院: "hospital", 診所: "hospital",
   健身房: "gym", 健身中心: "gym",
@@ -190,13 +189,26 @@ export function classifyEncounterActivitySpace(
   return requestedOutdoor ? "outdoor" : "indoor";
 }
 
-export function normalizeEncounterSceneKey(value: unknown): string | null {
-  const original = text(value);
+export function normalizeEncounterSceneKey(value: unknown, activityValue: unknown = ""): string | null {
+  const original = text(value).normalize("NFKC");
   const raw = original.toLocaleLowerCase();
   const compact = raw.replace(/\s+/g, "");
+  const activity = text(activityValue).normalize("NFKC");
+  const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
+
   if ((ENCOUNTER_SCENE_KEYS as readonly string[]).includes(raw)) return raw;
+
+  // POYOZZ currently groups music-related places and activities under Live House.
+  if (/(live\s*house|livehouse|音樂|樂團|團練|練團|排練|彩排|表演|演出|舞台|樂器|吉他|貝斯|鼓手|主唱|錄音室|音樂工作室|music|band|guitar|bass|drummer|performance|rehearsal)/i.test(context)) {
+    return "live-house";
+  }
+
+  // Ordinary residential settings all share the existing 308 apartment scene.
   if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) return null;
-  if (/^(?:308公寓|私人公寓|一般公寓|普通公寓|公寓|住宅|住家|住所|家|家中|家裡|租屋|租屋處|套房)$/.test(compact)) return "apartment";
+  if (/(308公寓|頂樓加蓋|頂樓出租屋|頂樓套房|公寓|住宅|住家|住所|家中|家裡|租屋|租屋處|出租屋|套房|臥室|臥房|房間|房內|宿舍|bedroom|apartment|rented\s*room)/i.test(compact)) {
+    return "apartment";
+  }
+
   return SCENE_ALIASES[raw] || SCENE_ALIASES[original] || null;
 }
 
@@ -356,7 +368,7 @@ function validateHourlySchedule(
       }
       weightTotal += Number(weight);
       const locationDescription = text(rawOption.location);
-      const locationKey = normalizeEncounterSceneKey(locationDescription);
+      const locationKey = normalizeEncounterSceneKey(locationDescription, activity);
       const activity = text(rawOption.activity);
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor === true);
       const isOutdoor = activitySpace === "outdoor";
@@ -374,7 +386,7 @@ function validateHourlySchedule(
       let rainActivity: string | null = null;
       if (isOutdoor) {
         const rainLocationDescription = text(rawOption.rain_fallback_location);
-        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription);
+        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity);
         rainActivity = text(rawOption.rain_fallback_activity);
         if (!isValidEncounterLocationLabel(rainLocationDescription) ||
           !rainLocationKey || !RAIN_FALLBACK_SCENE_KEYS.has(rainLocationKey) ||
