@@ -10147,11 +10147,11 @@ async function loadEncounterScheduleTestTools(){
           ?'下一位：'+profileTargetName+'｜角色資料已整理完成，請檢查下方結果後再執行第二步。'
           :profileJobStatus==='processing'
             ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
-            :profileWaiting
-              ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
-              :profileJobStatus==='failed'
+            :profileJobStatus==='failed'
               ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。保留失敗紀錄，不會自動重試。'
-              :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
+              :profileWaiting
+                ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
+                :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
       if(profilePreview)profilePreview.innerHTML=profileReady
         ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
         :'';
