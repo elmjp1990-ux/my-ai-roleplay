@@ -101,6 +101,8 @@ jobs:
           deno-version: v2.x
       - name: Test approved OpenRouter provider routing and failover
         run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts supabase/functions/_shared/openrouter-chat-completions.test.ts
+      # Covers wide natural-place labels, apartment/music scene precedence,
+      # post-show alley matching, and unmapped convenience-store rain alternatives.
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
       - name: Simulate authenticated manual schedule POST through mocked AI and database publish
