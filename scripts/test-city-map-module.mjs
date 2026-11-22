@@ -248,7 +248,7 @@ assert.doesNotMatch(html, /測試環境登入帳號皆可使用/);
 assert.match(html, /正式環境不提供此工具/);
 
 
-assert.match(cityMap, /data-place="apartment" transform="translate\(666 440\)"/,
+assert.match(cityMap, /data-place="apartment"[\s\S]*?aria-label="308公寓"/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/,
   'Opening a city character card must merge resolved schedule data with the base profile.');
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/,
