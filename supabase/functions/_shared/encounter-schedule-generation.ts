@@ -179,7 +179,11 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
 
   // Residential types are distinct fixed anchors: luxury residences use K,
-  // while ordinary homes and the existing 308 building use L.
+  // while ordinary homes and the existing 308 building use L. Customer homes
+  // follow the available context when it explicitly identifies a luxury residence.
+  if (/客戶家/.test(compact) && /(豪宅|別墅|莊園|豪華住宅|高級住宅|豪華公寓|高級公寓|頂級住宅)/i.test(activity)) {
+    return "luxury-apartment";
+  }
   if (/(豪宅|別墅|莊園|豪華住宅|高級住宅|頂級住宅|豪華公寓|高級公寓|頂樓豪宅|penthouse|mansion|villa|estate)/i.test(compact)) {
     return "luxury-apartment";
   }
@@ -213,10 +217,8 @@ export function normalizeEncounterSceneKey(value: unknown, activityValue: unknow
     return "shopping-street";
   }
 
-  // Known street-side food stalls use the existing street scene, even if the
-  // activity mentions a later performance. Small eateries remain natural labels.
-  if (/(路邊攤|小吃攤|攤販|早餐店|便當店)/i.test(compact)) return "shopping-street";
-  if (/(麵店|食堂|餐館|餐廳|小吃店)/i.test(compact)) return null;
+  // Street-side food stalls and small neighborhood eateries share fixed scene F.
+  if (/(路邊攤|小吃攤|攤販|早餐店|便當店|麵店|食堂)/i.test(compact)) return "shopping-street";
   if (/(人行道|路邊|街道|街頭)/i.test(compact)) return "shopping-street";
 
   // For generic or otherwise unmapped places, music and performance context
