@@ -204,6 +204,12 @@ assert.match(manualCandidates, /p_force IS NOT TRUE OR j\.author_id = p_actor_us
   "The actual manual schedule candidate selection must be scoped to the current author, not only the preflight count");
 assert.match(manualScheduleClaimMigration, /COMMENT ON FUNCTION public\.claim_encounter_schedule_batch/,
   "The author-scoped manual schedule claim behavior must be documented in the migration");
+assert.match(manualScheduleClaimMigration, /lease_expires_at < v_now[\s\S]*p_force IS NOT TRUE OR author_id = p_actor_user_id/,
+  "Manual schedule claims must not reconcile other authors' expired job leases");
+assert.match(manualScheduleClaimMigration, /started_at < v_now - interval '20 minutes'[\s\S]*p_force IS NOT TRUE OR actor_user_id = p_actor_user_id/,
+  "Manual schedule claims must not reconcile other authors' batch runs");
+assert.match(manualScheduleClaimMigration, /manual_actor_required/,
+  "A forced/manual schedule claim must always carry the authenticated author ID");
 assert.match(worker, /auth: \["user", "secret:default"\]/,
   "Profile worker must accept authenticated manual users and a separate internal secret mode");
 assert.match(worker, /ctx\.authMode === "user"/,
