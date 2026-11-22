@@ -325,7 +325,8 @@ assert.ok(worker.includes('status: "received"') && worker.includes('metadata: { 
 assert.ok(worker.includes('status: "completed", failureStage: null, failureCode: null') &&
   worker.includes('metadata: { persistence_status: "completed" }'),
   "A Profile diagnostic may be marked completed only after the database completion RPC succeeds");
-assert.match(worker, /error instanceof ProfileGenerationError[\\s\\S]*?error\\.metadata\\.httpStatus != null[\\s\\S]*?return "provider_response"/,
+assert.ok(worker.includes('code === "provider_outcome_unknown" && error instanceof ProfileGenerationError') &&
+  worker.includes('error.metadata.httpStatus != null) return "provider_response";'),
   "HTTP 5xx or malformed provider responses must be classified as provider-response failures, not network request failures");
 assert.ok(worker.includes('failureStage = generatedMetadata ? "profile_persistence" : profileFailureStage(error)'),
   "The Worker must distinguish provider/output failures from post-generation persistence failures");
