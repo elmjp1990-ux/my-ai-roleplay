@@ -211,7 +211,8 @@ assert.match(scheduleOrganizer, /characterPrompt = buildEncounterScheduleBatchMe
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /parseEncounterScheduleBatchOutput\([\s\S]*?\[source\],[\s\S]*?sceneCatalog/);
 assert.match(scheduleOrganizer, /providerTimeoutMs = 100_000/);
-assert.match(scheduleOrganizer, /Math\\.min\\(\\s*270_000/);
+assert.ok(scheduleOrganizer.includes("Math.min(") && scheduleOrganizer.includes("270_000"),
+  "Shared schedule handler must cap its runtime-specific provider timeout at 270 seconds.");
 assert.match(scheduleOrganizer, /timeoutMs: ENCOUNTER_SCHEDULE_PROVIDER_TIMEOUT_MS/);
 assert.match(scheduleOrganizer, /provider_duration_ms/);
 assert.match(scheduleOrganizer, /let providerDurationMs = 0/);
