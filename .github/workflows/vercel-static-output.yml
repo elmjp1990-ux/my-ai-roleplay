@@ -28,6 +28,7 @@ on:
       - ".github/workflows/chat-render-lifecycle.yml"
       - "*.webp"
       - "vercel.json"
+      - "package.json"
       - "scripts/build-vercel-static.mjs"
       - "scripts/test-vercel-static-output.mjs"
       - ".github/workflows/vercel-static-output.yml"
@@ -46,7 +47,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-      - name: Build the allowlisted static output
+      - name: Install Vercel build dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build the allowlisted static output and bundled API handler
         run: node scripts/build-vercel-static.mjs
       - name: Verify deployed files and local asset references
         run: node scripts/test-vercel-static-output.mjs
