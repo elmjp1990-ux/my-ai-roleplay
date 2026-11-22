@@ -723,7 +723,21 @@ export async function handleEncounterScheduleOrganizer(
         ? profileData as Record<string, unknown> : {};
       const lifeContext = profile.life_context && typeof profile.life_context === "object" && !Array.isArray(profile.life_context)
         ? profile.life_context : null;
-      return { ...source, derived_life_context: lifeContext };
+      const profileSections = [
+        "identity_background", "core_personality", "inner_motivations",
+        "emotional_response_patterns", "relationship_dynamics", "behavior_and_agency",
+        "knowledge_boundaries", "speech_style", "ooc_rules", "unknowns", "source_conflicts",
+      ];
+      const derivedCharacterProfile = Object.fromEntries(
+        profileSections
+          .filter((key) => profile[key] !== undefined)
+          .map((key) => [key, profile[key]]),
+      );
+      return {
+        ...source,
+        derived_life_context: lifeContext,
+        derived_character_profile: derivedCharacterProfile,
+      };
     } catch (error) {
       console.warn("Character life context read failed; using original creator sources:",
         error instanceof Error ? error.message : "unknown_error");
