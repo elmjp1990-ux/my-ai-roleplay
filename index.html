@@ -10052,6 +10052,43 @@ async function loadEncounterScheduleRepairOutputs(){
   }
 }
 
+function renderCharacterProfilePreview(profile, characterName, model) {
+  if (!profile || typeof profile !== "object" || Array.isArray(profile)) return "";
+  const labels = {
+    identity_background: "身分與背景",
+    core_personality: "核心個性",
+    inner_motivations: "內在動機",
+    emotional_response_patterns: "情緒反應",
+    relationship_dynamics: "關係互動",
+    behavior_and_agency: "行為與主動性",
+    knowledge_boundaries: "知識界線",
+    appearance_markers: "外觀特徵",
+    speech_style: "說話風格",
+    life_context: "生活脈絡",
+    ooc_rules: "角色一致性規則",
+    author_private_context: "作者私密補充"
+  };
+  const summaries = Object.entries(labels).map(([key, label]) => {
+    const section = profile[key];
+    if (!section || typeof section !== "object") return "";
+    const items = Array.isArray(section.items) ? section.items
+      : Array.isArray(section.tendencies) ? section.tendencies
+      : Array.isArray(section.rules) ? section.rules : [];
+    const content = items.map(item => typeof item === "string" ? item : item?.content || item?.rule || "")
+      .filter(Boolean).slice(0, 12).map(item => '<li>'+e(item)+'</li>').join("");
+    const nested = key === "life_context" && !items.length
+      ? Object.entries(section).map(([subKey, subSection]) => {
+          const subItems = Array.isArray(subSection?.items) ? subSection.items : [];
+          return subItems.length ? '<li><strong>'+e(subKey)+'</strong>：'+subItems.map(item=>e(item?.content||"")).filter(Boolean).join("；")+'</li>' : "";
+        }).join("")
+      : "";
+    const html = content || nested;
+    return '<section style="padding:8px 0;border-bottom:1px solid var(--border)"><strong>'+e(label)+' · '+e(section.status||"")+'</strong>'+(html?'<ul class="small" style="margin:5px 0 0;padding-left:20px">'+html+'</ul>':'<p class="small muted" style="margin:4px 0 0">目前沒有可顯示的整理項目</p>')+'</section>';
+  }).join("");
+  const raw = e(JSON.stringify(profile, null, 2));
+  return '<article class="panel stack" style="padding:12px;gap:8px"><div><strong>'+e(characterName||"角色")+'｜AI 角色資料整理結果</strong><p class="small muted" style="margin:4px 0 0">'+e(model||"DeepSeek V4 Flash 0423")+' · 已保存，可先檢查</p></div>'+summaries+'<details><summary class="small">查看完整 JSON（含來源依據與待釐清項目）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:11px">'+raw+'</pre></details></article>';
+}
+
 async function loadEncounterScheduleTestTools(){
   const section=document.getElementById('encounterScheduleTestTools');
   if(!section)return;
@@ -10080,6 +10117,47 @@ async function loadEncounterScheduleTestTools(){
     const pending=Number(data.pending_character_count||0);
     const processing=Number(data.processing_character_count||0);
     const failed=Number(data.failed_character_count||0);
+    const profileStatus=document.getElementById('characterProfileTestStatus');
+    const profilePreview=document.getElementById('characterProfilePreview');
+    const profileButton=section.querySelector('[data-action="organize-character-profile"]');
+    let profileReady=false;
+    let profileTargetAvailable=false;
+    let profileJobStatus='unknown';
+    let profileTargetName='';
+    let profileTargetId='';
+    let profileStatusError=false;
+    try{
+      const {data:profileData,error:profileError}=await client.functions.invoke('character-profile-organization-worker',{body:{mode:'status'}});
+      if(profileError||!profileData)throw profileError||new Error('profile_status_unavailable');
+      profileReady=profileData.profile_ready===true;
+      profileTargetAvailable=!!profileData.next_character_id;
+      profileJobStatus=String(profileData.profile_job_status||'missing');
+      profileTargetName=String(profileData.next_character_name||'角色');
+      profileTargetId=String(profileData.next_character_id||'');
+      if(profileStatus)profileStatus.textContent=!profileTargetAvailable
+        ?'目前沒有待生成行程的公開角色。'
+        :profileReady
+          ?'下一位：'+profileTargetName+'｜角色資料已整理完成，請檢查下方結果後再執行第二步。'
+          :profileJobStatus==='processing'
+            ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
+            :profileJobStatus==='failed'
+              ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。保留失敗紀錄，不會自動重試。'
+              :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
+      if(profilePreview)profilePreview.innerHTML=profileReady
+        ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
+        :'';
+      if(profileButton){
+        const enabled=profileTargetAvailable&&!profileReady&&profileJobStatus!=='processing'&&profileJobStatus!=='failed';
+        profileButton.dataset.aiEnabled=enabled?'true':'false';
+        profileButton.disabled=!enabled;
+      }
+    }catch(profileError){
+      profileStatusError=true;
+      if(profileStatus)profileStatus.textContent='角色資料狀態讀取失敗；為避免未整理就呼叫行程 AI，第二步已暫停。';
+      if(profilePreview)profilePreview.innerHTML='';
+      if(profileButton){profileButton.disabled=true;profileButton.dataset.aiEnabled='false';}
+      console.warn('Character Profile manual status failed:',profileError?.message||profileError);
+    }
     const reconciliation=Number(data.needs_reconciliation_count||0);
     const needsReview=Number(data.needs_review_character_count||0);
     const blocked=processing>0||reconciliation>0;
@@ -10096,7 +10174,12 @@ async function loadEncounterScheduleTestTools(){
       ?'測試環境已確認；目前無法讀取佇列狀態。'
       :'待處理：'+pending+' 位｜處理中：'+processing+' 位｜失敗：'+failed+' 位｜待核對：'+reconciliation+' 位｜待人工審核：'+needsReview+' 位｜'+
         queueHint+'｜上次成功完成：'+lastRun+(data.last_batch_status?'（'+data.last_batch_status+'）':'');
-    if(button){button.dataset.aiEnabled=canRun?'true':'false';button.disabled=!canRun;}
+    if(button){
+      const scheduleEnabled=canRun&&profileReady&&!profileStatusError;
+      button.dataset.aiEnabled=scheduleEnabled?'true':'false';
+      button.dataset.profileReady=profileReady?'true':'false';
+      button.disabled=!scheduleEnabled;
+    }
     const reconciliationContainer=document.getElementById('encounterScheduleReconciliationItems');
     if(reconciliationContainer){
       const items=Array.isArray(data.reconciliation_jobs)?data.reconciliation_jobs:[];
@@ -10137,6 +10220,37 @@ async function loadEncounterScheduleTestTools(){
 }
 
 document.addEventListener('click',async event=>{
+  const profileButton=event.target.closest('[data-action="organize-character-profile"]');
+  if(profileButton){
+    event.preventDefault();
+    if(profileButton.dataset.aiEnabled!=='true'||profileButton.disabled)return;
+    if(!window.confirm('將使用 AI 整理目前下一位待生成行程角色的資料，會產生模型服務成本，但不扣玩家銀幣或鑽石。每次只處理一位；完成後先檢查結果，再決定是否執行行程生成。要繼續嗎？'))return;
+    profileButton.disabled=true;
+    const profileStatus=document.getElementById('characterProfileTestStatus');
+    if(profileStatus)profileStatus.textContent='正在整理下一位角色資料，請稍候…';
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('character-profile-organization-worker',{body:{mode:'manual'}});
+      if(error)throw error;
+      if(data?.status==='completed'){
+        toast('角色資料整理完成，已保存。請先檢查整理結果，再按第二步生成行程。');
+      }else if(data?.status==='already_completed'){
+        toast('這位角色的資料已整理完成，沒有再次呼叫 AI。');
+      }else if(data?.status==='failed'){
+        toast('角色資料整理失敗：'+String(data.error_code||'unknown')+'；失敗紀錄已保留，未自動重試。');
+      }else{
+        toast('角色資料整理狀態：'+String(data?.status||data?.error||'未知狀態'));
+      }
+      await loadEncounterScheduleTestTools();
+    }catch(error){
+      toast('角色資料整理未完成；請查看後端診斷，系統不會自動重試。');
+      console.warn('Character Profile manual trigger failed:',error?.message||error);
+      await loadEncounterScheduleTestTools();
+    }finally{
+      const current=document.querySelector('#encounterScheduleTestTools [data-action="organize-character-profile"]');
+      if(current)current.disabled=current.dataset.aiEnabled!=='true';
+    }
+    return;
+  }
   const worldviewButton=event.target.closest('[data-action="worldview-review-decision"]');
   if(worldviewButton){
     event.preventDefault();
@@ -10561,6 +10675,18 @@ function renderModal(o) {
           <strong>相遇模式｜AI 行程與場景整理</strong>
           <p class="small muted">整理目前所有符合資格的公開角色行程，並建立／更新共同行程場景。</p>
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
+          <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
+            <strong>第一步｜角色資料整理</strong>
+            <p class="small muted" style="margin:0">先整理下一位待生成行程角色的背景、個性、動機、行為與生活脈絡。每次只處理一位；完成後會顯示完整整理結果供作者檢查。</p>
+            <p class="small muted" id="characterProfileTestStatus" style="margin:0">正在確認角色資料狀態…</p>
+            <div id="characterProfilePreview" class="stack"></div>
+            <button type="button" data-action="organize-character-profile" disabled>AI 整理下一位角色資料</button>
+          </div>
+          <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
+            <strong>第二步｜行程與場景生成</strong>
+            <p class="small muted" style="margin:0">只有第一步成功保存且資料檢查完成後，才可生成同一位角色的行程與共同行程場景。</p>
+            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
+          </div>
           <div class="stack" style="margin:10px 0">
             <strong>待核對工作</strong>
             <div id="encounterScheduleReconciliationItems" class="stack"></div>
@@ -10570,11 +10696,10 @@ function renderModal(o) {
             <div id="encounterScheduleManualReviewItems" class="stack"></div>
           </div>
           <div class="row wrap">
-            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
             <button type="button" data-action="load-encounter-schedule-repairs">查看失敗 AI 原始回覆</button>
           </div>
           <div id="encounterScheduleRepairOutputs" class="stack" style="margin-top:12px"></div>
-          <p class="small muted">會產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。失敗回覆最多保留 30 天，開啟工具時會清除已到期資料；補正只重新驗證與發布，不會再次呼叫 AI。正式環境不提供此工具。</p>
+          <p class="small muted">第一步角色資料整理與第二步行程生成會分別產生 AI 服務呼叫成本，但不扣玩家銀幣或鑽石；不會觸發相遇對話。每次各處理一位，失敗紀錄不會自動重試。正式環境不提供此工具。</p>
         </section>`);
       void loadEncounterScheduleTestTools();
       break;
