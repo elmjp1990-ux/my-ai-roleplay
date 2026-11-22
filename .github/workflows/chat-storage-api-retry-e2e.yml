@@ -123,8 +123,12 @@ jobs:
 
       - name: Install Playwright and Chromium
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          playwright_dir="$RUNNER_TEMP/poyozz-playwright"
+          mkdir -p "$playwright_dir"
+          npm install --prefix "$playwright_dir" --no-save playwright
+          "$playwright_dir/node_modules/.bin/playwright" install --with-deps chromium
+          mkdir -p node_modules
+          ln -s "$playwright_dir/node_modules/playwright" node_modules/playwright
 
       - name: Exercise browser multi-tab and cross-device deletion reconciliation
         run: node scripts/test-chat-deletion-browser-e2e.mjs
