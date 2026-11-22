@@ -9,7 +9,7 @@ const vercel = JSON.parse(fs.readFileSync("vercel.json", "utf8"));
 const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
 const tsconfig = JSON.parse(fs.readFileSync("tsconfig.json", "utf8"));
 
-assert.match(route, /handleEncounterScheduleOrganizer/);
+assert.match(route, /handleEncounterScheduleOrganizer/);\nassert.match(route, /encounter-schedule-organizer-handler(?!\\.ts)/, "Vercel must use an extensionless shared-handler import so the deployment bundler resolves it");
 assert.match(route, /270_000/);
 assert.match(route, /setInterval\(\(\) =>/);
 assert.match(route, /res\.write\(" "\)/);
