@@ -97,16 +97,16 @@ INSERT INTO public.character_schedules (
   '00000000-0000-4000-8000-000000000010'::uuid,
   'weekday', '09:00', '12:00', 'park', '在公園散步',
   0, true, 'manual', 'primary', 100,
-  '', true, 'cafe', '改到咖啡廳避雨',
-  pg_catalog.repeat('雨勢漸大，你們改到附近咖啡廳坐下休息，窗外雨聲逐漸變得平穩。', 6)
+  '', true, 'convenience-store', '改到便利商店避雨',
+  pg_catalog.repeat('雨勢漸大，你們改到附近便利商店坐下休息，窗外雨聲逐漸變得平穩。', 6)
 ),
 (
   '00000000-0000-4000-8000-000000000013'::uuid,
   '00000000-0000-4000-8000-000000000010'::uuid,
   'weekday', '12:00', '14:00', 'park', '下一段公園行程',
   0, true, 'manual', 'primary', 100,
-  '', true, 'cafe', '改到咖啡廳避雨',
-  pg_catalog.repeat('下雨時改到咖啡廳等待雨勢變小。', 12)
+  '', true, 'convenience-store', '改到便利商店避雨',
+  pg_catalog.repeat('下雨時改到便利商店等待雨勢變小。', 12)
 );
 INSERT INTO public.character_schedules (
   id, character_id, day_type, start_time, end_time, location_key, activity,
@@ -115,9 +115,9 @@ INSERT INTO public.character_schedules (
 ) VALUES (
   '00000000-0000-4000-8000-000000000015'::uuid,
   '00000000-0000-4000-8000-000000000010'::uuid,
-  'any', '09:00', '17:00', 'bookstore', '參加節日限定活動',
+  'any', '09:00', '17:00', 'shopping-street', '參加節日限定活動',
   0, true, 'manual', 'special', 100, 'lunar_new_year',
-  pg_catalog.repeat('今天是假日限定活動日，你們在書店安排了特別的展覽與交流，氣氛比平常更熱鬧。', 5),
+  pg_catalog.repeat('今天是假日限定活動日，你們在商店街安排了特別的展覽與交流，氣氛比平常更熱鬧。', 5),
   false
 );
 INSERT INTO public.character_schedules (
@@ -474,12 +474,12 @@ BEGIN
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
     NULL,
-    'cafe',
+    'convenience-store',
     '2026-11-17T10:00:00+08:00'::timestamptz
   );
   IF NOT FOUND
-     OR v_result.location_key <> 'cafe'
-     OR v_result.activity <> '改到咖啡廳避雨'
+     OR v_result.location_key <> 'convenience-store'
+     OR v_result.activity <> '改到便利商店避雨'
      OR v_result.is_outdoor IS NOT FALSE
      OR pg_catalog.char_length(v_result.encounter_greeting) NOT BETWEEN 150 AND 300 THEN
     RAISE EXCEPTION 'rainy outdoor schedule did not resolve to its indoor fallback';
@@ -496,7 +496,7 @@ BEGIN
     RAISE EXCEPTION 'rainy outdoor schedule must not remain at its original outdoor location';
   END IF;
 
-  -- Rain stops mid-slot: the original slot remains in the cafe until 12:00.
+  -- Rain stops mid-slot: the original slot remains in the convenience store until 12:00.
   UPDATE public.encounter_city_weather
   SET weather_text = '晴朗',
       is_raining = false,
@@ -508,13 +508,13 @@ BEGIN
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
     NULL,
-    'cafe',
+    'convenience-store',
     '2026-11-17T11:00:00+08:00'::timestamptz
   );
   IF NOT FOUND
      OR v_result.schedule_id <> '00000000-0000-4000-8000-000000000012'::uuid
-     OR v_result.location_key <> 'cafe'
-     OR v_result.activity <> '改到咖啡廳避雨'
+     OR v_result.location_key <> 'convenience-store'
+     OR v_result.activity <> '改到便利商店避雨'
      OR v_result.is_outdoor IS NOT FALSE THEN
     RAISE EXCEPTION 'rain stop must not move an active slot back to its original outdoor location';
   END IF;
@@ -570,11 +570,11 @@ BEGIN
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
     NULL,
-    'bookstore',
+    'shopping-street',
     '2026-11-17T10:00:00+08:00'::timestamptz
   );
   IF NOT FOUND
-     OR v_result.location_key <> 'bookstore'
+     OR v_result.location_key <> 'shopping-street'
      OR v_result.activity <> '參加節日限定活動'
      OR v_result.variant_key <> 'special' THEN
     RAISE EXCEPTION 'Lunar New Year specific schedule was not selected';
@@ -609,7 +609,7 @@ BEGIN
   FROM public.resolve_encounter_character_schedule(
     '00000000-0000-4000-8000-000000000010'::uuid,
     NULL,
-    'bookstore',
+    'shopping-street',
     '2026-11-18T10:00:00+08:00'::timestamptz
   );
   IF FOUND THEN
