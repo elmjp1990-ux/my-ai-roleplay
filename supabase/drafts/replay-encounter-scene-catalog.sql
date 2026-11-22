@@ -104,7 +104,29 @@ DO $dynamic_scene_publish$
 DECLARE
   v_result jsonb;
   v_catalog record;
+  v_scene_count integer;
 BEGIN
+  SELECT pg_catalog.count(*)::integer INTO v_scene_count
+  FROM public.get_encounter_scene_catalog();
+  IF v_scene_count <> 14 THEN
+    RAISE EXCEPTION 'scene catalog must expose exactly fourteen fixed A–N anchors';
+  END IF;
+
+  IF EXISTS (
+    SELECT required.location_key
+    FROM unnest(ARRAY[
+      'waterfront','commercial','airport','university','park','shopping-street',
+      'department-store','hospital','night-bar','live-house','luxury-apartment',
+      'apartment','convenience-store','private-club'
+    ]) AS required(location_key)
+    WHERE NOT EXISTS (
+      SELECT 1 FROM public.get_encounter_scene_catalog() c
+      WHERE c.location_key = required.location_key AND c.is_dynamic IS FALSE
+    )
+  ) THEN
+    RAISE EXCEPTION 'one or more fixed A–N scene anchors are missing';
+  END IF;
+
   v_result := public.publish_encounter_scene_metadata(
     jsonb_build_array(
       jsonb_build_object(
