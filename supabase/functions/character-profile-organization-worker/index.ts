@@ -377,22 +377,36 @@ export default {
         return Response.json({ error: "manual_profile_trigger_disabled" }, { status: 403 });
       }
       if (mode === "status") {
-        const { data: nextJob, error: nextError } = await supabase
+        const { data: pendingJobs, error: nextError } = await supabase
           .from("encounter_schedule_generation_jobs")
           .select("character_id")
           .eq("author_id", authorId)
           .eq("status", "pending")
           .order("queued_at", { ascending: true })
           .order("character_id", { ascending: true })
-          .limit(1)
-          .maybeSingle();
+          .limit(50);
         if (nextError) return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
+        const pendingIds = (pendingJobs || []).map((job: any) => job.character_id).filter(Boolean);
+        if (!pendingIds.length) {
+          return Response.json({ status: "no_pending_schedule_jobs", profile_ready: false });
+        }
+        const { data: eligibleCharacters, error: eligibleError } = await supabase
+          .from("characters")
+          .select("id,name")
+          .in("id", pendingIds)
+          .eq("author_id", authorId)
+          .eq("visibility", "public")
+          .eq("review_status", "approved")
+          .eq("rights_confirmed", true)
+          .is("deleted_at", null);
+        if (eligibleError) return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
+        const eligibleById = new Map((eligibleCharacters || []).map((character: any) => [character.id, character]));
+        const nextJob = (pendingJobs || []).find((job: any) => eligibleById.has(job.character_id));
         if (!nextJob?.character_id) {
           return Response.json({ status: "no_pending_schedule_jobs", profile_ready: false });
         }
-        const [characterResult, profileResult, jobResult] = await Promise.all([
-          supabase.from("characters").select("name")
-            .eq("id", nextJob.character_id).eq("author_id", authorId).maybeSingle(),
+        const nextCharacter = eligibleById.get(nextJob.character_id);
+        const [profileResult, jobResult] = await Promise.all([
           supabase.rpc("get_character_ai_profile_for_chat", {
             p_character_id: nextJob.character_id,
             p_author_id: authorId,
@@ -401,7 +415,7 @@ export default {
             .select("status,last_error_code,updated_at")
             .eq("character_id", nextJob.character_id).eq("author_id", authorId).maybeSingle(),
         ]);
-        if (characterResult.error || profileResult.error || jobResult.error) {
+        if (profileResult.error || jobResult.error) {
           return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
         }
         const profile = profileResult.data && typeof profileResult.data === "object" &&
@@ -418,7 +432,7 @@ export default {
         return Response.json({
           status: "available",
           next_character_id: nextJob.character_id,
-          next_character_name: characterResult.data?.name || "角色",
+          next_character_name: nextCharacter?.name || "角色",
           profile_ready: profileReady,
           profile_job_status: jobResult.data?.status || "missing",
           profile_error_code: jobResult.data?.last_error_code || null,
