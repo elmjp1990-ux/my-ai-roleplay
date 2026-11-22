@@ -25,6 +25,7 @@ on:
       - "supabase/functions/encounter-session/**"
       - "supabase/functions/encounter-schedule-organizer/**"
       - "supabase/functions/_shared/encounter-schedule-organizer-handler.ts"
+      - "supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts"
       - "api/encounter-schedule-organizer.ts"
       - "api/package.json"
       - "scripts/build-vercel-static.mjs"
@@ -102,9 +103,11 @@ jobs:
         run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts supabase/functions/_shared/openrouter-chat-completions.test.ts
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
+      - name: Simulate authenticated manual schedule POST through mocked AI and database publish
+        run: deno test supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts
       - name: Test lightweight seasonal Taipei weather simulation
         run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
       - name: Type-check Encounter and Character Profile Edge Functions
-        run: deno check supabase/functions/_shared/ai-generation-diagnostics.ts supabase/functions/chat-turn/index.ts supabase/functions/group-chat-turn/index.ts supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-session-state/index.ts supabase/functions/_shared/encounter-schedule-organizer-handler.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts
+        run: deno check supabase/functions/_shared/ai-generation-diagnostics.ts supabase/functions/chat-turn/index.ts supabase/functions/group-chat-turn/index.ts supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-session-state/index.ts supabase/functions/_shared/encounter-schedule-organizer-handler.ts supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts
