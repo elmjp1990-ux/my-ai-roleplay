@@ -25,6 +25,7 @@ assert.equal(vercel.functions?.["api/encounter-schedule-organizer.ts"]?.maxDurat
 assert.equal(packageJson.dependencies?.["@supabase/supabase-js"], "2.119.2");
 assert.match(html, /window\.mySupabase\.auth\.getSession\(\)/);
 assert.match(html, /fetch\('\/api\/encounter-schedule-organizer'/);
+assert.match(html, /Number\(data\?\.http_status\)>=400/);
 assert.doesNotMatch(
   html,
   /functions\.invoke\('encounter-schedule-organizer',\{body:\{mode:'manual'\}\}/,
