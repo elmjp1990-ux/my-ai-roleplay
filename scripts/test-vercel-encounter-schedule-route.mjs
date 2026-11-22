@@ -11,7 +11,14 @@ const tsconfig = JSON.parse(fs.readFileSync("tsconfig.json", "utf8"));
 const apiPackageJson = JSON.parse(fs.readFileSync("api/package.json", "utf8"));
 
 assert.match(route, /handleEncounterScheduleOrganizer/);
-assert.match(route, /from "\.\.\/supabase\/functions\/_shared\/encounter-schedule-organizer-handler\.ts";/, "Vercel ESM route must explicitly import the TypeScript handler so its dependency is bundled");
+assert.match(route, /from "\.\/_generated\/encounter-schedule-organizer-handler\.mjs";/, "Vercel route must import the build-generated handler bundle from inside api/");
+const vercelBuild = fs.readFileSync("scripts/build-vercel-static.mjs", "utf8");
+assert.match(vercelBuild, /import \{ build \} from [\x27"]esbuild[\x27"];/);
+assert.match(vercelBuild, /entryPoints: \[path\.join\(root, [\x27"]supabase\/functions\/_shared\/encounter-schedule-organizer-handler\.ts[\x27"]\)\]/);
+assert.match(vercelBuild, /outfile: path\.join\(generatedApiDir, [\x27"]encounter-schedule-organizer-handler\.mjs[\x27"]\)/);
+assert.match(vercelBuild, /bundle: true/);
+assert.match(vercelBuild, /packages: [\x27"]external[\x27"]/);
+assert.equal(packageJson.dependencies?.esbuild, "0.25.12");
 assert.equal(apiPackageJson.type, "module", "API route scope must be ESM for the TypeScript handler import");
 assert.match(route, /270_000/);
 assert.match(route, /setInterval\(\(\) =>/);
@@ -40,4 +47,4 @@ assert.doesNotMatch(
   "Manual schedule generation must not call the 150s Supabase Edge Function directly",
 );
 
-console.log("Vercel 300s Encounter schedule route, ESM TypeScript shared-handler bundling, auth forwarding, and timeout isolation contracts passed.");
+console.log("Vercel 300s Encounter schedule route, build-time local handler bundling, auth forwarding, and timeout isolation contracts passed.");
