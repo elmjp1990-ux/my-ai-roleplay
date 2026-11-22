@@ -209,6 +209,9 @@ Deno.test("classifies activity space independently from scene location", () => {
       throw new Error(location + " must resolve to the 308 apartment scene");
     }
   }
+  if (normalizeEncounterSceneKey("頂樓出租屋", "躺在床上用吉他彈奏和弦") !== "apartment") {
+    throw new Error("residential location must take precedence over incidental music activity");
+  }
   for (const location of ["Live House", "練團室", "排練室", "錄音室", "音樂工作室"]) {
     if (normalizeEncounterSceneKey(location) !== "live-house") {
       throw new Error(location + " must resolve to Live House");
