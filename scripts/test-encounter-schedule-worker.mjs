@@ -3,6 +3,7 @@ import fs from "node:fs";
 
 const worker = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 const pipeline = fs.readFileSync("supabase/drafts/encounter-schedule-pipeline.sql", "utf8");
+const fixedSceneMigration = fs.readFileSync("supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql", "utf8");
 const batchSemantics = fs.readFileSync("supabase/migrations/20261117133525_encounter_schedule_batch_semantics.sql", "utf8");
 const html = fs.readFileSync("index.html", "utf8");
 const generator = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
@@ -153,7 +154,13 @@ assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_we
 assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
-assert.match(pipeline, /location_key IN \('shopping-street'\)/);
+assert.match(fixedSceneMigration,/Returns only the fourteen permanent A–N city scene anchors/);
+assert.match(fixedSceneMigration,/AND r\.is_dynamic IS FALSE/);
+assert.match(fixedSceneMigration,/minimum_character_count/);
+assert.match(fixedSceneMigration,/publish_encounter_scene_metadata/);
+const fixedCityMap = fs.readFileSync("city-map.js", "utf8");
+assert.equal((fixedCityMap.match(/class="city-place-marker is-available"/g)||[]).length,14);
+assert.doesNotMatch(fixedCityMap,/MAX_DYNAMIC_SCENE_MARKERS|data-dynamic-scene|Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /minimum_character_count smallint NOT NULL DEFAULT 1/);
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_scene_registry\(\)/);
 assert.match(pipeline, /ADD COLUMN IF NOT EXISTS special_event_key text/);
@@ -168,10 +175,6 @@ assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_charact
 assert.match(pipeline, /encounter_greeting text,[\s\S]*?is_outdoor boolean,[\s\S]*?rain_fallback_greeting text,[\s\S]*?variant_weight smallint/);
 assert.match(pipeline, /cardinality\(p_character_ids\) BETWEEN 1 AND 10/);
 assert.match(pipeline, /count\(DISTINCT c\.id\)/);
-assert.match(pipeline, /HAVING pg_catalog\.count\(DISTINCT c\.id\) >= r\.minimum_character_count/);
-assert.match(pipeline, /ORDER BY r\.display_order, r\.location_key\s+LIMIT 3/);
-assert.match(fs.readFileSync("city-map.js", "utf8"), /MAX_DYNAMIC_SCENE_MARKERS=3/);
-assert.match(fs.readFileSync("city-map.js", "utf8"), /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
 assert.match(pipeline, /marker_x BETWEEN 40 AND 1622/);
 assert.match(pipeline, /marker_y BETWEEN 40 AND 892/);
 assert.match(generator, /地點是否能對應地圖由系統自行判斷/);
