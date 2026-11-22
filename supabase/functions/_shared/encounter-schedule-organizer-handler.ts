@@ -643,6 +643,46 @@ export async function handleEncounterScheduleOrganizer(
         failed_jobs_preserved: true,
       });
     }
+
+    // Do not claim a schedule lease or spend schedule-model tokens until the
+    // exact next public character has a source-current, complete AI Profile.
+    const { data: nextScheduleJob, error: nextScheduleJobError } = await admin
+      .from("encounter_schedule_generation_jobs")
+      .select("character_id")
+      .eq("author_id", actorUserId)
+      .eq("status", "pending")
+      .order("queued_at", { ascending: true })
+      .order("character_id", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (nextScheduleJobError) {
+      return json({ error: "character_profile_preflight_unavailable" }, 503);
+    }
+    if (nextScheduleJob?.character_id) {
+      const [{ data: profileData, error: profileError }, { data: characterData }] = await Promise.all([
+        admin.rpc("get_character_ai_profile_for_chat", {
+          p_character_id: nextScheduleJob.character_id,
+          p_author_id: actorUserId,
+        }),
+        admin.from("characters").select("name")
+          .eq("id", nextScheduleJob.character_id).eq("author_id", actorUserId).maybeSingle(),
+      ]);
+      if (profileError) {
+        return json({ error: "character_profile_preflight_unavailable" }, 503);
+      }
+      const profile = asRow(profileData);
+      const lifeContext = asRow(profile.life_context);
+      if (!profileData || Object.keys(lifeContext).length !== 7) {
+        return json({
+          status: "profile_required",
+          error: "character_profile_not_ready",
+          character_id: nextScheduleJob.character_id,
+          character_name: characterData?.name || "角色",
+          ai_called: false,
+          schedule_job_claimed: false,
+        }, 409);
+      }
+    }
   }
 
   const { data: claimData, error: claimError } = await admin.rpc("claim_encounter_schedule_batch", {
