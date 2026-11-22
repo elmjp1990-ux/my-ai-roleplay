@@ -21,8 +21,11 @@ const source = (character_id = id1, extra = {}) => ({
   ...extra,
 });
 const locations: Record<string, string> = {
-  apartment: "公寓", commercial: "公司", cafe: "咖啡廳", park: "公園",
-  "music-studio": "音樂工作室", restaurant: "餐廳", "art-gallery": "藝廊",
+  apartment: "308公寓", "luxury-apartment": "高級公寓", commercial: "辦公大樓",
+  airport: "機場", university: "校園", park: "中央公園",
+  "shopping-street": "商店街", "department-store": "百貨公司", hospital: "中央醫院",
+  "night-bar": "夜間酒吧", "live-house": "展演空間",
+  waterfront: "水岸港區", "convenience-store": "便利商店", "private-club": "高級會所",
 };
 const option = (extra: Record<string, unknown> = {}) => ({
   weight: 100,
@@ -59,11 +62,8 @@ const variants = (weekday = hourlyBlocks()) => ({
   weekday,
   holiday: hourlyBlocks(),
 });
-const builtInSceneCatalog: EncounterSceneCatalogEntry[] = [
-  { location_key: "commercial", display_name: "公司", is_dynamic: false },
-  { location_key: "cafe", display_name: "咖啡廳", is_dynamic: false },
-  { location_key: "art-gallery", display_name: "私人畫室", is_dynamic: true },
-];
+const builtInSceneCatalog: EncounterSceneCatalogEntry[] = Object.entries(locations)
+  .map(([location_key, display_name]) => ({ location_key, display_name, is_dynamic: false }));
 const result = (
   characters: Array<{ character_id: string; [key: string]: unknown }>,
   sourceRows?: ReturnType<typeof source>[],
@@ -199,11 +199,17 @@ Deno.test("classifies activity space independently from scene location", () => {
   }
   if (normalizeEncounterSceneKey("客戶家") !== "apartment") throw new Error("customer home must resolve to the apartment scene");
   if (normalizeEncounterSceneKey("街頭") !== "shopping-street") throw new Error("street must resolve to the existing street scene family");
-  if (normalizeEncounterSceneKey("便利商店") !== null || normalizeEncounterSceneKey("超商") !== null) {
-    throw new Error("convenience stores must remain unmatched until a dedicated scene is added");
+  if (normalizeEncounterSceneKey("便利商店") !== "convenience-store" || normalizeEncounterSceneKey("超商") !== "convenience-store") {
+    throw new Error("convenience stores must resolve to fixed scene M");
   }
-  if (normalizeEncounterSceneKey("江邊堤防") !== null) {
-    throw new Error("river embankment must remain unmatched until a suitable scene exists");
+  if (normalizeEncounterSceneKey("江邊堤防") !== "waterfront") {
+    throw new Error("river embankment must resolve to fixed scene A");
+  }
+  if (normalizeEncounterSceneKey("高級公寓") !== "luxury-apartment" ||
+      normalizeEncounterSceneKey("高級會所") !== "private-club" ||
+      normalizeEncounterSceneKey("中央醫院") !== "hospital" ||
+      normalizeEncounterSceneKey("校園") !== "university") {
+    throw new Error("fixed A–N scene destinations must resolve to their canonical keys");
   }
   for (const location of ["308公寓", "頂樓加蓋", "頂樓出租屋", "一般公寓", "臥室", "房間", "住所"]) {
     if (normalizeEncounterSceneKey(location) !== "apartment") {
@@ -227,9 +233,11 @@ Deno.test("classifies activity space independently from scene location", () => {
   if (normalizeEncounterSceneKey("後巷", "在後巷散步") !== "shopping-street") {
     throw new Error("an alley without music or post-show context must remain a street scene");
   }
-  if (normalizeEncounterSceneKey("小吃店") !== null ||
-      normalizeEncounterSceneKey("路邊攤") !== "shopping-street") {
-    throw new Error("unavailable small-eatery scenes stay unmapped while roadside stalls use the existing street scene");
+  if (normalizeEncounterSceneKey("小吃店") !== "shopping-street" ||
+      normalizeEncounterSceneKey("路邊攤") !== "shopping-street" ||
+      normalizeEncounterSceneKey("咖啡廳") !== "shopping-street" ||
+      normalizeEncounterSceneKey("書店") !== "shopping-street") {
+    throw new Error("street shops and small eateries must resolve to fixed scene F");
   }
   if (normalizeEncounterSceneKey("後巷") !== "shopping-street" ||
       normalizeEncounterSceneKey("巷口") !== "shopping-street") {
@@ -272,8 +280,8 @@ Deno.test("maps existing character schedule locations without rewriting natural 
   if (options[0].location_key !== "live-house" || options[0].location_description !== "Livehouse") {
     throw new Error("Livehouse label must map to Live House without rewriting the original label");
   }
-  if (options[0].rain_fallback_location_key !== null) {
-    throw new Error("unmapped convenience-store rain fallback must remain a valid natural location");
+  if (options[0].rain_fallback_location_key !== "convenience-store") {
+    throw new Error("convenience-store rain fallback must resolve to fixed scene M");
   }
   if (options[1].location_key !== "apartment" || options[1].location_description !== "頂樓出租屋") {
     throw new Error("residential location must stay in the apartment scene even when the activity mentions guitar");
@@ -292,14 +300,16 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
   if (parsed.characters[0].variants.weekday[8].options[0].location_description !== "私人畫室" ||
-      parsed.characters[0].variants.weekday[8].options[0].location_key !== "art-gallery") {
-    throw new Error("custom natural location was not preserved and system-matched");
+      parsed.characters[0].variants.weekday[8].options[0].location_key !== null) {
+    throw new Error("unmapped natural locations must be preserved without inventing a fixed scene");
   }
   if (normalizeEncounterSceneKey("酒吧") !== "night-bar" ||
       normalizeEncounterSceneKey("辦公大樓") !== "commercial" ||
-      normalizeEncounterSceneKey("咖啡廳") !== "cafe" ||
+      normalizeEncounterSceneKey("咖啡廳") !== "shopping-street" ||
       normalizeEncounterSceneKey("展演廳") !== "live-house" ||
-      normalizeEncounterSceneKey("代辦所") !== "commercial") throw new Error("canonical scene aliases regressed");
+      normalizeEncounterSceneKey("代辦所") !== "commercial" ||
+      normalizeEncounterSceneKey("歸途") !== "night-bar" ||
+      normalizeEncounterSceneKey("餐廳") !== "department-store") throw new Error("canonical A–N scene aliases regressed");
 
   const tooLong = hourlyBlocks();
   tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
