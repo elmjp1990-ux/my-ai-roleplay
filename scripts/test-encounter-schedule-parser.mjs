@@ -5,7 +5,7 @@ const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
-const scheduleOrganizer = fs.readFileSync("supabase/functions/encounter-schedule-organizer/index.ts", "utf8");
+const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 const worldviewReviewMigration = fs.readFileSync("supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql", "utf8");
 
 // The author-facing field must accept ordinary prose, not a pipe-delimited schema.
