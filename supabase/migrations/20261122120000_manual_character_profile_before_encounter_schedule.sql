@@ -1,3 +1,35 @@
+-- Shared selector used by the Profile status endpoint, Profile claim, and
+-- schedule preflight so all three agree on the exact next eligible character.
+CREATE OR REPLACE FUNCTION public.get_next_encounter_schedule_character_for_author(
+  p_author_id uuid
+)
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $
+  SELECT jsonb_build_object(
+    'character_id', j.character_id,
+    'character_name', c.name
+  )
+  FROM public.encounter_schedule_generation_jobs j
+  JOIN public.characters c ON c.id = j.character_id
+  WHERE j.author_id = p_author_id
+    AND j.status = 'pending'
+    AND c.visibility = 'public'
+    AND c.review_status = 'approved'
+    AND c.rights_confirmed IS TRUE
+    AND c.deleted_at IS NULL
+  ORDER BY j.queued_at, j.character_id
+  LIMIT 1;
+$;
+
+REVOKE ALL ON FUNCTION public.get_next_encounter_schedule_character_for_author(uuid)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.get_next_encounter_schedule_character_for_author(uuid)
+  TO service_role;
+
 -- Manual, author-scoped Profile generation for the next pending Encounter schedule role.
 -- This RPC is service-role only; the Edge Function authenticates the author first.
 CREATE OR REPLACE FUNCTION public.claim_next_encounter_character_profile_job(
@@ -41,18 +73,11 @@ BEGIN
 
   -- The Profile step always targets the exact next pending public character
   -- that the manual Encounter schedule step will claim.
-  SELECT j.character_id, c.name
-  INTO v_character_id, v_character_name
-  FROM public.encounter_schedule_generation_jobs j
-  JOIN public.characters c ON c.id = j.character_id
-  WHERE j.author_id = p_author_id
-    AND j.status = 'pending'
-    AND c.visibility = 'public'
-    AND c.review_status = 'approved'
-    AND c.rights_confirmed IS TRUE
-    AND c.deleted_at IS NULL
-  ORDER BY j.queued_at, j.character_id
-  LIMIT 1;
+  v_payload := public.get_next_encounter_schedule_character_for_author(p_author_id);
+  IF v_payload IS NOT NULL THEN
+    v_character_id := (v_payload ->> 'character_id')::uuid;
+    v_character_name := COALESCE(v_payload ->> 'character_name', '角色');
+  END IF;
 
   IF v_character_id IS NULL THEN
     RETURN jsonb_build_object('status', 'no_pending_schedule_jobs');
