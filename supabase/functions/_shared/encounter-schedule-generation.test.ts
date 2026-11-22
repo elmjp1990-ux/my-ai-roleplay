@@ -145,7 +145,7 @@ Deno.test("requires 2-3 options and exact 100 percent weight totals per hour", (
   }
 });
 
-Deno.test("limits activity descriptions to 10-30 characters and rejects extra greeting fields", () => {
+Deno.test("limits activity descriptions to 8-30 characters and rejects extra greeting fields", () => {
   const short = hourlyBlocks();
   short[0] = block(0, [option({ activity: "睡覺" }), option({ weight: 0, activity: "醒來喝水後又躺回床上休息" })]);
   const shortResult = result([{ character_id: id1, placement: "modern_map", variants: variants(short) }]);
@@ -156,7 +156,7 @@ Deno.test("limits activity descriptions to 10-30 characters and rejects extra gr
   if (extraResult.ok || !extraResult.errors.some((error) => error.includes("option_0_keys_invalid"))) throw new Error("generated greeting field accepted");
 });
 
-Deno.test("requires an indoor rain fallback for outdoor options only", () => {
+Deno.test("requires outdoor rain alternatives but permits reasonable indoor alternatives", () => {
   const valid = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!valid.ok) throw new Error(valid.errors.join(","));
   const invalid = hourlyBlocks();
@@ -174,8 +174,9 @@ Deno.test("requires an indoor rain fallback for outdoor options only", () => {
     option({ weight: 40 }),
   ]);
   const unexpectedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unexpected) }]);
-  if (unexpectedResult.ok || !unexpectedResult.errors.some((error) => error.includes("unexpected_rain_fallback"))) {
-    throw new Error("indoor option with rain fallback accepted");
+  if (!unexpectedResult.ok ||
+      unexpectedResult.characters[0].variants.weekday[1].options[0].rain_fallback_location_key !== "apartment") {
+    throw new Error("reasonable indoor option with rain alternative should be accepted");
   }
 });
 
@@ -301,10 +302,10 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
       normalizeEncounterSceneKey("代辦所") !== "commercial") throw new Error("canonical scene aliases regressed");
 
   const tooLong = hourlyBlocks();
-  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的音樂工作室名稱" }), option({ weight: 40 })]);
+  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
   const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
   if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
-    throw new Error("location label longer than eight characters accepted");
+    throw new Error("location label longer than twenty characters accepted");
   }
 });
 
@@ -482,7 +483,7 @@ Deno.test("builds concise schedule prompts without generated greetings", () => {
   const prompt = built.messages[0].content;
   if (built.messages.length !== 2 || !prompt.includes("不同時段獨立抽取") ||
       !prompt.includes("恰好 24 個逐小時時段") ||
-      !prompt.includes("10–30 個中文字") ||
+      !prompt.includes("8–30 個中文字") ||
       !prompt.includes("每個時段必須提供 2–3 個選項")) {
     throw new Error("24-hour compact schedule rules missing");
   }
