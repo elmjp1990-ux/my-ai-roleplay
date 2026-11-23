@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "scripts/test-chat-unread-nav-badge.mjs"
       - "encounter-scene.js"
       - "city-map.js"
       - "followed-authors.js"
@@ -62,6 +63,8 @@ jobs:
           }
           console.log('Parsed ' + blocks.length + ' inline JavaScript blocks.');
           NODE
+      - name: Verify chat unread badge and group reply refresh contract
+        run: node scripts/test-chat-unread-nav-badge.mjs
       - name: Parse extracted City map module
         run: node --check city-map.js
       - name: Parse extracted Followed authors module
