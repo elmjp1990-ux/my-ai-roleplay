@@ -333,8 +333,8 @@ assert.match(exploreGrid,/characterVideoObserver\.unobserve\(previousVideo\)/,
   "Explore pagination must preserve the existing video-node reuse behavior");
 
 const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
-assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
-  "Encounter memory lists must use the shared ten-session page size");
+assert.match(encounterMemory,/const pageSize=10/,
+  "Encounter diary must load exactly ten sessions per page");
 assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
