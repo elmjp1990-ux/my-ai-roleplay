@@ -548,7 +548,7 @@
  const bookmarks='<div class="city-character-bookmarks" aria-label="角色功能"><button type="button" class="city-character-bookmark '+(mode==='status'?'active':'')+'" data-action="city-character-status" aria-label="角色資料">角色資料</button><button type="button" class="city-character-bookmark '+(mode==='history'?'active':'')+'" data-action="city-character-history" aria-label="相遇紀錄">相遇紀錄</button><button type="button" class="city-character-bookmark" data-action="city-character-story" aria-label="故事模式">故事模式</button></div>';
  const affinityMarkup=(mode==='status'&&page===0||mode==='history')?'<div class="city-character-affinity" id="cityCharacterAffinity" data-character-id="'+escapeHTML(person.id)+'">正在讀取好感度…</div>':'';
  const meetControl=isSleepingSchedule(person.cityActivity,person.citySceneDescription)
- ? '<div class="city-character-meet" role="status">目前無法相遇（熟睡中）</div>'
+ ? '<div class="city-character-meet" role="status">熟睡中無法相遇</div>'
  : '<button type="button" class="city-character-meet primary" data-action="city-character-meet">與他相遇</button>';
  const left='<div class="city-character-photo-column">'+portrait+affinityMarkup+meetControl+'</div>';
  let copy='';
