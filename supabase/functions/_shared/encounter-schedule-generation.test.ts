@@ -176,8 +176,8 @@ Deno.test("rain fallback fields are optional and unrestricted by scene policy", 
   const unrestrictedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unrestrictedFallback) }]);
   if (!unrestrictedResult.ok) throw new Error(unrestrictedResult.errors.join(","));
   const chosen = unrestrictedResult.characters[0].variants.weekday[17].options[0];
-  if (chosen.rain_fallback_location_key !== null || chosen.rain_fallback_activity !== "喜歡在雨中繼續散步") {
-    throw new Error("unmapped rain fallback should be accepted without a validation error");
+  if (chosen.rain_fallback_location_key !== "waterfront" || chosen.rain_fallback_activity !== "喜歡在雨中繼續散步") {
+    throw new Error("recognized but formerly disallowed outdoor fallback should be accepted");
   }
 });
 
