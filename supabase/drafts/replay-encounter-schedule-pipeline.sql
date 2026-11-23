@@ -429,16 +429,16 @@ BEGIN
     RAISE EXCEPTION 'legacy weather scheduler disable check returned NULL';
   END IF;
 
+  -- This replay runs before the weekly-weather migration. Verify the legacy
+  -- six-hour worker here; the following migration step verifies the new
+  -- weekly and minute-55 schedules after they have actually been installed.
   IF pg_catalog.strpos(
     pg_catalog.pg_get_functiondef(
       'public.schedule_encounter_worker(text,boolean)'::regprocedure
     ),
-    '0 0 * * 0'
-  ) = 0 OR pg_catalog.strpos(
-    pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),
-    '55 * * * *'
+    '0 */6 * * *'
   ) = 0 THEN
-    RAISE EXCEPTION 'weather scheduler must use weekly and minute-55 intervals';
+    RAISE EXCEPTION 'legacy weather scheduler interval is missing before migration';
   END IF;
 
   IF pg_catalog.strpos(
