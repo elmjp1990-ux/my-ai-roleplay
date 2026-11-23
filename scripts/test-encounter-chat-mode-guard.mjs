@@ -287,7 +287,7 @@ assert.match(frontend, /function showEncounterLeaveDialog\(session\)/);
 assert.match(frontend, /data-action="encounter-temporary-leave"/);
 assert.doesNotMatch(frontend, /data-action="encounter-end-prompt"/);
 assert.match(frontend, /data-action="encounter-end-confirm"/);
-assert.match(frontend, /if\(messages\.length===0\)[\s\S]*?setEncounterLifecycleState\(session\.id,'end'\)/);
+assert.match(frontend, /if\(!messages\.some\(m=>m\.role==='user'&&String\(m\.text\|\|m\.content\|\|''\)\.trim\(\)\)\)[\s\S]*?setEncounterLifecycleState\(session\.id,'end'\)/);
 assert.match(frontend, /沒有互動，未建立好感度或相遇日記/);
 assert.match(frontend, /data-action="encounter-temporary-leave"/);
 assert.match(frontend, /activeEncounter\?\.encounterMode===true\)\{showEncounterLeaveDialog/);
