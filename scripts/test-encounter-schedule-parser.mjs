@@ -203,9 +203,14 @@ assert.ok(html.includes("const characterIllustrationMetadataInflight = new Map()
 assert.ok(html.includes("async function loadCharacterIllustrationAssets(characterIds, cleanupUserId=null)"));
 assert.ok(html.includes("if(cleanupUserId)await retryCharacterIllustrationCleanup(cleanupUserId)"));
 
-// Character hydration only fetches story fields consumed by the UI; avoid downloading unused story descriptions/titles.
+// Owned character hydration fetches the latest story through the bounded RPC.
+// Public character detail no longer reads opening text; it belongs only to chat startup.
 assert.ok(html.includes("client.rpc('get_latest_owned_character_stories'"), "Owned character hydration must fetch only the latest story per character through the bounded RPC.");
-assert.ok(html.includes(".select('opening_message')"), "Public character detail must select only the opening field it displays.");
+const detailMetadataStart = html.indexOf("async function hydratePublicCharacterDetailMetadata");
+const detailMetadataEnd = html.indexOf("async function hydratePublicCharacterIllustrations", detailMetadataStart);
+assert.ok(detailMetadataStart >= 0 && detailMetadataEnd > detailMetadataStart, "public character detail metadata block must exist");
+const detailMetadata = html.slice(detailMetadataStart, detailMetadataEnd);
+assert.ok(!detailMetadata.includes("character_stories") && !detailMetadata.includes("opening_message"), "Public character detail must not fetch opening text.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
 // Unknown worldview review is author-scoped and decisions never invoke AI inline.
