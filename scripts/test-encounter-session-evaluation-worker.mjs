@@ -45,6 +45,8 @@ assert.match(worker, /UUID_PATTERN/);
 assert.match(worker, /settle_encounter_session/);
 assert.match(worker, /persistEncounterSummary/);
 assert.match(worker, /encounterSummary: summary\.slice\(0, 1200\)/);
+assert.match(worker, /if \(!data\.no_interaction\) throw new Error\("encounter_empty_session_unexpectedly_recorded"\)/);
+assert.match(worker, /cancelled: true, noTurns: true, noInteraction: true, summarySynced: false/);
 assert.match(worker, /encounterEndedAt: Date\.parse\(endedAt\)/);
 assert.match(worker, /lifecycle\.status === "settled"[\s\S]*?summarySynced/,
   "A retry after affinity settlement must sync the saved summary without re-running evaluation");
@@ -141,5 +143,9 @@ assert.doesNotMatch(sessionStateEdge, /select\("session_data"\)/,
 assert.doesNotMatch(sessionStateEdge, /enqueue_due_encounter_evaluations/,
   "A manual end must not enqueue or drain unrelated users' due sessions");
 
+const emptyEncounterMigration = fs.readFileSync("supabase/migrations/20261123140000_encounter_empty_session_no_relationship.sql", "utf8");
+assert.match(emptyEncounterMigration, /l\.turn_count=0/);
+assert.match(emptyEncounterMigration, /status='cancelled'/);
+assert.match(emptyEncounterMigration, /no_interaction/);
 assert.doesNotMatch(worker, /affinity_delta.*整場相遇|relationship_stage.*八種階段/);
 console.log("Encounter session evaluator summary/memory parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
