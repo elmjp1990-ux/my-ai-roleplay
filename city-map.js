@@ -339,45 +339,23 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const cityPlaceAliases={waterfront:['waterfront','harbor','riverside'],commercial:['commercial','office','office-building'],airport:['airport'],university:['university','campus'],park:['park'],'shopping-street':['shopping-street','shopping_street','street-market'],'department-store':['department-store','department_store'],hospital:['hospital','central-hospital'],'night-bar':['night-bar','bar'],'live-house':['live-house','livehouse','performance-venue'],'luxury-apartment':['luxury-apartment','premium-apartment'],apartment:['apartment','308-apartment'],'convenience-store':['convenience-store','convenience_store','supermarket'],'private-club':['private-club','luxury-club','club']};
- const isSleepingSchedule=(a,s='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((a+' '+s).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
- const getTaipeiClock=()=>{
- const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Taipei',weekday:'short',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date());
- const values=Object.fromEntries(parts.map(part=>[part.type,part.value]));
- return {weekday:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[values.weekday],minutes:Number(values.hour)*60+Number(values.minute)};
- };
+ const cityPlaceSceneKeys={waterfront:'水岸港區',commercial:'辦公大樓',airport:'機場',university:'校園',park:'中央公園','shopping-street':'商店街','department-store':'百貨公司',hospital:'中央醫院','night-bar':'夜間酒吧','live-house':'展演空間','luxury-apartment':'高級公寓',apartment:'308公寓','convenience-store':'便利商店','private-club':'高級會所'};
+ const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
  const isCurrentCityCharacterEligible=(person)=>{
  const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
  return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
  };
  const getCityPresence=(place,sourceCharacters=state.characters)=>{
- const clock=getTaipeiClock();
- const aliases=cityPlaceAliases[place]||[place];
+ const sceneKey=cityPlaceSceneKeys[place];
+ if(!sceneKey)return [];
  return (Array.isArray(sourceCharacters)?sourceCharacters:[]).filter(character=>{
- if(character?.visibility!=='public'||character.deletedAt||!accessible(character)) return false;
- const raw=String(character.encounterSchedules||'').trim();
- if(!raw) return false;
- return raw.split(/\r?\n/).some(line=>{
- const parts=line.trim().split('|').map(value=>value.trim());
- if(parts.length!==6) return false;
- const [day,start,end,key,activity]=parts;
- if(!aliases.includes(key)||!activity) return false;
- if(day!=='*'&&Number(day)!==clock.weekday) return false;
- if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(start)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(end)) return false;
- const now=clock.minutes,from=Number(start.slice(0,2))*60+Number(start.slice(3)),to=Number(end.slice(0,2))*60+Number(end.slice(3));
- return from<to?now>=from&&now<to:(now>=from||now<to);
- });
+ if(character?.visibility!=='public'||character.deletedAt||!accessible(character))return false;
+ const schedules=Array.isArray(character.encounterSchedules)?character.encounterSchedules:[];
+ return schedules.some(row=>row?.location_key===sceneKey&&!isSleepingSchedule(row.activity,row.scene_description));
  }).map(character=>{
- const raw=String(character.encounterSchedules||'');
- const line=raw.split(/\r?\n/).find(item=>{
- const parts=item.trim().split('|').map(value=>value.trim());
- if(parts.length!==6||!(cityPlaceAliases[place]||[place]).includes(parts[3])||!parts[4]) return false;
- if(parts[0]!=='*'&&Number(parts[0])!==clock.weekday) return false;
- const from=Number(parts[1]?.slice(0,2))*60+Number(parts[1]?.slice(3)),to=Number(parts[2]?.slice(0,2))*60+Number(parts[2]?.slice(3));
- return Number.isFinite(from)&&Number.isFinite(to)&&(from<to?clock.minutes>=from&&clock.minutes<to:(clock.minutes>=from||clock.minutes<to));
- });
- const parts=String(line||'').trim().split('|').map(value=>value.trim());
- return {...character,cityStartTime:parts[1]||'',cityEndTime:parts[2]||'',cityActivity:parts[4]||'',citySceneDescription:(()=>{try{return decodeURIComponent(parts[5]||'')}catch{return ''}})()};
+ const row=(Array.isArray(character.encounterSchedules)?character.encounterSchedules:[])
+ .find(item=>item?.location_key===sceneKey&&!isSleepingSchedule(item.activity,item.scene_description));
+ return {...character,cityStartTime:String(row?.start_time||'').slice(0,5),cityEndTime:String(row?.end_time||'').slice(0,5),cityActivity:row?.activity||'',citySceneDescription:row?.scene_description||''};
  });
  };
  const cityPresenceByPlace={};
