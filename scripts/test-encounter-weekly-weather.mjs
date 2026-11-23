@@ -18,6 +18,6 @@ assert.match(handler,/forecast_rows_insufficient/);
 assert.match(handler,/request.headers.get\("Authorization"\)!=="Bearer "\+key/);
 assert.match(cityMap,/get_encounter_city_weather_v2/);
 assert.match(cityMap,/cityMapRainChance/);
-assert.match(cityMap,/60 \* 60 \* 1000/);
+assert.match(cityMap,/50 \\* 60 \\* 1000/);
 assert.doesNotMatch(cityMap,/readCityMapCache\('weather',CITY_MAP_WEATHER_CACHE_TTL_MS\)/);
 console.log("Encounter weekly forecast/hourly weather contract passed.");
