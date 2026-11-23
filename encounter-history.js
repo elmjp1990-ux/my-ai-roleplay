@@ -7,7 +7,7 @@ const renderHistory=(p,rows,esc,places)=>{
  const cards=rows.map(s=>{
   const date=new Date(Number(s.startedAt)||Date.now()).toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'});
   const venue=places[s.encounterPlace]||'城市相遇',preview=clean(s.lastMessagePreview||s.encounterSummary||(s.archived?'本次相遇已結束，尚未產生文字摘要':'')).slice(0,50);
-  return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+esc(date)+' · '+esc(venue)+'</strong></div>'+(s.archived?'<span class="city-encounter-history-status">已結束</span>':'')+(preview?'<p>'+esc(preview)+'</p>':'')+'</article>';
+  return '<article class="city-encounter-history-item"><div class="city-encounter-history-heading"><strong>'+esc(date)+' · '+esc(venue)+'</strong></div>'+(preview?'<p>'+esc(preview)+'</p>':'')+'</article>';
  }).join('');
  return (!rows.length&&!p.encounterHistoryLoading?'<p>目前還沒有已保存的相遇紀錄。完成「與他相遇」對話後，紀錄會顯示在這裡。</p>':'')+cards+(p.encounterHistoryLoading?'<p class="small muted">'+(rows.length?'正在載入更早的相遇紀錄…':'正在讀取雲端相遇紀錄…')+'</p>':'')+(p.encounterHistoryError?'<p role="alert">'+esc(p.encounterHistoryError)+'</p>':'')+(p.encounterHistoryHasMore?'<div data-encounter-history-sentinel="true" class="small muted" style="padding:12px;text-align:center">繼續往下滑動，載入更早的相遇紀錄…</div>':'');
 };
