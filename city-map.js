@@ -245,31 +245,14 @@
 
  locationModal=$('cityMapPeople');
  if(locationModal && locationModal.parentElement!==document.body) document.body.appendChild(locationModal);
- const cityPlaceNames={waterfront:'水岸港區',commercial:'辦公大樓',airport:'機場',university:'校園',park:'中央公園','shopping-street':'商店街','department-store':'百貨公司',hospital:'中央醫院','night-bar':'夜間酒吧','live-house':'展演空間','luxury-apartment':'高級公寓',apartment:'308公寓','convenience-store':'便利商店','private-club':'高級會所'};
- const cityPlaceSubtitles={
- waterfront:'河岸・碼頭',commercial:'商務・辦公',airport:'航廈・出境',university:'教室・校園',park:'綠地・廣場','shopping-street':'小吃・街邊店','department-store':'購物・餐飲',hospital:'醫療・照護','night-bar':'夜生活・樂團','live-house':'LIVE・展覽','luxury-apartment':'私宅・高級住宅',apartment:'住宅・日常','convenience-store':'便利・日常','private-club':'私人・娛樂'
- };
- const cityVenueScenes={
- airport:{icon:'✈️',heading:'城市的起點與交會處',description:'航班資訊在大廳螢幕上流動，旅人拖著行李匆匆經過。候機座位、接機大廳與深夜航班，總有新的相遇可能。',eventLabel:'場景亮點',eventTitle:'抵達大廳的偶遇',eventDescription:'適合安排接機、送別、轉機途中或旅程開始前的故事。'},
- commercial:{icon:'🏢',heading:'玻璃帷幕下的繁忙日常',description:'電梯穿梭於不同樓層，會議室、辦公座位與窗邊休息區構成城市工作的節奏。白天忙碌，傍晚後則逐漸安靜。',eventLabel:'場景亮點',eventTitle:'下班後的窗邊時光',eventDescription:'適合商業談判、同事互動、秘密會面或忙碌一天後的短暫休息。'},
- 'night-bar':{icon:'🍸',heading:'霓虹燈下的微醺夜色',description:'低亮度燈光映著吧台酒杯，音樂與交談聲交錯。角落座位保留一點私密感，適合卸下白天的面具。',eventLabel:'場景亮點',eventTitle:'吧台邊的陌生人',eventDescription:'適合深夜談心、偶然搭話、重逢或帶著秘密的夜間故事。'},
- 'live-house':{icon:'🎸',heading:'讓音樂填滿整個夜晚',description:'舞台燈光、音箱震動與觀眾的歡呼交織成現場氛圍。演出前後的走廊與吧台，也可能發生比舞台更難忘的對話。',eventLabel:'場景亮點',eventTitle:'演出開始前',eventDescription:'適合樂團演出、後台相遇、樂迷交流或散場後的續攤情節。'},
- apartment:{icon:'🏠',heading:'308 公寓的日常與秘密',description:'熟悉的電梯聲、走廊燈光與各自緊閉的房門，讓這裡既有生活感，也保留鄰居之間尚未說出口的故事。',eventLabel:'場景亮點',eventTitle:'走廊裡的偶然碰面',eventDescription:'適合鄰居日常、借物、深夜返家或逐漸熟悉彼此的生活故事。'},
- 'department-store':{icon:'🛍️',heading:'從精品櫥窗到美食樓層',description:'明亮的中庭連接各式品牌櫃位、服飾樓層與餐飲空間。人潮來去，購物、約會與臨時起意的行程都能在這裡展開。',eventLabel:'場景亮點',eventTitle:'中庭的週末人潮',eventDescription:'適合約會逛街、挑選禮物、偶遇熟人或在美食樓層稍作停留。'},
- park:{icon:'🌳',heading:'城市裡的一片綠意',description:'步道穿過樹蔭與草地，長椅、噴水池和開闊的天空讓人暫時遠離喧鬧。清晨散步、午後閒聊或傍晚慢跑，都有不同的城市風景。',eventLabel:'場景亮點',eventTitle:'樹蔭下的片刻寧靜',eventDescription:'適合散步、慢跑、野餐、偶遇或在戶外談一場不急著結束的對話。'},
- waterfront:{icon:'🌊',heading:'沿著河岸與港灣散步',description:'河堤步道、碼頭與水岸景觀連接城市不同區域，白天適合散步與吹風，夜晚則能欣賞水面與城市燈光。',eventLabel:'場景亮點',eventTitle:'水岸邊的偶遇',eventDescription:'適合散步、談心、看夜景或在河堤旁短暫停留。'},
- university:{icon:'🎓',heading:'校園裡的日常與青春',description:'教學大樓、圖書館、操場與校園廣場構成日常動線，下課鐘聲與社團活動讓不同故事在此交會。',eventLabel:'場景亮點',eventTitle:'下課後的校園時光',eventDescription:'適合課堂、社團、校園活動、圖書館自習與同學間的相遇。'},
- 'shopping-street':{icon:'🛍️',heading:'街邊店家交織的生活街區',description:'小吃攤、花店、咖啡廳與各式街邊店沿街排列，從白天採買到夜晚散步，都能遇見城市的日常風景。',eventLabel:'場景亮點',eventTitle:'街角的日常活動',eventDescription:'店家活動、臨時攤位與街頭表演可依當期內容更新，不改變固定地點。'},
- hospital:{icon:'🏥',heading:'城市裡的中央醫院',description:'門診大廳、候診區與院區周邊維持著忙碌而有秩序的節奏，醫療人員、病患與訪客各自有不同的故事。',eventLabel:'場景亮點',eventTitle:'醫院裡的日常',eventDescription:'適合就診、探病、值班、陪伴與醫院周邊的生活情節。'},
- 'luxury-apartment':{icon:'🏙️',heading:'城市高處的私人居所',description:'門禁、接待大廳與高樓層景觀構成安靜而講究隱私的住宅空間，住戶的日常多半在熟悉的生活圈中展開。',eventLabel:'場景亮點',eventTitle:'大廳裡的偶然相遇',eventDescription:'適合住戶日常、拜訪、鄰里互動或私人生活故事。'},
- 'convenience-store':{icon:'🏪',heading:'隨時亮著燈的便利商店',description:'明亮的貨架、微波爐與靠窗座位，讓這裡成為城市裡隨時能短暫停留的地方。',eventLabel:'場景亮點',eventTitle:'深夜補給時間',eventDescription:'適合買宵夜、臨時採買、短暫休息或深夜偶遇。'},
- 'private-club':{icon:'🥂',heading:'低調而私密的高級會所',description:'接待大廳、包廂與專屬餐飲空間提供隱密而舒適的聚會環境，商務往來與私人邀約都可能在此發生。',eventLabel:'場景亮點',eventTitle:'今晚的私人邀約',eventDescription:'適合商務聚會、私人餐敘、高級娛樂與會員活動。'}
- };
+ const cityPlaceNames=Object.create(null);
+ const cityVenueScenes=Object.create(null);
  const renderCitySceneCatalog=(rows)=>{
  for(const row of (Array.isArray(rows)?rows:[])){
  const key=String(row?.location_key||'').trim();
- if(!Object.prototype.hasOwnProperty.call(cityPlaceNames,key))continue;
+ if(!Object.prototype.hasOwnProperty.call(cityPlaceSceneKeys,key)&&!Object.values(cityPlaceSceneKeys).includes(key))continue;
  const previous=cityVenueScenes[key]||{};
+ cityPlaceNames[key]=String(row.display_name||key);
  const scene={
  icon:String(row.icon||previous.icon||'📍'),
  heading:String(row.heading||previous.heading||''),
@@ -283,18 +266,20 @@
  };
  const loadCitySceneCatalog=async()=>{
  const client=window.mySupabase;
- if(!client)return;
+ if(!client)return [];
  const cached=readCityMapCache('scenes-v2',CITY_MAP_SCENES_CACHE_TTL_MS);
  if(cached)renderCitySceneCatalog(cached.data);
- if(cached?.fresh)return;
+ if(cached?.fresh)return cached.data;
  try{
  const {data,error}=await client.rpc('get_encounter_scene_catalog');
  if(error)throw error;
  const rows=Array.isArray(data)?data:[];
  writeCityMapCache('scenes-v2',rows);
  renderCitySceneCatalog(rows);
+ return rows;
  }catch(error){
  if(!cached)console.warn('城市場景目錄載入失敗：',error?.message||error);
+ return cached?.data||[];
  }
  };
  activeSceneRefresh=async()=>{
@@ -449,6 +434,7 @@
  const openCityLocation=async(marker)=>{
  const place=marker?.dataset?.place;
  if(!place||!locationModal)return;
+ await loadCitySceneCatalog();
  const name=cityPlaceNames[place]||'地點';
  const scene=cityVenueScenes[place];
  if(!scene){console.error('城市地標缺少專屬場景設定：',place);toast('這個地點的場景資料尚未完成，請稍後再試。');return;}
@@ -465,7 +451,7 @@
  if(venueInfo)venueInfo.hidden=false;
  const title=$('cityMapPlaceTitle');
  if(title){title.textContent=name;title.style.display='block';title.style.visibility='visible';}
- const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent=cityPlaceSubtitles[place]||'';
+ const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent='';
  const placeIcon=$('cityMapPlaceIcon');
  if(placeIcon)placeIcon.textContent=scene.icon;
  const renderVenue=()=>{
@@ -476,7 +462,7 @@
  };
  const latestEventMarkup=latestNotice.items.map(item=>'<p>📣 '+escapeHTML(item)+'</p>').join('');
  if(title){title.textContent=cityPlaceNames[place]||name;title.style.display='block';title.style.visibility='visible';}
- const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent=cityPlaceSubtitles[place]||'';
+ const placeSubtitle=$('cityMapPlaceSubtitle');if(placeSubtitle)placeSubtitle.textContent='';
  if(placeIcon)placeIcon.textContent=latestScene.icon;
  const target=$('cityMapPresenceList');
  if(target)target.innerHTML='<h3 id="cityMapVenueHeading">'+escapeHTML(latestScene.heading)+'</h3><p id="cityMapVenueDescription">'+escapeHTML(latestScene.description)+'</p><div class="city-location-news"><span class="city-location-event-label">'+escapeHTML(latestNotice.label)+'</span><div class="city-location-news-items">'+latestEventMarkup+'</div></div>'+flightMarkup;
