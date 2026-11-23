@@ -303,7 +303,7 @@ body.day .tag { color:#4f46b8; }
   background:transparent;
   color:var(--muted);
 }
-.nav-btn.active { background:var(--soft); color:var(--text); }
+.nav-btn.active { background:var(--soft); color:var(--text); }\n.nav-btn { position:relative; }\n.nav-unread-badge { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; min-width:18px; max-width:30px; height:18px; padding:0 5px; border-radius:999px; background:#8b5cf6; color:#fff; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; box-sizing:border-box; box-shadow:0 0 0 2px var(--panel); }\n@media(max-width:767px){ #mobileNav .nav-btn { position:relative; } #mobileNav .nav-unread-badge { position:absolute; top:2px; right:4px; min-width:16px; max-width:25px; height:16px; font-size:9px; padding:0 4px; } }
 .nav-btn.active .chat-nav-icon { fill:currentColor; }
 .sidebar-footer { margin-top:auto; display:flex; justify-content:center; }
 .sidebar-footer button { padding:8px; }
@@ -5139,6 +5139,29 @@ function visit(page,idValue) {
   go(next);
 }
 
+function chatNavUnreadCount(){
+  const sessions=Object.values(state.sessions||{}).filter(session=>{
+    const character=sessionCharacter(session);
+    return character&&!isEncounterChatSession(session)&&!session.archived&&
+      hasUserMessage(session)&&chatHasUnreadAssistantMessage(session.lastAssistantMessageAt,session.lastReadAt);
+  });
+  const byCharacter=new Set();
+  for(const session of sessions)byCharacter.add(session.characterId||sessionCharacter(session)?.id||session.id);
+  let count=byCharacter.size;
+  const uid=currentUser()?.uid;
+  if(uid){
+    for(const group of groupPrototype.groups||[]){
+      const preview=groupPrototype.groupPreviews?.[group.id];
+      if(groupPreviewLastAssistantAt(preview)>groupChatReadAt(uid,group.id))count++;
+    }
+  }
+  return count;
+}
+function chatNavUnreadBadge(){
+  const count=chatNavUnreadCount();
+  if(!count)return '';
+  return '<span class="nav-unread-badge" aria-label="'+count+' 筆未讀訊息">'+(count>99?'99+':count)+'</span>';
+}
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
     : route.page === 'citymap' ? 'home'
@@ -5154,7 +5177,7 @@ function renderShell() {
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>
+      ${ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>${page === 'chat' ? chatNavUnreadBadge() : ''}
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
