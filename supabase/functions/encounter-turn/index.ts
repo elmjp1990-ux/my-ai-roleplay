@@ -391,7 +391,7 @@ Deno.serve(async (request) => {
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
       ...(suggestedReplies.length > 0 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
-      encounter: { evidence, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
+      encounter: { evidence, sessionMetadataSynced, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
     });
   };
   const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta,suggested_replies")
