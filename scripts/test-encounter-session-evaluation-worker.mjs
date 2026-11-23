@@ -22,6 +22,14 @@ assert.equal(parseEncounterSessionEvaluation({ ...valid, diary_summary: "" }), n
 assert.equal(parseEncounterSessionEvaluation({ ...valid, rationale: "" }), null);
 
 const worker = fs.readFileSync("supabase/functions/encounter-evaluation-worker/index.ts", "utf8");
+const emptySettlementResultFix = fs.readFileSync(
+  "supabase/migrations/20261123150000_fix_encounter_empty_settlement_result.sql",
+  "utf8",
+);
+assert.match(emptySettlementResultFix, /set_encounter_session_lifecycle_state/);
+assert.match(emptySettlementResultFix, /settle_encounter_session/);
+assert.match(emptySettlementResultFix, /settlement_result=jsonb_build_object/);
+assert.match(emptySettlementResultFix, /no_interaction/);
 assert.match(worker, /ENCOUNTER_DISCOVERY_SENTINEL/);
 assert.match(worker, /玩家選擇留空，讓角色主動發現自己/);
 assert.match(worker, /玩家留空發送，請角色自然延續目前互動/);
