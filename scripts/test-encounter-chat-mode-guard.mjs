@@ -486,7 +486,7 @@ assert.match(encounterHistory, /session_data->>encounterMode/);
 assert.match(encounterHistory, /encounterSummary:clean\(r\.encounter_summary/);
 assert.match(encounterHistory, /archived:r\.session_archived==='true'\|\|!!ended/);
 assert.match(encounterHistory, /本次相遇已結束，尚未產生文字摘要/);
-assert.doesNotMatch(encounterHistory, /city-encounter-history-status|已結束/);
+assert.doesNotMatch(encounterHistory, /city-encounter-history-status/);
 assert.doesNotMatch(encounterHistory, /limit\(2\)/);
 assert.match(encounterHistory, /chat_messages/, "speaker preview query is expected");
 assert.match(encounterHistory, /limit\(N\)/, "preview query must remain capped at ten");
