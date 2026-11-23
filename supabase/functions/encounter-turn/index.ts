@@ -391,7 +391,7 @@ Deno.serve(async (request) => {
         .update({ session_data: sessionData }).eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null)
         .select("updated_at").maybeSingle();
       sessionMetadataSynced = !sessionMetaWriteError && Boolean(updatedSessionMeta?.updated_at);
-      if (sessionMetadataSynced) sessionUpdatedAt = asText(updatedSessionMeta.updated_at);
+      if (sessionMetadataSynced && updatedSessionMeta) sessionUpdatedAt = asText(updatedSessionMeta.updated_at);
       if (sessionMetaWriteError) console.warn("encounter_session_metadata_sync_failed", sessionMetaWriteError.code || "unknown");
       else if (!updatedSessionMeta) console.warn("encounter_session_metadata_update_returned_no_row");
     }
