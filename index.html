@@ -5163,7 +5163,7 @@ function chatNavUnreadCount(){
 function chatNavUnreadBadge(){
   const count=chatNavUnreadCount();
   if(!count)return '';
-  return '<span class="nav-unread-badge'+(count>99?' is-overflow':'')+'" aria-label="'+(count>99?'99 則以上未讀訊息':count+' 筆未讀訊息')+'">'+(count>99?'99+':count)+'</span>';
+  return '<span class="nav-unread-badge'+(count>=99?' is-overflow':'')+'" aria-label="'+(count>=99?'99 則以上未讀訊息':count+' 筆未讀訊息')+'">'+(count>=99?'99+':count)+'</span>';
 }
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
