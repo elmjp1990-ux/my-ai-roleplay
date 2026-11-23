@@ -24,8 +24,8 @@ jobs:
           const fs = require('node:fs');
           const { spawnSync } = require('node:child_process');
           const html = fs.readFileSync('index.html', 'utf8');
-          const blocks = [...html.matchAll(/<script\\b([^>]*)>([\\s\\S]*?)<\\/script\\s*>/gi)]
-            .filter(match => !/\\bsrc\\s*=/.test(match[1]))
+          const blocks = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)]
+            .filter(match => !/\bsrc\s*=/.test(match[1]))
             .map(match => match[2]);
           for (let i = 0; i < blocks.length; i++) {
             const file = '/tmp/poyozz-inline-' + i + '.js';
