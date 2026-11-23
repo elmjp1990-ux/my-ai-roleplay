@@ -221,6 +221,17 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
   }
 }
 `;
+  style.textContent += `
+/* Final mobile composer guard: keep the input and both action buttons visible above the safe area. */
+@media(max-width:767px){
+  body.encounter-mode-active .chat-main.encounter-scene .composer{bottom:0!important;max-height:min(44dvh,340px)!important;padding-bottom:calc(10px + env(safe-area-inset-bottom))!important;overflow-y:auto!important;overflow-x:hidden!important}
+  body.encounter-mode-active .chat-main.encounter-scene .suggestions-panel{max-height:15dvh!important}
+  body.encounter-mode-active .chat-main.encounter-scene .suggestion-cards{max-height:12dvh!important}
+  body.encounter-mode-active .chat-main.encounter-scene .composer-input-row{flex:0 0 auto!important}
+  body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{position:sticky!important;bottom:0!important;z-index:8!important;display:flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important;min-height:48px!important;padding:6px 0 calc(4px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,rgba(30,25,37,.78),rgba(30,25,37,.98))!important}
+  body.encounter-mode-active .chat-main.encounter-scene .composer-icon-button,body.encounter-mode-active .chat-main.encounter-scene .composer-send{display:inline-flex!important;visibility:visible!important;opacity:1!important}
+}
+`;
   document.head.appendChild(style);
   const splitEncounterBeats=(value)=>{
     const source=String(value||'').replace(/\r\n?/g,'\n').replace(/[ \t]+\n/g,'\n').trim();
@@ -248,7 +259,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       beats.push(cleaned);
     };
     for(const paragraph of paragraphs){
-      const sentences=paragraph.match(/[^。！？!?；;]+[。！？!?；;」』”’"）)】]*/gu)||[paragraph];
+      const sentences=paragraph.match(/(?:\*(?!\*)[^*]*\*(?!\*)|[^。！？!?；;])+(?:[。！？!?；;」』”’"）)】]*)?/gu)||[paragraph];
       for(const sentence of sentences){
         const part=sentence.trim();
         if(part)pushSentence(part);
