@@ -1,0 +1,28 @@
+name: Encounter weekly weather cache contract
+on:
+  pull_request:
+    paths:
+      - "city-map.js"
+      - "supabase/functions/encounter-weather-sync/**"
+      - "supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql"
+      - "scripts/test-encounter-weekly-weather.mjs"
+      - ".github/workflows/encounter-weekly-weather.yml"
+  push:
+    branches:
+      - "feat/encounter-weekly-weather-hourly"
+    paths:
+      - "city-map.js"
+      - "supabase/functions/encounter-weather-sync/**"
+      - "supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql"
+      - "scripts/test-encounter-weekly-weather.mjs"
+      - ".github/workflows/encounter-weekly-weather.yml"
+jobs:
+  weather-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check weekly forecast and hourly refresh contract
+        run: node scripts/test-encounter-weekly-weather.mjs
