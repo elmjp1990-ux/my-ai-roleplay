@@ -3732,7 +3732,7 @@ function chatSessionData(s) {
     (!s.cloudOwned && s.messages?.[0]?.role === 'assistant' ? s.messages[0] : null);
   const lastMessage = (s.messages || []).at(-1);
   const latestAssistantSuggestionMessage=[...(s.messages||[])].reverse().find(message=>
-    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
   );
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
@@ -4415,7 +4415,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     // Restore the suggestion set attached to the newest assistant turn first.
     // session_data remains a backward-compatible fallback for older sessions.
     const latestAssistantSuggestions=[...session.messages].reverse().find(message=>
-      message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+      message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
     )?.suggestedReplies;
     if(Array.isArray(latestAssistantSuggestions)){
       session.suggestedReplies=latestAssistantSuggestions.map(value=>String(value||'').trim()).filter(Boolean).slice(0,3);
