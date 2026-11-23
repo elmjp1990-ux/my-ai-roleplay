@@ -13,7 +13,7 @@ assert.match(migration,/get_encounter_city_weather_v2/);
 assert.match(migration,/DROP FUNCTION IF EXISTS public\.schedule_encounter_weather_sync\(boolean\)/);
 const authMigration=await readFile("supabase/migrations/20261123193000_verify_encounter_weather_cron_key.sql","utf8");
 assert.match(authMigration,/verify_encounter_weather_cron_key/);
-assert.match(authMigration,/GRANT EXECUTE ON FUNCTION public\\.verify_encounter_weather_cron_key\\(text\\) TO service_role/);
+assert.ok(authMigration.includes("GRANT EXECUTE ON FUNCTION public.verify_encounter_weather_cron_key(text) TO service_role;"));
 assert.match(handler,/forecast_days=7/);
 assert.match(handler,/temperature_2m,precipitation_probability,weather_code/);
 assert.match(handler,/task==="weekly_sync"/);
