@@ -298,7 +298,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const speakerLabel=formattedBeat.hasSpeech?'<span class="encounter-speaker-label">'+e(speakerName)+'</span>':'';
     const replayButton=idx===beats.length-1?'<button type="button" class="encounter-dialogue-replay" data-action="encounter-replay-beat">再看一次</button>':'';
     const dialogueMarkup=beats.length
-      ? '<div class="encounter-dialogue-stack"><button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情">'+speakerLabel+'<span class="encounter-dialogue-text">'+formattedBeat.html+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'+replayButton+'</div>'
+      ? '<div class="encounter-dialogue-stack"><div role="button" tabindex="0" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情">'+speakerLabel+'<span class="encounter-dialogue-text">'+formattedBeat.html+'</span><span class="encounter-dialogue-footer">'+replayButton+'<span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></span></div></div>'
       : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
     messages.innerHTML=dialogueMarkup+(session.activeTurnInFlight&&!hasAssistantTurnReply?encounterTypingMarkup(speakerName):'');
     messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
@@ -448,6 +448,13 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     else if((session.encounterBeatIndex||0)<beats.length-1)session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;
     else return;
     persist();renderConversation();
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Enter'&&event.key!==' ')return;
+    const beat=event.target.closest('.encounter-dialogue-beat[role="button"]');
+    if(!beat||event.target.closest('.encounter-dialogue-replay'))return;
+    event.preventDefault();
+    beat.click();
   });
 
 
