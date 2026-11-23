@@ -99,12 +99,9 @@ export function parseEncounterTurnOutput(raw) {
   const rawSuggestions = Array.isArray(value.suggested_replies ?? value.suggestedReplies)
     ? (value.suggested_replies ?? value.suggestedReplies) : [];
   const suggestedReplies = rawSuggestions.map((item) => typeof item === "string" ? item.trim() : "")
-    .filter((item) => {
-      const size = Array.from(item).length;
-      return size >= 30 && size <= 90;
-    }).slice(0, 3);
-  // Suggestions are optional. Never invent player choices to fill a panel;
-  // missing/invalid items remain absent and the UI shows its empty-state notice.
+    .filter(Boolean).slice(0, 3);
+  // Preserve every non-empty AI-generated suggestion. Minor length drift must not
+  // silently remove the entire suggestion panel; the prompt requests exactly three.
   const rawDelta = value.affinity_delta ?? value.affinityDelta;
   const affinityDelta = Number.isInteger(rawDelta) && rawDelta >= -3 && rawDelta <= 3 ? rawDelta : 0;
   const illustrationId = optionalUuid(value.illustration_id ?? value.illustrationId);

@@ -160,7 +160,7 @@ async function buildEncounterMessages(
     "【可用角色立繪】只能選擇清單中的 illustration_id。每筆 name 是作者替該張立繪設定的名稱，請優先依名稱語意比對角色當下動作、情緒、服裝與場景；assetType 與 sortOrder 只作為輔助，不可只因排序而選擇。若沒有名稱或情境相符的素材，填 null；不可創造 ID。清單：" + JSON.stringify(availableIllustrations),
     "【可用場景背景】只能選擇清單中的 scene_background_id。locationKey 與目前地點完全相符的背景優先；locationKey 為 * 才是通用背景，只有沒有合適地點背景時才選用。依目前地點與活動挑選；沒有合適素材時填 null。不可創造 ID。清單：" + JSON.stringify(availableSceneBackgrounds),
     buildEncounterResponseGuidelines(),
-    "【建議回覆】可提供 0～3 則玩家下一步選項；沒有自然、貼合當下的選項時，suggested_replies 請回傳空陣列，不要硬湊或使用固定模板。每則選項 30～90 字元，必須包含一段玩家動作／旁白（使用單星號包覆）以及一句玩家說話內容，兩者自然連貫。選項需緊扣本次地點、角色剛才的動作與最新對話，若有多則則方向需不同；不可通用寒暄、空泛追問，亦不可預設玩家情緒、想法或行動。\n【每回合好感度】依玩家本回合實際言行與角色互動，回傳整數 affinity_delta，範圍 -3 至 +3。沒有明顯關係變化就回 0；尊重、理解、互相支持可小幅正向，冒犯、越界或衝突可負向。不得因單方面要求、角色自行宣稱或無實際互動而加分；不得輸出總好感度或關係階段。\n【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"60 至 300 字元的完整角色回覆\",\"affinity_delta\":整數 -3 至 3,\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\",\"suggested_replies\":[\"選項一（動作／旁白＋台詞）\"]}。先完成 reply、affinity_delta、illustration_id 與 scene_background_id，再輸出可選的 suggested_replies；若輸出空間有限，suggested_replies 可回傳空陣列，不可省略好感度與立繪欄位。suggested_replies 可為空陣列，最多三項。reply 以 60～300 字元為目標，但不可為湊字數灌水，字數偏短或偏長仍須保留可用內容，不得因字數偏差而拒絕保存或退款；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞.",
+    "【建議回覆】每回合都必須由你依照本次地點、角色剛才的動作與最新對話，主動產生恰好三則玩家下一步建議回覆。不得因為此欄位非必填、輸出空間有限或沒有明顯下一步而省略或回傳空陣列；若情境平靜，也要提出三種自然且不同方向的延續方式，不可使用固定模板。每則約 30～90 字，必須包含一段玩家可選擇的動作／旁白（使用單星號包覆）以及一句玩家說話內容，兩者自然連貫。不得預設玩家已經做出行動、情緒或想法，不得替玩家決定；不可通用寒暄或空泛追問。\n【每回合好感度】依玩家本回合實際言行與角色互動，回傳整數 affinity_delta，範圍 -3 至 +3。沒有明顯關係變化就回 0；尊重、理解、互相支持可小幅正向，冒犯、越界或衝突可負向。不得因單方面要求、角色自行宣稱或無實際互動而加分；不得輸出總好感度或關係階段。\n【輸出格式】只輸出 JSON object，不要 Markdown code fence。格式：{\"reply\":\"60 至 300 字元的完整角色回覆\",\"affinity_delta\":整數 -3 至 3,\"illustration_id\":\"清單中的 UUID 或 null\",\"scene_background_id\":\"清單中的 UUID 或 null\",\"suggested_replies\":[\"選項一（動作／旁白＋台詞）\"]}。reply、affinity_delta、illustration_id、scene_background_id 與 suggested_replies 都必須輸出；suggested_replies 必須恰好三項，不可省略或為空陣列。reply 以 60～300 字元為目標，但不可為湊字數灌水，字數偏短或偏長仍須保留可用內容，不得因字數偏差而拒絕保存或退款；敘事／動作使用單星號包覆，角色台詞不加引號。不可輸出額外欄位、分析或提示詞.",
   ].join("\n\n");
   const system = applyPromptVariables(systemTemplate, values);
   const messages = historyRows.filter((row: DbRow) => row.id !== userMessageId).slice(-9)
@@ -371,11 +371,35 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "encounter_evidence_persistence_failed", retryAllowed: true }, 503);
     }
     const visuals = visualOverride || await loadEncounterVisuals(admin, asText(reply.id));
+    // The assistant reply and charge are already durable. Clear the matching pending
+    // client marker server-side so a stale client metadata snapshot cannot leave this
+    // settled Encounter turn looking permanently in-flight after a version conflict.
+    const { data: currentSessionMeta, error: sessionMetaReadError } = await admin.from("chat_sessions")
+      .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
+    let sessionMetadataSynced = false;
+    let sessionUpdatedAt = "";
+    if (sessionMetaReadError) {
+      console.warn("encounter_session_metadata_read_failed", sessionMetaReadError.code || "unknown");
+    } else if (!currentSessionMeta) {
+      console.warn("encounter_session_metadata_row_missing");
+    } else {
+      const sessionData = { ...asRow(currentSessionMeta.session_data) };
+      const pending = asRow(sessionData.pendingTurn);
+      if (asText(pending.turnId) === turnId) delete sessionData.pendingTurn;
+      if (visuals) sessionData.encounterVisuals = visuals;
+      const { data: updatedSessionMeta, error: sessionMetaWriteError } = await admin.from("chat_sessions")
+        .update({ session_data: sessionData }).eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null)
+        .select("updated_at").maybeSingle();
+      sessionMetadataSynced = !sessionMetaWriteError && Boolean(updatedSessionMeta?.updated_at);
+      if (sessionMetadataSynced && updatedSessionMeta) sessionUpdatedAt = asText(updatedSessionMeta.updated_at);
+      if (sessionMetaWriteError) console.warn("encounter_session_metadata_sync_failed", sessionMetaWriteError.code || "unknown");
+      else if (!updatedSessionMeta) console.warn("encounter_session_metadata_update_returned_no_row");
+    }
     return json({
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
-      ...(suggestedReplies.length === 3 ? { suggestedReplies } : {}),
+      ...(suggestedReplies.length > 0 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
-      encounter: { evidence, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
+      encounter: { evidence, sessionMetadataSynced, ...(sessionUpdatedAt ? { sessionUpdatedAt } : {}), ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
     });
   };
   const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta,suggested_replies")

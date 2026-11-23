@@ -36,6 +36,9 @@ type RequestOptions = {
   timeoutMs?: number;
   temperature?: number;
   responseFormat?: { type: "json_object" };
+  provider?: ApprovedOpenRouterProvider;
+  disableProviderFallback?: boolean;
+  retrySameProviderOnRateLimit?: boolean;
 };
 
 const asRow = (value: unknown): Record<string, unknown> =>
@@ -146,8 +149,16 @@ async function requestFromProvider(
  */
 export async function requestOpenRouterChatCompletion(options: RequestOptions): Promise<OpenRouterCompletionResult> {
   const model = options.model || POYOZZ_DEFAULT_CHAT_MODEL;
-  const [primaryProvider, fallbackProvider] = APPROVED_OPENROUTER_PROVIDERS;
+  const [defaultPrimaryProvider, defaultFallbackProvider] = APPROVED_OPENROUTER_PROVIDERS;
+  const primaryProvider = options.provider || defaultPrimaryProvider;
   const primary = await requestFromProvider(options, model, primaryProvider);
+  if (options.disableProviderFallback) {
+    if (options.retrySameProviderOnRateLimit && primary.httpStatus === 429) {
+      return await requestFromProvider(options, model, primaryProvider);
+    }
+    return primary;
+  }
   if (!isTransientProviderFailure(primary)) return primary;
+  const fallbackProvider = primaryProvider === defaultPrimaryProvider ? defaultFallbackProvider : defaultPrimaryProvider;
   return await requestFromProvider(options, model, fallbackProvider);
 }

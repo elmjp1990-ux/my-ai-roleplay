@@ -29,6 +29,7 @@ const fileBudgets = {
   'poyozz-ui.css': 40_000,
   // Scene presentation is feature-rich; the global 1.5 MB budget still bounds total output.
   'encounter-scene.js': 45_000,
+  'encounter-scene.css': 5_000,
   'group-opening-presets.js': 16_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();

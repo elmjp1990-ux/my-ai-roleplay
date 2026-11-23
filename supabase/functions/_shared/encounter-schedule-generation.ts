@@ -23,11 +23,6 @@ export const ENCOUNTER_SCENE_KEYS = [
 export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [] as const;
 
 const OUTDOOR_SCENE_KEYS = new Set(["waterfront", "park", "shopping-street"]);
-const RAIN_FALLBACK_SCENE_KEYS = new Set([
-  "commercial", "airport", "university", "department-store", "hospital",
-  "night-bar", "live-house", "luxury-apartment", "apartment",
-  "convenience-store", "private-club",
-]);
 const MODERN_SETTING_PATTERN = /現代世界|現代背景|現代都市|現代社會|現代生活|當代|財閥|企業集團|集團總裁|總裁夫人|企業|公司|商業盟約|慈善晚宴|時尚雜誌|名媛|豪門|媒體|智慧型手機|手機通訊|社群媒體|網路平台|科技業|捷運|地鐵|高鐵|信用卡|電子商務|藝術工作室|私人美術館|上班族|辦公室|公司職員|大學校園|現代醫院|現代學校|手機|網路|社群|公寓|都市|城市生活|地下\s*Live\s*House|Live\s*House|地下樂團|地下搖滾|搖滾樂團|獨立樂團|樂團主唱|主吉他手|吉他手|貝斯手|鼓手|練團室|錄音室|效果器|重機|機車|出租屋|頂樓出租屋|租屋處|宵夜攤|冰美式|試音|樂器行|男公關|牛郎|夜生活|俱樂部|VIP|黑卡|live\s*music|rock\s*band|guitarist|bassist|drummer|motorcycle|rented\s*apartment/i;
 const CULTIVATION_PATTERN = /修仙|仙俠|修真|修煉|靈根|金丹|元嬰|渡劫|宗門|仙界|魔界|靈氣|劍修|丹修|道君|仙尊|cultivation|xianxia|xianxia/i;
 const HISTORICAL_PATTERN = /ancient|historical|medieval|antiquity|古代|歷史|中世紀|中古|封建|戰國|春秋|秦漢|唐代|宋代|明代|清代|古羅馬|古希臘|大正時代|維多利亞時代/i;
@@ -446,20 +441,13 @@ function validateHourlySchedule(
 
       let rainLocationKey: string | null = null;
       let rainActivity: string | null = null;
-      const hasRainFallback = rawOption.rain_fallback_location !== null || rawOption.rain_fallback_activity !== null;
-      if (isOutdoor && !hasRainFallback) {
-        errors.push(blockLabel + "_option_" + optionIndex + "_rain_fallback_missing");
-      }
-      if (hasRainFallback) {
-        const rainLocationDescription = text(rawOption.rain_fallback_location);
-        rainLocationKey = normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext);
-        rainActivity = text(rawOption.rain_fallback_activity);
-        if (!isValidEncounterLocationLabel(rainLocationDescription) ||
-          (rainLocationKey !== null && !RAIN_FALLBACK_SCENE_KEYS.has(rainLocationKey)) ||
-          Array.from(rainActivity).length < 8 || Array.from(rainActivity).length > 30) {
-          errors.push(blockLabel + "_option_" + optionIndex + "_rain_fallback_invalid");
-        }
-      }
+      // Rain fallback fields are optional context only. Rain preference belongs to
+      // the character; publishing must not constrain fallback location/content.
+      const rainLocationDescription = text(rawOption.rain_fallback_location);
+      rainLocationKey = rainLocationDescription
+        ? normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext)
+        : null;
+      rainActivity = text(rawOption.rain_fallback_activity) || null;
       options.push({
         option_key: ("option_" + (optionIndex + 1)) as ScheduleOption["option_key"],
         weight: Number(weight),

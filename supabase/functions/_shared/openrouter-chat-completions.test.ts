@@ -192,3 +192,62 @@ Deno.test("ambiguous generic 5xx provider outcomes do not trigger a second bille
     globalThis.fetch = originalFetch;
   }
 });
+
+
+Deno.test("GPT OSS summary routing stays on approved DeepInfra when Inference.net does not serve the model", async () => {
+  const originalFetch = globalThis.fetch;
+  let call = 0;
+  let capturedProvider: unknown = null;
+  globalThis.fetch = async (_input, init) => {
+    call += 1;
+    capturedProvider = JSON.parse(String(init?.body)).provider;
+    return new Response(JSON.stringify({ error: { code: "engine_overloaded", message: "temporary provider capacity issue" } }), {
+      status: 429, headers: { "Content-Type": "application/json" },
+    });
+  };
+  try {
+    const result = await requestOpenRouterChatCompletion({
+      messages: [{ role: "user", content: "summarize" }],
+      apiKey: "test-key", model: "openai/gpt-oss-20b",
+      provider: "deepinfra", disableProviderFallback: true, timeoutMs: 1_000,
+    });
+    assertEquals(call, 1);
+    assertEquals(capturedProvider, { only: ["deepinfra"], allow_fallbacks: false, data_collection: "allow" });
+    assertEquals(result.httpStatus, 429);
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+
+Deno.test("summary provider retries one explicit rate limit on DeepInfra without switching providers", async () => {
+  const originalFetch = globalThis.fetch;
+  const providers: unknown[] = [];
+  let call = 0;
+  globalThis.fetch = async (_input, init) => {
+    call += 1;
+    providers.push(JSON.parse(String(init?.body)).provider);
+    if (call === 1) return new Response(JSON.stringify({
+      error: { code: "rate_limit", message: "rate limited" },
+    }), { status: 429, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({
+      provider: "deepinfra",
+      model: "openai/gpt-oss-20b",
+      choices: [{ message: { content: '{"summary":"這是一段長度足夠的測試摘要，用於確認核准供應商限流後可以在同一供應商重試。","affinity_correction":0}' } }],
+      usage: { prompt_tokens: 12, completion_tokens: 15, total_tokens: 27 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    const result = await requestOpenRouterChatCompletion({
+      messages: [{ role: "user", content: "summarize" }],
+      apiKey: "test-key", model: "openai/gpt-oss-20b",
+      provider: "deepinfra", disableProviderFallback: true,
+      retrySameProviderOnRateLimit: true, timeoutMs: 1_000,
+    });
+    assertEquals(call, 2);
+    assertEquals(providers, [
+      { only: ["deepinfra"], allow_fallbacks: false, data_collection: "allow" },
+      { only: ["deepinfra"], allow_fallbacks: false, data_collection: "allow" },
+    ]);
+    assertEquals(result.httpStatus, 200);
+    assertEquals(result.provider, "deepinfra");
+  } finally { globalThis.fetch = originalFetch; }
+});

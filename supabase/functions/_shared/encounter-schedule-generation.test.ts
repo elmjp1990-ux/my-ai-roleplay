@@ -156,27 +156,28 @@ Deno.test("limits activity descriptions to 8-30 characters and rejects extra gre
   if (extraResult.ok || !extraResult.errors.some((error) => error.includes("option_0_keys_invalid"))) throw new Error("generated greeting field accepted");
 });
 
-Deno.test("requires outdoor rain alternatives but permits reasonable indoor alternatives", () => {
-  const valid = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
-  if (!valid.ok) throw new Error(valid.errors.join(","));
-  const invalid = hourlyBlocks();
-  invalid[17] = block(17, [option({
-    weight: 75, location: "公園", activity: "沿著公園步道散步並聽音樂",
-    is_outdoor: true, rain_fallback_location: "公園", rain_fallback_activity: "下雨時仍在公園散步",
-  }), option({ weight: 25 })]);
-  const invalidResult = result([{ character_id: id1, placement: "modern_map", variants: variants(invalid) }]);
-  if (invalidResult.ok || !invalidResult.errors.some((error) => error.includes("rain_fallback_invalid"))) {
-    throw new Error("outdoor rain fallback to another outdoor scene accepted");
-  }
-  const unexpected = hourlyBlocks();
-  unexpected[1] = block(1, [
-    option({ weight: 60, rain_fallback_location: "公寓", rain_fallback_activity: "改在家裡整理房間" }),
-    option({ weight: 40 }),
+Deno.test("rain fallback fields are optional and unrestricted by scene policy", () => {
+  const missingFallback = hourlyBlocks();
+  missingFallback[17] = block(17, [
+    option({ weight: 75, location: "公園", activity: "沿著公園步道散步並聽音樂", is_outdoor: true }),
+    option({ weight: 25 }),
   ]);
-  const unexpectedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unexpected) }]);
-  if (!unexpectedResult.ok ||
-      unexpectedResult.characters[0].variants.weekday[1].options[0].rain_fallback_location_key !== "apartment") {
-    throw new Error("reasonable indoor option with rain alternative should be accepted");
+  const missingResult = result([{ character_id: id1, placement: "modern_map", variants: variants(missingFallback) }]);
+  if (!missingResult.ok) throw new Error(missingResult.errors.join(","));
+
+  const unrestrictedFallback = hourlyBlocks();
+  unrestrictedFallback[17] = block(17, [
+    option({
+      weight: 75, location: "公園", activity: "沿著公園步道散步並聽音樂", is_outdoor: true,
+      rain_fallback_location: "河邊露天座位", rain_fallback_activity: "喜歡在雨中繼續散步",
+    }),
+    option({ weight: 25 }),
+  ]);
+  const unrestrictedResult = result([{ character_id: id1, placement: "modern_map", variants: variants(unrestrictedFallback) }]);
+  if (!unrestrictedResult.ok) throw new Error(unrestrictedResult.errors.join(","));
+  const chosen = unrestrictedResult.characters[0].variants.weekday[17].options[0];
+  if (chosen.rain_fallback_location_key !== null || chosen.rain_fallback_activity !== "喜歡在雨中繼續散步") {
+    throw new Error("unmapped outdoor fallback label should remain optional and accepted");
   }
 });
 

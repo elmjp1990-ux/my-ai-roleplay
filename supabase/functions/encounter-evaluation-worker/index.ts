@@ -154,8 +154,8 @@ async function evaluateJob(admin: any, job: ClaimedJob, apiKey: string) {
       },
     });
     if (error || !data?.settled) throw new Error("encounter_empty_session_settlement_failed");
-    await persistEncounterSummary(admin, job.session_id, "本次相遇沒有進行對話。", new Date().toISOString());
-    return { sessionId: job.session_id, settled: true, noTurns: true, summarySynced: true, result: data.result };
+    if (!data.no_interaction) throw new Error("encounter_empty_session_unexpectedly_recorded");
+    return { sessionId: job.session_id, settled: false, cancelled: true, noTurns: true, noInteraction: true, summarySynced: false, result: data.result ?? null };
   }
 
   if (!apiKey) throw new Error("encounter_evaluation_provider_not_configured");

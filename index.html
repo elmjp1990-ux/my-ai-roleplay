@@ -1108,6 +1108,28 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 </style>
 
 
+<style id="poyozz-city-map-desktop-dock-fix">
+@media(min-width:768px){
+  body.city-map-mode #mobileNav.mobile-nav{display:none!important}
+  body.city-map-mode .city-map-bottom{
+    display:flex!important;position:fixed!important;z-index:60!important;
+    left:50%!important;right:auto!important;bottom:16px!important;
+    transform:translateX(-50%)!important;width:min(560px,calc(100vw - 40px))!important;
+    max-width:560px!important;min-height:0!important;box-sizing:border-box!important;
+    padding:6px!important;gap:4px!important;border:1px solid rgba(255,255,255,.22)!important;
+    border-radius:18px!important;background:rgba(20,27,43,.22)!important;
+    box-shadow:0 8px 28px rgba(7,13,27,.16)!important;
+    -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+    backdrop-filter:blur(18px) saturate(135%)!important;
+  }
+  body.city-map-mode .city-map-bottom button{
+    flex:1 1 0!important;min-width:0!important;min-height:54px!important;
+    padding:9px 6px!important;font-size:13px!important;line-height:1.35!important;
+    text-align:center!important;white-space:nowrap!important;
+  }
+}
+</style>
+<link rel="stylesheet" href="./encounter-scene.css">
 </head>
 
 <body>
@@ -3696,7 +3718,7 @@ function chatSessionData(s) {
     (!s.cloudOwned && s.messages?.[0]?.role === 'assistant' ? s.messages[0] : null);
   const lastMessage = (s.messages || []).at(-1);
   const latestAssistantSuggestionMessage=[...(s.messages||[])].reverse().find(message=>
-    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+    message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
   );
   return {
     name:s.name || '', archived:!!s.archived, hidden:!!s.hidden,
@@ -4379,7 +4401,7 @@ async function loadCloudSessionMessages(sessionId, options = {}) {
     // Restore the suggestion set attached to the newest assistant turn first.
     // session_data remains a backward-compatible fallback for older sessions.
     const latestAssistantSuggestions=[...session.messages].reverse().find(message=>
-      message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length===3
+      message.role==='assistant'&&Array.isArray(message.suggestedReplies)&&message.suggestedReplies.length>0
     )?.suggestedReplies;
     if(Array.isArray(latestAssistantSuggestions)){
       session.suggestedReplies=latestAssistantSuggestions.map(value=>String(value||'').trim()).filter(Boolean).slice(0,3);
@@ -4739,6 +4761,16 @@ async function executePendingChatTurn(s) {
     return;
   }
 
+  // The Encounter Edge Function updates session_data after settlement. Carry
+  // its confirmed updated_at token forward so the next user turn does not fail
+  // the optimistic-concurrency check against a server-side write we initiated.
+  const encounterSessionUpdatedAt=result.encounter?.sessionUpdatedAt;
+  if(s.encounterMode===true&&typeof encounterSessionUpdatedAt==='string'&&Number.isFinite(Date.parse(encounterSessionUpdatedAt))){
+    s.cloudUpdatedAt=encounterSessionUpdatedAt;
+    const currentSession=state.sessions?.[s.id];
+    if(currentSession&&currentSession!==s)currentSession.cloudUpdatedAt=encounterSessionUpdatedAt;
+  }
+
   if(result.encounter?.visuals&&s.encounterMode===true){
     const visual=result.encounter.visuals;
     s.encounterVisuals={
@@ -4759,9 +4791,9 @@ async function executePendingChatTurn(s) {
   }
   const replyWasAdded = !s.messages.some(message => message.id === reply.id);
   const responseSuggestions=Array.isArray(result.suggestedReplies)?result.suggestedReplies:Array.isArray(result.suggested_replies)?result.suggested_replies:[];
-  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90).slice(0,3);
+  const validResponseSuggestions=responseSuggestions.map(value=>String(value||'').trim()).filter(Boolean).slice(0,3);
   // Never substitute unrelated generic replies when contextual suggestions are absent.
-  s.suggestedReplies=validResponseSuggestions.length===3?validResponseSuggestions:[];
+  s.suggestedReplies=validResponseSuggestions;
   if (replyWasAdded) {
     const assistantAt=Date.now();
     s.messages.push({
@@ -4801,7 +4833,8 @@ async function executePendingChatTurn(s) {
   // The server has already durably saved and settled the assistant reply.
   // A later session-metadata sync failure must never trigger a refund.
   const metadataSaved = await saveChatSessionSafely(s);
-  if (!metadataSaved) {
+  const encounterMetadataSaved = s.encounterMode === true && result.encounter?.sessionMetadataSynced === true;
+  if (!metadataSaved && !encounterMetadataSaved) {
     toast('回覆與扣款已完成，但聊天附加資料同步失敗；回覆不會因此重複扣款。');
   }
 }
@@ -6641,7 +6674,7 @@ async function createEncounterSession(character) {
     encounterDay: new Date().toLocaleDateString('en-CA'),
     encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
     encounterAffinity: Number.isInteger(data.session.session_data?.encounter?.affinity)?data.session.session_data.encounter.affinity:0,
-    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'first_meeting',
+    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'stranger',
     messages: [],
     memories: [],
     album: [],
@@ -6690,7 +6723,7 @@ function showEncounterLeaveDialog(session) {
     '<p class="small muted">選擇暫時離開，或結束這次相遇並整理相遇日記。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
     '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>保留今天同一地標的相遇，稍後可以接續。</small></span><span>›</span></button>'+
-    '<button type="button" class="profile-setting" data-action="encounter-end-prompt" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
     '</div>');
 }
 
@@ -8259,16 +8292,9 @@ async function renderGroupMemorySummaries(groupId,force=false) {
   if(meter)meter.style.width=Math.min(100,totalChars/10000*100)+'%';
   const cards=summaries.map(item=>{
     const batch=Number(item.batch_number)||0,important=Boolean(item.important);
-    return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'" data-group-ai-memory-card="'+batch+'"><div class="diary-memory-head"><div class="diary-memory-actions"><label class="diary-check"><input type="checkbox" data-group-ai-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><button type="button" class="diary-edit-icon" data-action="edit-group-ai-memory" data-id="'+batch+'" aria-label="編輯群組摘要" title="編輯群組摘要">✎</button></div><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><p class="prose diary-memory-text">'+e(item.summary)+'</p><form class="diary-memory-edit-form hidden" data-form="group-ai-memory-edit" data-id="'+batch+'"><textarea name="text" maxlength="150" aria-label="編輯群組 AI 摘要">'+e(item.summary)+'</textarea><div class="diary-memory-edit-actions"><button type="button" data-action="cancel-group-ai-memory-edit" data-id="'+batch+'">取消</button><button type="submit" class="primary">儲存</button></div></form>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
+    return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'" data-group-ai-memory-card="'+batch+'"><div class="diary-memory-head"><div class="diary-memory-actions"><label class="diary-check"><input type="checkbox" data-group-ai-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><button type="button" class="diary-edit-icon" data-action="edit-group-ai-memory" data-id="'+batch+'" aria-label="編輯群組摘要" title="編輯群組摘要">✎</button></div><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><p class="prose diary-memory-text">'+e(item.summary)+'</p><form class="diary-memory-edit-form hidden" data-form="group-ai-memory-edit" data-id="'+batch+'"><textarea name="text" maxlength="100" aria-label="編輯群組 AI 摘要">'+e(item.summary)+'</textarea><div class="diary-memory-edit-actions"><button type="button" data-action="cancel-group-ai-memory-edit" data-id="'+batch+'">取消</button><button type="submit" class="primary">儲存</button></div></form>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
   }).join('');
-  const error=groupMemorySummaryErrors.get(groupId)||'';
-  let statusText='';
-  if(error)statusText='群組 AI 摘要服務尚未完成同步，請在資料庫更新後重新開啟甜蜜日記。';
-  else if(statusRow.generation_status==='processing'||statusRow.generation_status==='pending')statusText='AI 正在整理這段群組故事，完成後會顯示 50–150 字摘要。';
-  else if(statusRow.generation_status==='failed')statusText='上一批群組摘要生成未成功，系統會在後續群組回合再次嘗試。';
-  else if(completedTurns<5)statusText='群組故事摘要累積中：目前已完成 '+completedTurns+' 個群組回合，再 '+(5-completedTurns%5)+' 回合建立第一則摘要。';
-  else if(!cards)statusText='目前尚無可顯示的群組摘要。';
-  target.innerHTML=cards+(statusText?'<p class="small muted">'+e(statusText)+'</p>':'');
+  target.innerHTML=cards||'<p class="small muted">目前還沒有日記產生，再多多聊天對話吧！</p>';
   if(statusRow.generation_status==='processing'||statusRow.generation_status==='pending'){
     const attempts=groupMemorySummaryPolls.get(groupId)||0;
     if(attempts<6){groupMemorySummaryPolls.set(groupId,attempts+1);setTimeout(()=>void renderGroupMemorySummaries(groupId,true),4000);}
@@ -8414,7 +8440,7 @@ function renderGroupChatOverlay(kind) {
   }
   if(kind==='diary'){
     const renderLegacyRows=()=>ensureGroupDiaryMemories().map(m=>'<article class="memory-item diary-memory-card '+(m.important?'is-important':'')+'"><div class="diary-memory-head"><label class="diary-check"><input type="checkbox" data-group-memory="'+e(m.id)+'" '+(m.important?'checked':'')+'><span class="diary-heart">'+(m.important?'♥':'♡')+'</span><span>舊版珍藏回憶</span></label><span class="diary-memory-date">'+e(timeText(m.at))+'</span></div><p class="prose diary-memory-text">'+e(m.text)+'</p><p class="small diary-lock-note">♥ 已珍藏的舊版回憶</p></article>').join('');
-    const summary='<section class="diary-summary"><div class="diary-summary-head"><div><p class="small muted diary-eyebrow">SWEET DIARY · GROUP STORY</p><h3>把你們共同的故事，好好收藏</h3><p class="small muted">每 5 個已完成的群組回合，由 AI 整理一則 50–150 字摘要；摘要可編輯，也可設為重大記憶。</p></div><div class="diary-count"><strong id="groupMemoryCount">0</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span id="groupMemoryMeter" style="width:0%"></span></div><p class="small muted diary-hint">群組摘要與單人故事使用相同的五回合整理節奏。舊版珍藏內容會保留，不再以完整聊天摘錄充當新摘要。</p></section><div id="groupMemorySummary" class="stack" style="gap:10px"><p class="small muted">正在載入群組 AI 回憶摘要…</p></div>';
+    const summary='<section class="diary-summary"><div class="diary-summary-head"><div><h3>把重要的瞬間，好好收藏</h3></div><div class="diary-count"><strong id="groupMemoryCount">0</strong><span>/ 10,000 字</span></div></div><div class="diary-meter"><span id="groupMemoryMeter" style="width:0%"></span></div></section><div id="groupMemorySummary" class="stack" style="gap:10px"><p class="small muted">正在載入 AI 回憶摘要…</p></div>';
     panel.insertAdjacentHTML('beforeend','<section class="chat-overlay chat-settings-overlay" aria-label="甜蜜日記"><div class="overlay-heading"><button class="ghost" data-action="chat-settings-back" aria-label="返回上一頁" title="返回上一頁">'+ICON.back+'</button><h2>甜蜜日記</h2></div>'+summary+'<div id="groupLegacyDiary">'+(renderLegacyRows()||'')+'</div></section>');
     if(!groupDiaryCloudReady.get(group.id)){
       void ensureGroupDiaryCloudSynced(group.id).then(()=>{
@@ -9820,13 +9846,15 @@ async function renderPhoneModal() {
   ensurePhoneModalHistoryGuard();
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
 }
+// Single and group diary editors follow the generated 30–100 character summary contract.
 function normalizeStoryMemorySummaryText(value) {
   const text=String(value??'').replace(/\s+/g,' ').trim();
   const chars=Array.from(text);
-  if(chars.length<=150)return text;
-  const clipped=chars.slice(0,150).join('');
+  if(chars.length<30)return '';
+  if(chars.length<=100)return text;
+  const clipped=chars.slice(0,100).join('');
   const sentenceEnd=Math.max(...['。','！','？','!','?'].map(mark=>clipped.lastIndexOf(mark)));
-  return (sentenceEnd>=49?clipped.slice(0,sentenceEnd+1):clipped).trim();
+  return (sentenceEnd>=29?clipped.slice(0,sentenceEnd+1):clipped).trim();
 }
 async function loadStoryMemorySummary(session) {
   const target=document.getElementById('storyMemorySummary');
@@ -9862,17 +9890,12 @@ async function loadStoryMemorySummary(session) {
     const cards=summaries.map(item=>{
       const important=Boolean(item.important);
       const batch=Number(item.batch_number)||0;
-      return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'" data-story-memory-card="'+batch+'"><div class="diary-memory-head"><div class="diary-memory-actions"><label class="diary-check"><input type="checkbox" data-story-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><button type="button" class="diary-edit-icon" data-action="edit-story-memory" data-id="'+batch+'" aria-label="編輯回憶" title="編輯回憶">✎</button></div><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><p class="prose diary-memory-text">'+e(item.summary||'')+'</p><form class="diary-memory-edit-form hidden" data-form="story-memory-edit" data-id="'+batch+'"><textarea name="text" maxlength="1000" aria-label="編輯回憶內容">'+e(item.summary||'')+'</textarea><div class="diary-memory-edit-actions"><button type="button" data-action="cancel-story-memory-edit" data-id="'+batch+'">取消</button><button type="submit" class="primary">儲存</button></div></form>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
+      return '<article class="memory-item diary-memory-card '+(important?'is-important':'')+'" data-story-memory-card="'+batch+'"><div class="diary-memory-head"><div class="diary-memory-actions"><label class="diary-check"><input type="checkbox" data-story-memory-batch="'+batch+'" '+(important?'checked':'')+'><span class="diary-heart">'+(important?'♥':'♡')+'</span><span>'+(important?'重大記憶':'設為重大記憶')+'</span></label><button type="button" class="diary-edit-icon" data-action="edit-story-memory" data-id="'+batch+'" aria-label="編輯回憶" title="編輯回憶">✎</button></div><span class="diary-memory-date">'+e(timeText(item.memory_at||item.created_at))+'</span></div><p class="prose diary-memory-text">'+e(item.summary||'')+'</p><form class="diary-memory-edit-form hidden" data-form="story-memory-edit" data-id="'+batch+'"><textarea name="text" maxlength="100" aria-label="編輯回憶內容">'+e(item.summary||'')+'</textarea><div class="diary-memory-edit-actions"><button type="button" data-action="cancel-story-memory-edit" data-id="'+batch+'">取消</button><button type="submit" class="primary">儲存</button></div></form>'+(important?'<p class="small diary-lock-note">♥ 已珍藏，不會被自動清除</p>':'')+'</article>';
     }).join('');
     if(cards){
       target.innerHTML=cards;
-    }else if(status==='processing'||status==='pending'){
-      target.innerHTML='<p class="small muted">AI 正在整理這段故事的回憶摘要。</p>';
-    }else if(status==='failed'){
-      target.innerHTML='<p class="small muted">上一批摘要生成未成功，系統會在後續故事回合再次嘗試。</p>';
     }else{
-      const remainder=turns%5;
-      target.innerHTML='<p class="small muted">AI 回憶摘要累積中：目前已完成 '+turns+' 個故事回合'+(remainder?'，再 '+(5-remainder)+' 回合建立下一則摘要。':'，達到 5 回合後建立第一則摘要。')+'</p>';
+      target.innerHTML='<p class="small muted">目前還沒有日記產生，再多多聊天對話吧！</p>';
     }
   }catch(error){
     if(document.getElementById('storyMemorySummary'))document.getElementById('storyMemorySummary').innerHTML='<p class="small muted">目前無法載入 AI 回憶摘要，請稍後重試。</p>';
@@ -11539,15 +11562,29 @@ document.addEventListener('click',async event => {
           toast(error?.message||'暫時離開失敗，請稍後再試。');
           break;
         }
-        $('modal')?.close();hideList=false;go({page:'citymap'});break;
-      }
-      case 'encounter-end-prompt': {
-        const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
-        showDialog('結束相遇','<p>結束後將整理好感度與相遇日記，今天無法續談。</p><div class="row" style="justify-content:flex-end"><button data-action="encounter-dialog-dismiss">取消</button><button class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">確定結束</button></div>');break;
+        $('modal')?.close();hideList=false;go({page:'citymap'});toast('已暫時離開，今天仍可從同一地標接續相遇。');break;
       }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
         const messages=session.messages||[];
+        if(!messages.some(m=>m.role==='user'&&String(m.text||m.content||'').trim())){
+          try{
+            const lifecycle=await setEncounterLifecycleState(session.id,'end');
+            delete state.sessions[session.id];
+            if(!persist()){
+              state.sessions[session.id]=session;
+              throw new Error('本機聊天狀態無法保存。');
+            }
+            $('modal')?.close();hideList=false;go({page:'citymap'});
+            toast(lifecycle?.status==='cancelled'
+              ? '本次相遇已結束；因沒有互動，未建立好感度或相遇日記。'
+              : '本次相遇已結束，系統正在確認互動紀錄。');
+          }catch(error){
+            console.error('空白相遇結束失敗：',error);
+            toast(error?.message||'結束相遇失敗，請稍後再試。');
+          }
+          break;
+        }
         const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
         const isEncounterSystemMessage=message=>['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message?.text||message?.content||'').trim());
          const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()&&!isEncounterSystemMessage(m)).slice(-1)[0];
@@ -14301,5 +14338,8 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
 </style>
 <script src="./chat-keyboard-viewport.js"></script>
 
+<script>
+document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const target=event.target?.closest?.('.encounter-dialogue-beat');if(!target||event.target?.closest?.('.encounter-dialogue-replay'))return;event.preventDefault();target.click();});
+</script>
 </body>
 </html>

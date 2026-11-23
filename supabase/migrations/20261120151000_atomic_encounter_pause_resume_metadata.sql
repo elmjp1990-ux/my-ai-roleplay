@@ -27,7 +27,7 @@ BEGIN
   SET session_data=COALESCE(session_data,'{}'::jsonb)||
         jsonb_build_object('archived',false,'archivedAt',NULL,'encounterTemporarilyLeftAt',v_left_at),
       updated_at=pg_catalog.clock_timestamp()
-  WHERE id=p_session_id AND user_id=p_user_id AND chat_mode='encounter' AND deleted_at IS NULL
+  WHERE id=p_session_id AND user_id=p_user_id AND chat_mode='encounter' AND deleted_at IS NULL;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'encounter_session_metadata_not_found' USING ERRCODE='P0002';

@@ -74,7 +74,7 @@ body.encounter-mode-active .app,body.encounter-mode-active #view,body.encounter-
 .encounter-scene .encounter-dialogue-beat{display:flex!important;flex-direction:column!important;gap:10px!important;width:100%!important;max-width:100%!important;min-height:74px!important;padding:14px 16px!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:17px!important;background:linear-gradient(135deg,rgba(22,22,30,.58),rgba(22,22,30,.34))!important;color:#fff!important;text-align:left!important;white-space:pre-wrap!important;backdrop-filter:blur(14px)!important;box-shadow:0 10px 28px rgba(0,0,0,.12),inset 0 1px rgba(255,255,255,.1)!important}
 .encounter-scene .encounter-dialogue-text{font-size:clamp(15px,3.8vw,19px)!important;line-height:1.85!important;overflow-wrap:anywhere!important}
 .encounter-scene .encounter-dialogue-hint{align-self:flex-end!important;color:#e0d6f4!important;font-size:11px!important;letter-spacing:.04em!important}
-.encounter-character-sprite{position:absolute!important;z-index:1!important;pointer-events:none!important;right:-2%!important;bottom:0!important;width:min(108%,680px)!important;height:78lvh!important;object-fit:contain!important;object-position:center bottom!important;max-height:none!important;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28))!important;opacity:.98!important;background:transparent!important}
+.encounter-character-sprite{position:absolute!important;z-index:1!important;pointer-events:none!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;bottom:0!important;width:min(108%,680px)!important;height:78lvh!important;object-fit:contain!important;object-position:center bottom!important;max-height:none!important;filter:drop-shadow(0 12px 24px rgba(0,0,0,.28))!important;opacity:.98!important;background:transparent!important}
 .encounter-character-sprite.encounter-card-portrait-fallback{object-fit:contain!important;object-position:center bottom!important;filter:drop-shadow(0 10px 22px rgba(0,0,0,.22))!important}
 .encounter-character-sprite.encounter-auto-bg-fallback{mix-blend-mode:normal!important}
 .encounter-scene .composer{position:absolute!important;z-index:3!important;left:0!important;right:0!important;width:100%!important;max-width:100vw!important;margin:0!important;transform:none!important;bottom:0!important;max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 72px)!important;overflow-y:auto!important;overflow-x:hidden!important;overscroll-behavior:contain!important;touch-action:pan-y!important;padding:7px max(10px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left))!important;border:0!important;border-radius:20px 20px 0 0!important;background:linear-gradient(180deg,rgba(24,25,30,.12),rgba(22,23,28,.60) 20%,rgba(22,23,28,.78))!important;backdrop-filter:blur(18px) saturate(110%)!important;scrollbar-width:thin!important;scrollbar-color:rgba(230,225,245,.35) transparent!important}
@@ -113,11 +113,10 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3
 @keyframes encounterTypingPulse{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media(max-width:767px){.encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}.encounter-character-sprite{width:min(108%,680px)!important;height:78lvh!important}.encounter-scene .composer{max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 60px)!important}.encounter-scene .messages{padding:8px 14px!important}}
 
-/* Consolidated final Encounter polish. */
 body.encounter-mode-active .chat-main.encounter-scene:before{background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading{background:linear-gradient(110deg,rgba(25,22,35,.30),rgba(45,38,55,.18) 52%,rgba(25,22,35,.10))!important;border-color:rgba(255,255,255,.12)!important;box-shadow:0 8px 28px rgba(8,6,14,.08)!important;backdrop-filter:blur(12px)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{max-width:calc(100% - 12px)!important;gap:8px!important}
-body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{position:relative;z-index:2;width:min(100%,760px)!important;margin:0 auto!important;gap:9px!important;padding:17px 19px 12px!important;color:rgba(255,250,247,.96)!important;background:linear-gradient(135deg,rgba(35,29,43,.54),rgba(61,48,66,.43) 48%,rgba(31,28,42,.48))!important;border-color:rgba(255,237,242,.22)!important;box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px rgba(255,255,255,.10)!important;backdrop-filter:blur(15px)!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;width:min(100%,760px)!important;margin:0 auto!important;gap:9px!important;padding:17px 19px 12px!important;color:rgba(255,250,247,.96)!important;background:linear-gradient(135deg,rgba(35,29,43,.54),rgba(61,48,66,.43) 48%,rgba(31,28,42,.48))!important;border-color:rgba(255,237,242,.22)!important;box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px rgba(255,255,255,.10)!important;backdrop-filter:blur(15px)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;color:rgba(255,239,224,.98)!important;background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;border-left:2px solid rgba(244,204,218,.72)!important;box-shadow:inset 0 1px rgba(255,255,255,.12)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:15px!important;line-height:1.9!important;font-weight:450!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;font-size:10px!important}
@@ -127,7 +126,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer{background:linea
 body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
 @media(max-width:767px){body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}}
-/* Final full-bleed chat frame: remove the outer panel inset and let header/composer glass meet the phone edges. */
 body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
 body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
 body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
@@ -135,7 +133,6 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
 `;
 ;
   style.textContent += `
-/* Unified header: full identity row; affinity directly below name, Encounter control row uses fixed chip sizing. */
 .encounter-scene .chat-heading>.row.between{align-items:flex-start!important;flex-wrap:wrap!important;gap:5px!important}
 .encounter-scene .chat-heading>.row.between>.row.grow{width:100%!important;max-width:100%!important;min-width:0!important;flex-wrap:nowrap!important;gap:7px!important}
 .encounter-scene .chat-heading .chat-name{max-width:none!important}
@@ -199,7 +196,7 @@ body.encounter-mode-active .chat-main.encounter-scene .chat-heading [data-encoun
 }
 body.encounter-mode-active .chat-main.encounter-scene .encounter-character-sprite,
 body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .encounter-character-sprite{
-  position:absolute!important;bottom:0!important;transform:none!important;top:auto!important;
+  position:absolute!important;bottom:0!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;top:auto!important;
 }
 body.encounter-mode-active .chat-main.encounter-scene .composer{padding-bottom:calc(15px + env(safe-area-inset-bottom))!important}
 body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
@@ -223,10 +220,9 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const paragraphs=source.split(/\n+/).map(x=>x.trim()).filter(Boolean);
     const beats=[];
     const pushSentence=(text)=>{
-      const cleaned=String(text||'').replace(/^\s*[-*•]+\s*/,'').replace(/^\*+|\*+$/g,'').trim();
+      const cleaned=String(text||'').replace(/^\s*[-•]+\s*/,'').trim();
       if(!cleaned)return;
-      // Long, unpunctuated prose is broken into readable visual-novel beats too.
-      if(cleaned.length>58){
+      if(cleaned.length>58&&!cleaned.includes('*')){
         const clauses=cleaned.split(/(?<=[，,、；;：:])/u).map(x=>x.trim()).filter(Boolean);
         if(clauses.length>1){
           let chunk='';
@@ -243,7 +239,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       beats.push(cleaned);
     };
     for(const paragraph of paragraphs){
-      const sentences=paragraph.match(/[^。！？!?；;]+[。！？!?；;」』”’"）)】]*/gu)||[paragraph];
+      const sentences=paragraph.match(/(?:\*(?!\*)[^*]*\*(?!\*)|[^。！？!?；;])+(?:[。！？!?；;」』”’"）)】]*)?/gu)||[paragraph];
       for(const sentence of sentences){
         const part=sentence.trim();
         if(part)pushSentence(part);
@@ -251,9 +247,8 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     }
     return beats;
   };
-  // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
-  // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
-  // from restoring ordinary chat bubbles and silently cancelling progressive dialogue.
+  const encounterBeatMarkup=value=>{const parts=String(value||'').split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean),isNarration=p=>p[0]==='*'&&p[1]!=='*'&&p[p.length-1]==='*'&&p[p.length-2]!=='*';return{html:parts.map(p=>isNarration(p)?'<em>'+e(p.slice(1,-1))+'</em>':e(p)).join(''),hasSpeech:parts.some(p=>!isNarration(p)&&p.trim())};};
+  const encounterTypingMarkup=(name)=>'<div class="encounter-typing-indicator" role="status" aria-live="polite"><span>'+e(name)+' 正在回覆...</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>';
   const applyEncounterDialogue=(panel,session)=>{
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
@@ -280,7 +275,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       if(suggestions)suggestions.hidden=!hasAssistantTurnReply;
     }
     if(!hasStarted){
-      messages.innerHTML='';
+      messages.innerHTML=session.activeTurnInFlight?encounterTypingMarkup(String(sessionCharacter(session)?.name||'角色')):'';
       messages.classList.remove('encounter-dialogue-ready');
       messages.dataset.encounterBeatKey='opening-input:'+session.id;
       messages.dataset.encounterBeatIndex='0';
@@ -292,9 +287,14 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const idx=Math.min(Math.max(0,Number(session.encounterBeatIndex)||0),Math.max(0,beats.length-1));
     const speakerCharacter=sessionCharacter(session);
     const speakerName=String(speakerCharacter?.name||speakerCharacter?.display_name||speakerCharacter?.character_name||'角色').trim();
-    messages.innerHTML=beats.length
-      ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-speaker-label">'+e(speakerName)+'</span><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
+    const beat=beats[idx]||'';
+    const formattedBeat=encounterBeatMarkup(beat);
+    const speakerLabel=formattedBeat.hasSpeech?'<span class="encounter-speaker-label">'+e(speakerName)+'</span>':'';
+    const replayButton=idx===beats.length-1?'<button type="button" class="encounter-dialogue-replay" data-action="encounter-replay-beat">再看一次</button>':'';
+    const dialogueMarkup=beats.length
+      ? '<div class="encounter-dialogue-stack"><div role="group" tabindex="0" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="相遇劇情內容，按 Enter 或空白鍵繼續">'+speakerLabel+'<span class="encounter-dialogue-text">'+formattedBeat.html+'</span><span class="encounter-dialogue-footer">'+replayButton+'<span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></span></div></div>'
       : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
+    messages.innerHTML=dialogueMarkup+(session.activeTurnInFlight&&!hasAssistantTurnReply?encounterTypingMarkup(speakerName):'');
     messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
     if(composer){
       const suggestions=composer.querySelector('.suggestions');
@@ -317,8 +317,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       const defaultSceneImage='./encounter-default-scene.webp';
       panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
       panel.dataset.encounterPlace=session.encounterPlace||'';
-      // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
-      // The character-card primary image is intentionally never reused as a scene sprite.
       const selectedIllustrationId=typeof session?.encounterVisuals?.illustrationId==='string'?session.encounterVisuals.illustrationId:'';
       const selectedGalleryAsset=selectedIllustrationId
         ? (character?.galleryIllustrations||[]).find(asset=>asset?.id===selectedIllustrationId)
@@ -410,9 +408,9 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
           if(!stack){stack=document.createElement('div');stack.className='encounter-identity-stack';nameNode.before(stack);stack.appendChild(nameNode);}
           if(!stack.contains(affinityChip))stack.appendChild(affinityChip);
         }else if(controlsRow&&!controlsRow.contains(affinityChip)){controlsRow.appendChild(affinityChip);}
-        affinityChip.innerHTML=window.PoyozzAffinityUI?.render(session.encounterAffinity,session.encounterRelationshipStage||'first_meeting','encounter')||'';
+        affinityChip.innerHTML=window.PoyozzAffinityUI?.render(session.encounterAffinity,session.encounterRelationshipStage||'stranger','encounter')||'';
         affinityChip.setAttribute('role','status');
-        affinityChip.setAttribute('aria-label','目前關係：'+(window.PoyozzAffinityUI?.labels?.[session.encounterRelationshipStage]||'初次見面'));
+        affinityChip.setAttribute('aria-label','目前關係：'+(window.PoyozzAffinityUI?.labels?.[session.encounterRelationshipStage]||'陌生人'));
       }
       const input=panel.querySelector('.composer #messageInput');
       if(input)input.setAttribute('aria-label','相遇模式對話');
@@ -426,7 +424,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     });
   }
   document.addEventListener('click',event=>{
-    const target=event.target.closest('[data-action="encounter-next-beat"]');
+    const target=event.target.closest('[data-action="encounter-next-beat"],[data-action="encounter-replay-beat"]');
     if(!target)return;
     const session=currentSession();
     if(!session?.encounterMode)return;
@@ -438,7 +436,17 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const raw=String(latestReply?.text||latestReply?.content||'').trim();
     const beats=splitEncounterBeats(raw);
     if(session.encounterBeatKey!==key){session.encounterBeatKey=key;session.encounterBeatIndex=0;}
-    if((session.encounterBeatIndex||0)<beats.length-1){session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;persist();renderConversation();}
+    if(target.dataset.action==='encounter-replay-beat')session.encounterBeatIndex=0;
+    else if((session.encounterBeatIndex||0)<beats.length-1)session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;
+    else return;
+    persist();renderConversation();
+  });
+  document.addEventListener('keydown',event=>{
+    if(event.key!=='Enter'&&event.key!==' ')return;
+    const beat=event.target.closest('.encounter-dialogue-beat[role="group"]');
+    if(!beat||event.target.closest('.encounter-dialogue-replay'))return;
+    event.preventDefault();
+    beat.click();
   });
 
 
