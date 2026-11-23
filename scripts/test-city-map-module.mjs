@@ -289,11 +289,8 @@ assert.doesNotMatch(html, /city-location-open-inline/,
   'Removed open-status CSS must not remain in the main stylesheet.');
 assert.match(html, /\.city-location-subtitle\{/,
   'Scene subtitle must use the restrained secondary-text style.');
-assert.match(cityMap, /const cityPlaceSubtitles=\{/,
-  'Scene subtitle labels must be centralized by canonical scene key.');
-assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=cityPlaceSubtitles\[place\]\|\|''/,
-  'Scene subtitle must update with the selected scene and clear when no label exists.');
-for (const key of ['waterfront','commercial','airport','university','park','shopping-street','department-store','hospital','night-bar','live-house','luxury-apartment','apartment','convenience-store','private-club']) {
-  assert.match(cityMap, new RegExp("(?:['\\\"])?"+key.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')+"(?:['\\\"])?\\s*:"),
-    'Scene subtitle map must include '+key+'.');
-}
+assert.doesNotMatch(cityMap, /cityPlaceSubtitles/,
+  'Redundant hardcoded scene subtitles must be removed; the database catalog is the single scene metadata source.');
+assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=''/,
+  'The unused subtitle element must be cleared rather than retaining a second scene-name dictionary.');
+
