@@ -4,6 +4,7 @@ import vm from "node:vm";
 
 const html = fs.readFileSync("index.html", "utf8");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
+const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
 const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
 const source = fs.readFileSync("chat-keyboard-viewport.js", "utf8");
@@ -16,6 +17,8 @@ assert.match(style, /body\.conversation main/);
 assert.match(style, /body\.group-chat-page main/);
 assert.match(encounterScene, /top:0!important;bottom:auto!important/);
 assert.match(encounterScene, /height:78lvh!important/);
+assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
+assert.match(encounterSceneCss, /composer-icon-button,body\.encounter-mode-active/);
 assert.match(encounterScene, /bottom:var\(--poyozz-encounter-composer-height,190px\)!important/);
 assert.match(encounterScene, /bottom:0!important;max-height:calc\(var\(--poyozz-chat-viewport-height,100dvh\) - 72px\)!important/);
 assert.match(encounterScene, /encounterTypingPulse/);
