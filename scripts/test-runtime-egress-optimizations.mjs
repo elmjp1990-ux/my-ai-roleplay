@@ -339,8 +339,8 @@ assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
-  "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
+assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|!!row\.encounter_ended_at\|\|row\.encounter_ended==='true'\|\|diaryBySession\.has\(row\.id\)/,
+  "finished Encounter sessions must be visible from end metadata even before diary summary hydration");
 const encounterListPage=between("async function loadEncounterMemoryPage(list,session,pager)","let encounterMemoryDetailPager");
 assert.doesNotMatch(encounterListPage,/from\(['"]chat_messages['"]\)/,
   "Encounter list hydration must not scan message rows just to detect completed sessions");
