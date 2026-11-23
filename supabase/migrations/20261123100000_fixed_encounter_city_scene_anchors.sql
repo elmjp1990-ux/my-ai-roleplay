@@ -69,8 +69,7 @@ INSERT INTO public.encounter_scene_registry (
 ON CONFLICT (location_key) DO UPDATE
 SET display_name = EXCLUDED.display_name,
     icon = EXCLUDED.icon,
-    marker_x = EXCLUDED.marker_x,
-    marker_y = EXCLUDED.marker_y,
+    -- Preserve marker coordinates already curated in the live map registry.
     heading = EXCLUDED.heading,
     description = EXCLUDED.description,
     event_label = EXCLUDED.event_label,
