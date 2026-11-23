@@ -113,7 +113,6 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3
 @keyframes encounterTypingPulse{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media(max-width:767px){.encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}.encounter-character-sprite{width:min(108%,680px)!important;height:78lvh!important}.encounter-scene .composer{max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 60px)!important}.encounter-scene .messages{padding:8px 14px!important}}
 
-/* Consolidated final Encounter polish. */
 body.encounter-mode-active .chat-main.encounter-scene:before{background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading{background:linear-gradient(110deg,rgba(25,22,35,.30),rgba(45,38,55,.18) 52%,rgba(25,22,35,.10))!important;border-color:rgba(255,255,255,.12)!important;box-shadow:0 8px 28px rgba(8,6,14,.08)!important;backdrop-filter:blur(12px)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{max-width:calc(100% - 12px)!important;gap:8px!important}
@@ -127,7 +126,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer{background:linea
 body.encounter-mode-active .chat-main.encounter-scene .messages .message>img.avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .message .avatar,body.encounter-mode-active .chat-main.encounter-scene .messages .roleplay-segments .avatar{display:none!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-empty{display:none!important}
 @media(max-width:767px){body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{padding:14px 15px 10px!important;gap:7px!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:14px!important;line-height:1.85!important}body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{font-size:11px!important;padding:4px 10px!important}}
-/* Final full-bleed chat frame: remove the outer panel inset and let header/composer glass meet the phone edges. */
 body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
 body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
 body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
@@ -135,7 +133,6 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
 `;
 ;
   style.textContent += `
-/* Unified header: full identity row; affinity directly below name, Encounter control row uses fixed chip sizing. */
 .encounter-scene .chat-heading>.row.between{align-items:flex-start!important;flex-wrap:wrap!important;gap:5px!important}
 .encounter-scene .chat-heading>.row.between>.row.grow{width:100%!important;max-width:100%!important;min-width:0!important;flex-wrap:nowrap!important;gap:7px!important}
 .encounter-scene .chat-heading .chat-name{max-width:none!important}
@@ -252,7 +249,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
   };
   const encounterBeatMarkup=value=>{const parts=String(value||'').split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean),isNarration=p=>p[0]==='*'&&p[1]!=='*'&&p[p.length-1]==='*'&&p[p.length-2]!=='*';return{html:parts.map(p=>isNarration(p)?'<em>'+e(p.slice(1,-1))+'</em>':e(p)).join(''),hasSpeech:parts.some(p=>!isNarration(p)&&p.trim())};};
   const encounterTypingMarkup=(name)=>'<div class="encounter-typing-indicator" role="status" aria-live="polite"><span>'+e(name)+' 正在回覆...</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>';
-  // Restore progressive dialogue after #messages rerenders.
   const applyEncounterDialogue=(panel,session)=>{
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
@@ -321,7 +317,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       const defaultSceneImage='./encounter-default-scene.webp';
       panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
       panel.dataset.encounterPlace=session.encounterPlace||'';
-      // Scene sprites use encounter art/gallery, not card art.
       const selectedIllustrationId=typeof session?.encounterVisuals?.illustrationId==='string'?session.encounterVisuals.illustrationId:'';
       const selectedGalleryAsset=selectedIllustrationId
         ? (character?.galleryIllustrations||[]).find(asset=>asset?.id===selectedIllustrationId)
