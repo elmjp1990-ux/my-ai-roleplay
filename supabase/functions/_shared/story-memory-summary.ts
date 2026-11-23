@@ -7,11 +7,11 @@ const SUMMARY_INTERVAL = 5;
 function normalizeStoryMemorySummaryText(value: unknown): string {
   const compact = str(value).replace(/\s+/g, " ").trim();
   const chars = Array.from(compact);
-  if (chars.length < 50) return "";
-  if (chars.length <= 150) return compact;
-  const clipped = chars.slice(0, 150).join("");
+  if (chars.length < 30) return "";
+  if (chars.length <= 100) return compact;
+  const clipped = chars.slice(0, 100).join("");
   const sentenceEnd = Math.max(...["。", "！", "？", "!", "?"].map(mark => clipped.lastIndexOf(mark)));
-  return (sentenceEnd >= 49 ? clipped.slice(0, sentenceEnd + 1) : clipped).trim();
+  return (sentenceEnd >= 29 ? clipped.slice(0, sentenceEnd + 1) : clipped).trim();
 }
 const row = (value: unknown): DbRow =>
   value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
@@ -293,9 +293,9 @@ export async function processDueStoryMemorySummary(
       {
         role: "system",
         content: [
-          "你是 POYOZZ 的長期劇情記憶整理器與關係校正器。請將既有摘要與本批新增對話整合成一份可供角色下次自然接續的繁體中文記憶。",
-          "只輸出 JSON object：{\"summary\":\"50～150 個中文字的累積摘要\",\"affinity_correction\":0,\"affinity_reason\":\"校正理由\"}。不要 Markdown 或其他文字。",
-          "摘要目標為 50～150 個中文字，單一精簡段落，不要標題、條列、分析或補充說明。",
+          "你是 POYOZZ 的長期劇情記憶整理器與關係校正器。每次只整理本批新增的五個已完成回合，產生一則獨立的本批重點摘要，供角色下次接續故事使用。",
+          "只輸出 JSON object：{\"summary\":\"30～100 個中文字的本批摘要\",\"affinity_correction\":0,\"affinity_reason\":\"校正理由\"}。不要 Markdown 或其他文字。",
+          "摘要目標為 30～100 個中文字，單一精簡段落，不要標題、條列、分析或補充說明。只摘要本批五回合新發生的重點，不要把前一批摘要的 1～5 回合事件再次寫入；既有摘要只供理解長期背景，除非本批有明確更新，否則不要重述。",
           "好感度校正不是把這五回合的變化重新累加。每回合好感度已即時微調；請檢視五回合完整互動後，判斷目前累積值是否需要小幅修正，只回傳 -5 到 5 的整數 correction。若逐回合評估合理就填 0；不可把五回合淨變化再加一次，也不可因單次甜蜜互動直接跳級。",
           "優先保留玩家明確偏好、角色關係變化、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
           "只記錄確實發生或明確約定的內容。不可推測、補造事件、替玩家決定想法或行動，也不可把角色提出但未完成的事寫成已完成。",
@@ -304,10 +304,10 @@ export async function processDueStoryMemorySummary(
       },
       {
         role: "user",
-        content: "【既有記憶摘要】\n" + (previousSummary || "尚無既有摘要") +
+        content: "【既有記憶摘要（僅供背景參照，不可重複寫入本批摘要）】\n" + (previousSummary || "尚無既有摘要") +
           "\n\n【目前好感度】" + String(relationshipState.affinity) + "；目前關係階段：" + str(relationshipState.relationship_stage) +
           "\n\n【本次新增的五回合對話】\n" + transcript +
-          "\n\n請依指定 JSON 格式輸出更新後的完整累積摘要與必要的好感度小幅校正。",
+          "\n\n請依指定 JSON 格式輸出只涵蓋本批新增五回合的摘要，以及必要的好感度小幅校正；不要重述既有摘要。",
       },
     ], apiKey, existingBatch);
   } catch {
@@ -523,9 +523,9 @@ export async function processDueGroupMemorySummary(
       {
         role: "system",
         content: [
-          "你是 POYOZZ 群組故事的長期記憶整理器。請將既有摘要與本批新增的五個已完成群組回合整合成一段可供下次自然接續的繁體中文記憶。",
-          "只輸出 JSON object：{\"summary\":\"50～150 個中文字的累積摘要\"}。不要 Markdown、標題、條列或其他文字。",
-          "摘要必須是 50～150 個中文字、單一精簡段落。保留玩家偏好、角色關係、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
+          "你是 POYOZZ 的長期劇情記憶整理器。每次只整理本批新增的五個已完成群組回合，產生一則獨立的本批重點摘要，供角色下次接續故事使用。",
+          "只輸出 JSON object：{\"summary\":\"30～100 個中文字的本批摘要\"}。不要 Markdown、標題、條列或其他文字。",
+          "摘要必須是 30～100 個中文字、單一精簡段落。以本批五回合為唯一摘要範圍，凝結玩家偏好、角色關係變化、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。既有摘要只供背景參照，不可再次重述前一批已記錄的事件。",
           "群組內每位角色的人格與發言必須分清楚，不可把不同角色的行動、背景或想法混在一起。",
           "只記錄確實發生或明確約定的內容。不可推測、補造事件、替玩家決定想法或行動，也不可把角色提出但未完成的事寫成已完成。",
           "若新對話明確更正舊記憶，以玩家最新明確更正為準；不可為追求精簡而遺失仍有效的重要承諾或未完成事項。",
@@ -533,9 +533,9 @@ export async function processDueGroupMemorySummary(
       },
       {
         role: "user",
-        content: "【既有群組記憶摘要】\n" + (previousSummary || "尚無既有摘要") +
+        content: "【既有摘要（僅供背景參照，不可重複寫入本批摘要）】\n" + (previousSummary || "尚無既有摘要") +
           "\n\n【本次新增的五個群組回合】\n" + transcript +
-          "\n\n請輸出更新後的完整累積摘要。",
+          "\n\n請只輸出本批新增五回合的獨立摘要，不要重述既有摘要。",
       },
     ], apiKey, existingBatch);
   } catch {
