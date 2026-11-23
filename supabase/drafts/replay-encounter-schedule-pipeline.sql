@@ -422,13 +422,11 @@ BEGIN
     RAISE EXCEPTION 'scheduler disable check returned NULL';
   END IF;
 
-  v_scheduler_status := public.schedule_encounter_worker('weather_weekly_sync', false);
+  -- This replay runs before the weekly-weather migration, so only the legacy
+  -- weather worker exists at this point. The following migration adds the two new jobs.
+  v_scheduler_status := public.schedule_encounter_worker('weather_sync', false);
   IF v_scheduler_status IS NULL THEN
-    RAISE EXCEPTION 'weekly weather scheduler disable check returned NULL';
-  END IF;
-  v_scheduler_status := public.schedule_encounter_worker('weather_hourly_update', false);
-  IF v_scheduler_status IS NULL THEN
-    RAISE EXCEPTION 'hourly weather scheduler disable check returned NULL';
+    RAISE EXCEPTION 'legacy weather scheduler disable check returned NULL';
   END IF;
 
   IF pg_catalog.strpos(
