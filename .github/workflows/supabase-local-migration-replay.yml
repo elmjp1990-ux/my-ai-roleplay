@@ -513,6 +513,28 @@ jobs:
           fi
           cat "$LOG_FILE"
 
+      - name: Apply and verify weekly hourly weather migration in disposable DB
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $weather_check$
+          BEGIN
+            IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname='encounter_city_weather_forecast_hourly') THEN
+              RAISE EXCEPTION 'weekly forecast table missing';
+            END IF;
+            IF pg_catalog.to_regprocedure('public.get_encounter_city_weather_v2()') IS NULL THEN
+              RAISE EXCEPTION 'weather v2 RPC missing';
+            END IF;
+            IF pg_catalog.position('55 * * * *' in pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure))=0
+               OR pg_catalog.position('0 0 * * 0' in pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure))=0 THEN
+              RAISE EXCEPTION 'weekly/hourly weather cron schedule missing';
+            END IF;
+          END
+          $weather_check$;
+          SQL
+
       - name: Replay public character eligibility and NSFW viewer gate
         shell: bash
         run: |
