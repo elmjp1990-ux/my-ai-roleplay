@@ -282,7 +282,7 @@ assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneK
   'Sleeping characters must remain visible in their current city scene.');
 assert.match(cityMap, /\.find\(item=>item\?\.location_key===sceneKey\)/,
   'The displayed status must use the current scene schedule even when the character is asleep.');
-assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
+assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?熟睡中無法相遇/);
 assert.match(cityMap, /const left=.*meetControl/);
 
 assert.match(cityMap, /id="cityMapPlaceSubtitle"/,
