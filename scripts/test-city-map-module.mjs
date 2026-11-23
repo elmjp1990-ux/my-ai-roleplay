@@ -277,7 +277,11 @@ assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)
   'Null or empty schedule profile fields must fall back to the cached character profile.');
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
-assert.match(cityMap, /const isSleepingSchedule=/);
+assert.match(cityMap, /const isSleepingSchedule=.*睡夢.*淺眠/);
+assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneKey\)/,
+  'Sleeping characters must remain visible in their current city scene.');
+assert.match(cityMap, /\.find\(item=>item\?\.location_key===sceneKey\)/,
+  'The displayed status must use the current scene schedule even when the character is asleep.');
 assert.match(cityMap, /const meetControl=isSleepingSchedule[\s\S]*?目前無法相遇（熟睡中）/);
 assert.match(cityMap, /const left=.*meetControl/);
 
