@@ -25,7 +25,7 @@ assert.doesNotMatch(html, /星期\(0=日、1=一/);
 assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 50 \* 60 \* 1000/);
 assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
 assert.match(cityMap, /sessionStorage\.getItem\('poyozz-city-map-/);
-assert.match(cityMap, /readCityMapCache\('weather'/);
+assert.match(cityMap, /readCityMapCache\('weather-v2'/);
 assert.match(cityMap, /readCityMapCache\('scenes-v3'/);
 assert.match(cityMap, /if\(cached\?\.fresh\)return/);
 
