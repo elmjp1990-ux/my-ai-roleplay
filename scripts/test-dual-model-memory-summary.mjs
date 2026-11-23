@@ -60,6 +60,10 @@ assert.ok(summaryStart >= 0 && summaryEnd > summaryStart, "shared summary genera
 const summaryRequest = summary.slice(summaryStart, summaryEnd);
 assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not set a client-side token cap");
 assert.match(summaryRequest, /model: SUMMARY_MODEL/);
+assert.match(summaryRequest, /provider: "deepinfra"/);
+assert.match(summaryRequest, /disableProviderFallback: true/);
+assert.match(openRouterShared, /disableProviderFallback\?: boolean/);
+assert.match(openRouterShared, /options\.disableProviderFallback/);
 assert.match(summaryRequest, /timeoutMs: 45_000/);
 assert.match(summaryRequest, /temperature: 0\.2/);
 assert.match(summaryRequest, /responseFormat: \{ type: "json_object" \}/);
