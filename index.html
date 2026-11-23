@@ -20,7 +20,7 @@
 <style>
 :root {
   color-scheme: dark;
-  /* Shared neutral-glass design tokens. Lavender is reserved for selection and focus. */
+  
   --bg:#17191b;
   --panel:rgba(255,255,255,.075);
   --panel2:rgba(255,255,255,.105);
@@ -53,7 +53,7 @@ body.day {
   --shade:rgba(235,235,233,.86);
 }
 * { box-sizing:border-box; }
-/* Apply city-map startup presentation before parser-blocking app scripts execute. */
+
 html.city-map-boot body {
   min-height:100vh;
   background:#18253e;
@@ -119,7 +119,7 @@ svg { pointer-events:none; }
 }
 .hidden { display:none!important; }
 .primary { background:var(--primary); color:white; border-color:transparent; }
-/* Shared deep POYOZZ action style for persona-picker Apply buttons. */
+
 .persona-picker-apply { width:100%; min-height:44px; color:#f7f8ff; font-weight:650; letter-spacing:.04em; background:linear-gradient(135deg,#303d68 0%,#29284f 52%,#3b2d59 100%); border:1px solid #7180b8; box-shadow:0 7px 18px #05091455,inset 0 1px #ffffff22; }
 .persona-picker-apply:hover:not(:disabled) { background:linear-gradient(135deg,#3a4b7e 0%,#353363 52%,#4a376c 100%); border-color:#9ba9e4; filter:none; }
 .persona-picker-apply:disabled { background:linear-gradient(135deg,#20283c,#24243b); color:#8790a8; border-color:#343d54; box-shadow:none; opacity:1; }
@@ -207,7 +207,7 @@ body.day .tag { color:#4f46b8; }
 .avatar-fallback { display:grid; place-items:center; color:#ddd6fe; font-weight:bold; }
 .group-list-avatar { width:36px; height:36px; display:grid; place-items:center; border-radius:50%; flex-shrink:0; color:#e0e7ff; background:linear-gradient(135deg,#6366f1,#8b5cf6); font-weight:700; font-size:13px; }
 .group-avatar-stack{width:36px;height:36px;flex:0 0 36px;position:relative;display:block}
-/* Each portrait now has a status wrapper; size and position the wrapper, not only its nested image. */
+
 .group-avatar-stack > .character-avatar-status{position:absolute;display:block;width:25px;height:25px;flex:0 0 25px;box-sizing:border-box;border:2px solid var(--panel);border-radius:50%}
 .group-avatar-stack > .character-avatar-status:nth-child(1){left:0;top:0}
 .group-avatar-stack > .character-avatar-status:nth-child(2){right:0;top:0}
@@ -231,7 +231,7 @@ body.day .tag { color:#4f46b8; }
 .character-avatar-status .avatar {
   display:block;
 }
-/* Offline is communicated by the status dot; keep the saved portrait visually intact. */
+
 .detail-image.character-offline-image {
   filter:grayscale(1);
   opacity:.68;
@@ -264,7 +264,7 @@ body.day .tag { color:#4f46b8; }
   display:inline-block;
   flex:0 0 auto;
 }
-/* Story relationship chip styling is centralized in poyozz-ui.css. */
+
 
 .character-status-banner {
   border:1px solid var(--border);
@@ -275,7 +275,7 @@ body.day .tag { color:#4f46b8; }
   line-height:1.6;
 }
 
-/* Logo / navigation */
+
 .logo-img { width:132px; height:29px; object-fit:contain; }
 .group-member-avatar-link{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;padding:0;border:0;border-radius:50%;background:transparent;line-height:0}
 .group-member-avatar-link:hover{filter:brightness(1.12)}
@@ -371,7 +371,7 @@ header {
 main { max-width:1500px; margin:auto; padding:25px; }
 .mobile-nav { display:none; }
 
-/* Explore */
+
 .hero {
   min-height:280px;
   padding:36px;
@@ -466,8 +466,8 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
 .card-tags .tag{padding:4px 7px;font-size:10px}
 
-/* Chat */
-/* 單人對話使用完整視窗高度，不顯示全站標頭（頁名／測試環境／錢包／帳號）。 */
+
+
 body.conversation .app > header { display:none !important; }
 body.conversation main { max-width:none; height:var(--poyozz-chat-viewport-height,100dvh); min-height:0; padding:0; }
 body.conversation .chat-layout { height:100%; min-height:0; }
@@ -484,7 +484,7 @@ body.group-chat-page .chat-heading { padding-top:calc(8px + env(safe-area-inset-
 body.group-chat-page .messages { padding:12px 12px; }
 body.group-chat-page .composer { padding:5px 8px calc(5px + env(safe-area-inset-bottom)); }
 
-/* Group creation wizard must scroll independently from the full-screen chat shell. */
+
 body.group-chat-page:has(.group-wizard) {
   height:auto;
   min-height:100dvh;
@@ -609,8 +609,7 @@ body.group-chat-page:has(.group-wizard) #view {
   line-height:1.85;
   margin-bottom:3px;
 }
-/* Locked format: desktop narration max ~25em; mobile narration spans the panel with 1px insets;
-   spoken dialogue bubbles remain ~18 full-width CJK chars (20em outer). Keep widths separate. */
+
 .roleplay-segment.is-character { max-width:min(20em,100%); }
 .roleplay-segment.is-action { width:fit-content; max-width:min(25em,100%); }
 .roleplay-segment.is-action .narration { max-width:min(25em,100%); }
@@ -631,9 +630,9 @@ body.group-chat-page:has(.group-wizard) #view {
 
 .typing-indicator{display:flex;align-items:center;gap:8px;padding:10px 13px;border-radius:16px;background:var(--panel2);color:var(--muted);font-size:13px}.typing-dots{display:inline-flex;align-items:center;gap:4px}.typing-dots i{width:5px;height:5px;border-radius:50%;background:currentColor;opacity:.35;animation:po-typing 1.1s infinite ease-in-out}.typing-dots i:nth-child(2){animation-delay:.15s}.typing-dots i:nth-child(3){animation-delay:.3s}@keyframes po-typing{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 
-/* Character phone modal styles are centralized in poyozz-ui.css. */
 
-/* Composer: compact tools and wallet share the same bottom row. */
+
+
 .composer { flex:0 0 auto; padding:8px 12px 10px; border-top:1px solid var(--border); background:var(--header); }
 .composer-input-row { display:flex; align-items:flex-end; }
 .composer-input-row textarea { flex:1; min-width:0; width:100%; resize:none; height:42px; min-height:42px; max-height:120px; font-size:13px; padding:9px 11px; line-height:1.55; overflow-y:auto; }
@@ -683,7 +682,7 @@ body.group-chat-page:has(.group-wizard) #view {
 .chat-settings-overlay .overlay-heading > button.ghost { display:inline-flex; align-items:center; justify-content:center; flex:0 0 44px; width:44px; min-width:44px; height:44px; min-height:44px; padding:0; line-height:1; }
 .chat-settings-overlay .overlay-heading > button.ghost .icon { display:block; width:20px; height:20px; flex:0 0 20px; }
 .chat-settings-overlay .profile-setting { padding:18px 6px; }
-/* 全站返回箭頭統一尺寸、點擊區與 SVG 大小，手機也容易點按。 */
+
 button[aria-label^="返回"], button[data-action="chat-back"], button[data-action="group-return-list"],
 .overlay-heading > button.ghost {
   box-sizing:border-box; width:44px; height:44px; min-width:44px; min-height:44px;
@@ -719,7 +718,7 @@ button[data-action="group-return-list"] .icon, .overlay-heading > button.ghost .
 .ledger-scroll { height:min(360px,44dvh); min-height:180px; overflow-y:auto; overscroll-behavior:contain; margin-top:10px; padding-right:4px; }
 .notice { padding:18px; border:1px solid var(--border); border-radius:16px; margin-top:12px; background:var(--panel); }
 
-/* Dialog */
+
 dialog {
   width:min(560px,calc(100vw - 26px));
   max-height:90dvh;
@@ -775,10 +774,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .environment { font-size:8px; }
   .wallet-button { padding:4px 6px; gap:5px; font-size:10px; }
   .wallet-button .avatar { width:24px; height:24px; }
-  /*
-   * 手機底部導覽需與六個入口同列，避免新增「群組聊天」後自動換行，
-   * 導致固定導覽列變高並遮住個人帳號頁底部操作。
-   */
+  
   .app { min-height:100dvh; }
   main {
     padding:16px 12px calc(104px + env(safe-area-inset-bottom));
@@ -884,7 +880,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 @media(prefers-reduced-motion:reduce) {
   * { scroll-behavior:auto!important; transition:none!important; }
 }
-/* GROUP-01 integrated test-mode prototype */
+
 .group-wizard{max-width:850px;margin:0 auto;display:grid;gap:16px}
 .group-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .group-step{padding:9px 6px;text-align:center;border:1px solid var(--border);border-radius:10px;color:var(--muted);background:var(--panel2)}
@@ -915,7 +911,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 .group-chat-entry:focus-visible{outline:2px solid var(--accent,#7c6cf2);outline-offset:2px;}
 .inline-help{display:inline-flex;position:relative;vertical-align:middle;margin-left:5px;font-size:12px}.inline-help summary{display:inline-grid;place-items:center;width:17px;height:17px;border:1px solid currentColor;border-radius:50%;cursor:pointer;list-style:none}.inline-help summary::-webkit-details-marker{display:none}.inline-help>span{position:absolute;z-index:30;left:22px;top:-6px;width:min(260px,70vw);padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--panel);box-shadow:0 8px 24px #0003;font-weight:400;line-height:1.5}.char-counter{display:block;font-variant-numeric:tabular-nums}
 
-/* Character card v2: video-ready portrait, edge tabs, typography-only pagination */
+
 .city-character-portrait-video{display:block;object-fit:cover;object-position:center top;background:rgba(8,12,24,.55)}
 .city-character-bookmarks{top:54px!important;right:-1px!important;gap:0!important;width:34px!important}
 .city-character-bookmark{width:34px!important;min-width:34px!important;min-height:68px!important;padding:8px 5px!important;border-radius:0!important;border:1px solid rgba(255,255,255,.26)!important;border-right:0!important;border-left:1px solid rgba(255,255,255,.26)!important;background:linear-gradient(90deg,rgba(43,49,68,.9),rgba(67,74,98,.95))!important;box-shadow:inset 0 1px rgba(255,255,255,.1),-3px 2px 8px rgba(8,12,25,.12)!important}
@@ -957,7 +953,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-block.park{left:59%;top:56%;width:25%;height:24%;background:#75b78b;border-radius:25px}
 .city-map-block.shop{left:12%;top:63%;width:20%;height:14%;background:#d9a8d5}
 .city-map-block.home{left:70%;top:38%;width:15%;height:13%;background:#e4b8a0}
-/* Restored original 9 POYOZZ city landmark anchors from feat/poyozz-city-location-panel-v2. */
+
 .city-building-layer{position:absolute;inset:0;width:100%;height:100%;z-index:3;overflow:visible;pointer-events:auto!important}
 .city-place-marker{pointer-events:all!important;cursor:pointer;transform-box:fill-box;transform-origin:center;animation:city-marker-float 3.1s ease-in-out infinite;outline:none}
 .city-place-marker:nth-of-type(even){animation-delay:-1.45s}
@@ -990,7 +986,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 </style>
 
 <style id="poyozz-city-map-glass-polish">
-/* POYOZZ city map: logo lockup and refined translucent neutral controls */
+
 .city-map-title{display:flex;align-items:center;gap:7px;font-size:15px!important;letter-spacing:.01em}
 .city-map-title img{display:block;width:clamp(88px,11vw,112px);height:auto;max-height:27px;object-fit:contain;object-position:left center}
 .city-map-title span{font-weight:650;white-space:nowrap}
@@ -1013,7 +1009,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 .city-map-bottom button.active{background:rgba(104,108,121,.88)!important}
 .city-map-info p{color:rgba(255,255,255,.91)}
 .city-map-empty{background:rgba(66,72,83,.58)!important;color:rgba(255,255,255,.96)!important}
-/* City map navigation stays available, styled as a translucent in-world glass dock. */
+
 .city-map-bottom{
  display:flex!important;
  background:rgba(20,27,43,.18)!important;
@@ -1050,7 +1046,7 @@ body.city-map-mode main{max-width:none;padding:0!important;margin:0!important}
 </style>
 
 <style id="poyozz-city-map-container-fix">
-/* Container fix: keep the map image behind the full-height UI, including the bottom dock. */
+
 html:has(body.city-map-mode),body.city-map-mode{width:100%;height:100%;min-height:100%;overflow:hidden}
 body.city-map-mode .city-map-stage{position:fixed;inset:0;width:100%;height:100dvh;min-height:0;overflow:hidden;isolation:isolate}
 body.city-map-mode .city-map-world{position:absolute;z-index:0;overflow:visible;transform-origin:center center}
@@ -1063,7 +1059,7 @@ body.city-map-mode .city-map-bottom{position:absolute;left:0;right:0;bottom:0;wi
 </style>
 
 <style id="poyozz-city-map-mobile-nav-glass">
-/* The visible five-button bar is the legacy #mobileNav outside #view, not .city-map-bottom. */
+
 body.city-map-mode #mobileNav.mobile-nav{
   display:grid!important;
   position:fixed!important;
@@ -1103,7 +1099,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
   border-color:rgba(255,255,255,.18)!important;
   color:#fff!important;
 }
-/* Avoid a second set of five navigation actions underneath the legacy mobile bar. */
+
 @media(max-width:767px){body.city-map-mode .city-map-bottom{display:none!important}}
 @media(min-width:768px){
   body.city-map-mode #mobileNav.mobile-nav{display:none!important}
@@ -14087,7 +14083,7 @@ if (window.__pendingSupabaseUser) {
 
 
 <style id="poyozz-ui-quick-polish">
-/* UI-172 quick polish: consistent compact hints, touch targets, and stable form affordances */
+
 .followed-authors-back{display:inline-flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 12px;border-radius:12px}
 .group-member-avatar-link{cursor:pointer}
 .group-member-avatar-link .avatar{width:44px;height:44px}
@@ -14145,8 +14141,7 @@ document.addEventListener('submit',function(event){
 <style id="poyozz-city-location-panel">
 .city-location-modal[hidden]{display:none!important}
 .city-location-modal{position:fixed;inset:0;z-index:120;display:grid;place-items:center;padding:22px;isolation:isolate;pointer-events:auto}
-/* Keep every landmark on the same neutral translucent-gray glass system as the bottom dock.
-   Scene identity comes from its title, copy, schedule and scene content—not tinted modal skins. */
+
 .city-location-modal[data-scene] .city-location-glass{
  background:linear-gradient(135deg,rgba(231,233,239,.24),rgba(141,149,167,.22) 52%,rgba(205,209,218,.20))!important;
  border:1px solid rgba(255,255,255,.28);
@@ -14173,7 +14168,7 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:104px minmax(0,1fr) 34px;gap:10px;align-items:stretch;min-height:0}
 .city-character-photo-column{display:flex;flex-direction:column;gap:9px;min-width:0}
 
-/* One canonical relationship badge: restrained jewel tones, a clear heart cue, and consistent sizing. */
+
 .poyozz-affinity-ui{display:inline-flex;align-items:center;justify-content:center;gap:5px;max-width:100%;min-width:0;padding:4px 10px;border:1px solid var(--affinity-border);border-radius:999px;background:var(--affinity-bg);color:var(--affinity-text);font-size:10px;font-weight:650;line-height:1.25;letter-spacing:.015em;white-space:nowrap;box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 2px 8px rgba(12,8,24,.12);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .poyozz-affinity-ui.is-negative{--affinity-border:rgba(112,91,145,.58);--affinity-bg:linear-gradient(135deg,rgba(35,27,48,.94),rgba(65,48,78,.88));--affinity-text:#e8dff1}
 .poyozz-affinity-ui.is-positive{--affinity-border:rgba(230,174,218,.62);--affinity-bg:linear-gradient(135deg,rgba(116,72,111,.92),rgba(151,105,157,.88));--affinity-text:#fff0fb}
@@ -14263,7 +14258,7 @@ document.addEventListener('submit',function(event){
 .city-character-card-body{display:grid;grid-template-columns:118px minmax(0,1fr);gap:14px;margin:12px 0}
 .city-character-portrait{width:118px;height:164px;object-fit:cover;object-position:center top;border-radius:12px;border:1px solid rgba(255,255,255,.24);background:rgba(255,255,255,.06);box-shadow:none;display:block}
 .city-character-portrait-fallback{display:grid;place-items:center;color:#eee;font-size:30px}
-/* Portraits and transparent cutout art must not inherit a gray placeholder backing. */
+
 .city-character-portrait,.city-character-portrait-video{background:transparent!important;}
 .city-character-copy{min-width:0;color:#f4f2fa;font-size:12px;line-height:1.7;overflow-wrap:anywhere}
 .city-character-copy h3{margin:0 0 9px;font-size:17px;line-height:1.35;overflow-wrap:anywhere}
@@ -14280,7 +14275,7 @@ document.addEventListener('submit',function(event){
 @media(prefers-reduced-motion:no-preference){.city-location-modal[data-side="left"] .city-location-glass{animation:city-location-slide-left .24s ease-out both}.city-location-modal[data-side="right"] .city-location-glass{animation:city-location-slide-right .24s ease-out both}}
 @media(prefers-reduced-motion:no-preference){.city-location-glass{animation:city-location-enter .22s ease-out both}@keyframes city-location-enter{from{opacity:0;transform:translateY(8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}}
 
-/* Premium alignment pass: scene header, close controls, pagination and right-side bookmark rail */
+
 .city-location-header{display:flex!important;align-items:center!important;justify-content:space-between!important;min-height:44px!important;gap:12px!important;padding:0 1px!important}
 .city-location-title-row{display:flex!important;align-items:center!important;align-self:center!important;gap:10px!important;flex-wrap:nowrap!important;min-width:0!important}
 .city-location-title-icon{display:grid!important;place-items:center!important;width:34px!important;height:34px!important;flex:0 0 34px!important;line-height:1!important;font-size:18px!important;border-radius:11px!important;background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.17)!important;box-shadow:inset 0 1px rgba(255,255,255,.14)!important}
@@ -14329,7 +14324,7 @@ document.addEventListener('submit',function(event){
 }
 
 
-/* 2026-10-29 screenshot corrections: remove arrow discs and make true book-edge tabs */
+
 #cityCharacterCard{position:relative!important;overflow:visible!important;margin-right:34px!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:20px!important}
 #cityCharacterCard .city-character-card-head{position:relative!important;padding-right:42px!important}
 #cityCharacterCard .city-character-card-close{position:absolute!important;right:7px!important;top:7px!important;z-index:4!important}
@@ -14355,8 +14350,8 @@ document.addEventListener('submit',function(event){
 </style>
 
 <style id="poyozz-chat-full-bleed-shared">
-/* Full-bleed rules shared by standard chat modes only; Encounter visual styles are kept separate. */
-/* Final full-bleed chat frame: remove the outer panel inset and let header/composer glass meet the phone edges. */
+
+
 body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
 body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
 body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
@@ -14366,7 +14361,7 @@ body.chat-page .messages,body.conversation .messages,body.group-chat-page .messa
 
 
 <style id="poyozz-chat-keyboard-viewport">
-/* Keep single/group chat and encounter-mode composers inside the visible software-keyboard viewport. */
+
 body.conversation main,body.group-chat-page main{
   height:var(--poyozz-chat-viewport-height,100dvh);
   min-height:0;
