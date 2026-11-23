@@ -535,6 +535,10 @@ jobs:
           $weather_check$;
           SQL
 
+      - name: Run weekly weather contract assertions
+        shell: bash
+        run: node scripts/test-encounter-weekly-weather.mjs
+
       - name: Replay public character eligibility and NSFW viewer gate
         shell: bash
         run: |
