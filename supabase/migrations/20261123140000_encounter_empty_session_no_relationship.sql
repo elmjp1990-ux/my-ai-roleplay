@@ -71,6 +71,15 @@ BEGIN
   v_new := $new$    IF NOT FOUND THEN
       v_affinity:=0;
       v_relationship_stage:='stranger';
+      -- A concurrent first turn may have created the relationship after the initial read.
+      SELECT state.affinity,state.relationship_stage
+      INTO v_affinity,v_relationship_stage
+      FROM public.encounter_character_state AS state
+      WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+      IF NOT FOUND THEN
+        v_affinity:=0;
+        v_relationship_stage:='stranger';
+      END IF;
     ELSE
       INSERT INTO public.encounter_character_state(
         user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at
@@ -94,6 +103,14 @@ BEGIN
   IF NOT FOUND THEN
     v_affinity := 0;
     v_stage := 'stranger';
+    -- Re-read in case another session created the relationship concurrently.
+    SELECT state.affinity INTO v_affinity FROM public.encounter_character_state state WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+    IF FOUND THEN
+      v_stage := public.story_relationship_stage_for_affinity(v_affinity);
+    ELSE
+      v_affinity := 0;
+      v_stage := 'stranger';
+    END IF;
   ELSE
     v_stage := public.story_relationship_stage_for_affinity(v_affinity);
   END IF;$new$;
