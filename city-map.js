@@ -5,7 +5,7 @@
  let activeSceneRefresh = null;
  let activeScheduleRefresh = null;
  let activeVenueRefresh = null;
- const CITY_MAP_WEATHER_CACHE_TTL_MS = 60 * 60 * 1000;
+ const CITY_MAP_WEATHER_CACHE_TTL_MS = 50 * 60 * 1000;
  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
  const cityMapMemoryCache = new Map();
  const cityCharacterAffinityCache = new Map();
@@ -319,8 +319,12 @@
  if(cached)applyCityWeather(cached.data);
  if(cached?.fresh)return;
  try{
- const {data,error}=await client.rpc('get_encounter_city_weather_v2');
- if(error)throw error;
+ let {data,error}=await client.rpc('get_encounter_city_weather_v2');
+ if(error){
+ const legacy=await client.rpc('get_encounter_city_weather');
+ if(legacy.error)throw error;
+ data=legacy.data;
+ }
  const weather=Array.isArray(data)?data[0]:data;
  if(weather)writeCityMapCache('weather-v2',weather);
  applyCityWeather(weather);
