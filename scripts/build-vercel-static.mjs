@@ -90,6 +90,7 @@ const runtimeFiles = [
   'custom-tag-picker.js',
   'memory-album.js',
   'encounter-scene.js',
+  'encounter-scene.css',
   'group-opening-presets.js',
   'LOGO_WEBICON.webp',
   'LOGO_WEBLOGO.webp',
