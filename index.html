@@ -4822,7 +4822,8 @@ async function executePendingChatTurn(s) {
   // The server has already durably saved and settled the assistant reply.
   // A later session-metadata sync failure must never trigger a refund.
   const metadataSaved = await saveChatSessionSafely(s);
-  if (!metadataSaved) {
+  const encounterMetadataSaved = s.encounterMode === true && result.encounter?.sessionMetadataSynced === true;
+  if (!metadataSaved && !encounterMetadataSaved) {
     toast('回覆與扣款已完成，但聊天附加資料同步失敗；回覆不會因此重複扣款。');
   }
 }
