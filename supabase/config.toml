@@ -13,7 +13,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.encounter-weather-sync]
-# The handler validates the service-role key and generates lightweight seasonal Taipei weather locally.
+# The handler validates the service-role bearer and syncs the shared weekly Taipei forecast.
 verify_jwt = false
 
 [functions.encounter-taiwan-calendar-sync]
