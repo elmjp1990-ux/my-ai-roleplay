@@ -49,8 +49,8 @@ const contextualSuggestions = ["我想先問問你剛才在廚房處理蟑螂的
 const fence = String.fromCharCode(96).repeat(3);
 const suggestedOutput = parseEncounterTurnOutput(fence + "json\n" + JSON.stringify({ reply: text, suggested_replies: contextualSuggestions, affinity_delta: -2, illustration_id: illustrationId }) + "\n" + fence);
 assert.deepEqual(suggestedOutput.suggestedReplies, contextualSuggestions);
-assert.deepEqual(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"], affinity_delta: 1 })).suggestedReplies, [], "Invalid suggestions are discarded without fallback content");
-assert.deepEqual(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: [validSuggestions[0], "太短", validSuggestions[1]], affinity_delta: 1 })).suggestedReplies, [validSuggestions[0], validSuggestions[1]], "Keep only valid suggestions, without filling missing slots");
+assert.deepEqual(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: ["太短", "也太短", "還是太短"], affinity_delta: 1 })).suggestedReplies, ["太短", "也太短", "還是太短"], "Non-empty AI suggestions are preserved instead of silently discarded by a length gate");
+assert.deepEqual(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: [validSuggestions[0], "太短", validSuggestions[1]], affinity_delta: 1 })).suggestedReplies, [validSuggestions[0], "太短", validSuggestions[1]], "Preserve every non-empty AI suggestion");
 assert.deepEqual(parseEncounterTurnOutput(JSON.stringify({ reply: text, suggested_replies: [validSuggestions[0]], affinity_delta: 0 })).suggestedReplies, [validSuggestions[0]], "A single valid suggestion remains a single option");
 
 const failedUsageMigration = fs.readFileSync("supabase/migrations/20261119001300_ai_model_usage_failed_encounter_turns.sql", "utf8");
@@ -58,6 +58,11 @@ const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 assert.match(encounterScene, /const processEncounterSpriteBackdrop=/);
 assert.match(encounterScene, /\(r\+g\+b\)\/3>=140&&Math.max\(r,g,b\)-Math.min\(r,g,b\)<=42/);
 assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,halfBodyImage\)/);
+assert.match(encounterScene, /session\.activeTurnInFlight\?encounterTypingMarkup/);
+assert.match(encounterScene, /data-action="encounter-replay-beat"/);
+assert.match(encounterScene, /formattedBeat\.html/);
+assert.match(encounterScene, /encounter-dialogue-text em/);
+assert.match(encounterScene, /composer-bottom-row\{position:sticky/);
 assert.equal((encounterScene.match(/const neutralBackdrop=i=>/g)||[]).length,1,
   'Portrait background-removal algorithm must exist only once');
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
@@ -80,6 +85,9 @@ assert.match(affinityMigration, /OLD\.session_data->>'affinityMode' IS DISTINCT 
 assert.match(endpoint, /apply_encounter_turn_affinity/);
 assert.match(endpoint, /affinity_delta/);
 assert.match(endpoint, /不得輸出總好感度或關係階段/);
+assert.match(endpoint, /恰好三則玩家下一步建議回覆/);
+assert.match(endpoint, /suggestedReplies\.length > 0/);
+assert.match(endpoint, /sessionMetadataSynced/);
 const frontend = fs.readFileSync("index.html", "utf8");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sharedRelationshipLabels = "hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'";
