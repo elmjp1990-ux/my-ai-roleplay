@@ -410,9 +410,9 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
           if(!stack){stack=document.createElement('div');stack.className='encounter-identity-stack';nameNode.before(stack);stack.appendChild(nameNode);}
           if(!stack.contains(affinityChip))stack.appendChild(affinityChip);
         }else if(controlsRow&&!controlsRow.contains(affinityChip)){controlsRow.appendChild(affinityChip);}
-        affinityChip.innerHTML=window.PoyozzAffinityUI?.render(session.encounterAffinity,session.encounterRelationshipStage||'first_meeting','encounter')||'';
+        affinityChip.innerHTML=window.PoyozzAffinityUI?.render(session.encounterAffinity,session.encounterRelationshipStage||'stranger','encounter')||'';
         affinityChip.setAttribute('role','status');
-        affinityChip.setAttribute('aria-label','目前關係：'+(window.PoyozzAffinityUI?.labels?.[session.encounterRelationshipStage]||'初次見面'));
+        affinityChip.setAttribute('aria-label','目前關係：'+(window.PoyozzAffinityUI?.labels?.[session.encounterRelationshipStage]||'陌生人'));
       }
       const input=panel.querySelector('.composer #messageInput');
       if(input)input.setAttribute('aria-label','相遇模式對話');
