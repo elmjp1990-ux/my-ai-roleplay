@@ -130,14 +130,19 @@ assert.match(cityMap, /activeVenueRefresh=renderVenue/);
 assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
 assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
 
-assert.ok(cityMap.indexOf("void loadCitySceneCatalog();") > cityMap.indexOf("const cityPlaceAliases"),
-  "scene catalog loading must start after place aliases and names are initialized");
+assert.ok(cityMap.indexOf("void loadCitySceneCatalog();") > cityMap.indexOf("const cityPlaceSceneKeys"),
+  "scene catalog loading must start after the fixed scene-key map is initialized");
 
 assert.match(cityMap, /get_encounter_city_weather/);
 assert.match(cityMap, /stage.classList.toggle\('is-raining',weather.is_raining===true\)/);
 assert.doesNotMatch(cityMap, /MAX_DYNAMIC_SCENE_MARKERS|data-dynamic-scene|cityDynamicSceneMarkers|createElementNS\(CITY_MAP_SVG_NS/);
 assert.doesNotMatch(cityMap, /Math\.hypot\(point\.x-x,point\.y-y\)<120/);
-assert.match(cityMap, /const cityPlaceAliases=\{waterfront:/);
+assert.match(cityMap, /const cityPlaceSceneKeys=\{waterfront:'waterfront'/);
+assert.doesNotMatch(cityMap, /cityPlaceAliases|getTaipeiClock/);
+assert.match(cityMap, /row=>row\?\.location_key===sceneKey/);
+assert.match(cityMap, /Array\.isArray\(character\.encounterSchedules\)/);
+assert.match(html, /rows\.push\(row\)/);
+assert.doesNotMatch(html, /encodeURIComponent\(String\(row\.scene_description/);
 assert.match(cityMap, /row\.event_label/);
 assert.match(cityMap, /Object\.prototype\.hasOwnProperty\.call\(cityPlaceNames,key\)/);
 assert.doesNotMatch(cityMap, /row\.is_dynamic!==true/);
