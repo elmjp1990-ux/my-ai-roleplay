@@ -225,7 +225,6 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const pushSentence=(text)=>{
       const cleaned=String(text||'').replace(/^\s*[-•]+\s*/,'').trim();
       if(!cleaned)return;
-      // Long, unpunctuated prose is broken into readable visual-novel beats too.
       if(cleaned.length>58&&!cleaned.includes('*')){
         const clauses=cleaned.split(/(?<=[，,、；;：:])/u).map(x=>x.trim()).filter(Boolean);
         if(clauses.length>1){
@@ -253,8 +252,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
   };
   const encounterBeatMarkup=value=>{const parts=String(value||'').split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean),isNarration=p=>p[0]==='*'&&p[1]!=='*'&&p[p.length-1]==='*'&&p[p.length-2]!=='*';return{html:parts.map(p=>isNarration(p)?'<em>'+e(p.slice(1,-1))+'</em>':e(p)).join(''),hasSpeech:parts.some(p=>!isNarration(p)&&p.trim())};};
   const encounterTypingMarkup=(name)=>'<div class="encounter-typing-indicator" role="status" aria-live="polite"><span>'+e(name)+' 正在回覆...</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>';
-  // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
-  // from restoring ordinary chat bubbles and silently cancelling progressive dialogue.
+  // Restore progressive dialogue after #messages rerenders.
   const applyEncounterDialogue=(panel,session)=>{
     const messages=panel?.querySelector('.messages');
     if(!messages)return;
@@ -323,8 +321,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       const defaultSceneImage='./encounter-default-scene.webp';
       panel.style.setProperty('--encounter-scene-photo','url('+JSON.stringify(sceneImage||defaultSceneImage)+')');
       panel.dataset.encounterPlace=session.encounterPlace||'';
-      // Encounter scenes use dedicated encounter art or the author's scene-illustration gallery.
-      // The character-card primary image is intentionally never reused as a scene sprite.
+      // Scene sprites use encounter art/gallery, not card art.
       const selectedIllustrationId=typeof session?.encounterVisuals?.illustrationId==='string'?session.encounterVisuals.illustrationId:'';
       const selectedGalleryAsset=selectedIllustrationId
         ? (character?.galleryIllustrations||[]).find(asset=>asset?.id===selectedIllustrationId)
