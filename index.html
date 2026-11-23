@@ -1108,6 +1108,27 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 </style>
 
 
+<style id="poyozz-city-map-desktop-dock-fix">
+@media(min-width:768px){
+  body.city-map-mode #mobileNav.mobile-nav{display:none!important}
+  body.city-map-mode .city-map-bottom{
+    display:flex!important;position:fixed!important;z-index:60!important;
+    left:50%!important;right:auto!important;bottom:16px!important;
+    transform:translateX(-50%)!important;width:min(560px,calc(100vw - 40px))!important;
+    max-width:560px!important;min-height:0!important;box-sizing:border-box!important;
+    padding:6px!important;gap:4px!important;border:1px solid rgba(255,255,255,.22)!important;
+    border-radius:18px!important;background:rgba(20,27,43,.22)!important;
+    box-shadow:0 8px 28px rgba(7,13,27,.16)!important;
+    -webkit-backdrop-filter:blur(18px) saturate(135%)!important;
+    backdrop-filter:blur(18px) saturate(135%)!important;
+  }
+  body.city-map-mode .city-map-bottom button{
+    flex:1 1 0!important;min-width:0!important;min-height:54px!important;
+    padding:9px 6px!important;font-size:13px!important;line-height:1.35!important;
+    text-align:center!important;white-space:nowrap!important;
+  }
+}
+</style>
 </head>
 
 <body>
@@ -11539,7 +11560,7 @@ document.addEventListener('click',async event => {
           toast(error?.message||'暫時離開失敗，請稍後再試。');
           break;
         }
-        $('modal')?.close();hideList=false;go({page:'citymap'});break;
+        $('modal')?.close();hideList=false;go({page:'citymap'});toast('已暫時離開，今天仍可從同一地標接續相遇。');break;
       }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
