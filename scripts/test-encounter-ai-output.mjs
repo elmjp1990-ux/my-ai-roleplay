@@ -61,8 +61,7 @@ assert.match(encounterScene, /processEncounterSpriteBackdrop\(existingSprite,hal
 assert.match(encounterScene, /session\.activeTurnInFlight\?encounterTypingMarkup/);
 assert.match(encounterScene, /data-action="encounter-replay-beat"/);
 assert.match(encounterScene, /formattedBeat\.html/);
-assert.match(encounterScene, /encounter-dialogue-text em/);
-assert.match(encounterScene, /composer-bottom-row\{position:sticky/);
+
 assert.equal((encounterScene.match(/const neutralBackdrop=i=>/g)||[]).length,1,
   'Portrait background-removal algorithm must exist only once');
 const endpoint = fs.readFileSync("supabase/functions/encounter-turn/index.ts", "utf8");
@@ -90,6 +89,8 @@ assert.match(endpoint, /suggestedReplies\.length > 0/);
 assert.match(endpoint, /sessionMetadataSynced/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
+assert.match(frontend, /encounter-dialogue-text em/);
+assert.match(frontend, /composer-bottom-row\{position:sticky/);
 assert.match(frontend, /encounterMetadataSaved = s\.encounterMode === true && result\.encounter\?\.sessionMetadataSynced === true/);
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sharedRelationshipLabels = "hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'";
