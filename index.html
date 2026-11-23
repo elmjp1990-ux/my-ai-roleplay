@@ -303,7 +303,12 @@ body.day .tag { color:#4f46b8; }
   background:transparent;
   color:var(--muted);
 }
-.nav-btn.active { background:var(--soft); color:var(--text); }\n.nav-btn { position:relative; }\n.nav-unread-badge { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; min-width:18px; max-width:30px; height:18px; padding:0 5px; border-radius:999px; background:#8b5cf6; color:#fff; font-size:10px; font-weight:700; line-height:1; white-space:nowrap; box-sizing:border-box; box-shadow:0 0 0 2px var(--panel); }\n@media(max-width:767px){ #mobileNav .nav-btn { position:relative; } #mobileNav .nav-unread-badge { position:absolute; top:2px; right:4px; min-width:16px; max-width:25px; height:16px; font-size:9px; padding:0 4px; } }
+.nav-btn.active { background:var(--soft); color:var(--text); }
+.nav-icon-wrap { position:relative; display:inline-flex; align-items:center; justify-content:center; flex:0 0 22px; width:22px; height:22px; }
+.nav-icon-wrap > .icon { width:22px; height:22px; }
+.nav-unread-badge { position:absolute; top:-7px; right:-10px; z-index:2; display:inline-flex; align-items:center; justify-content:center; min-width:17px; max-width:27px; height:17px; padding:0 4px; border:1.5px solid var(--panel); border-radius:999px; background:#8b5cf6; color:#fff; font-size:9px; font-weight:750; line-height:1; white-space:nowrap; box-sizing:border-box; box-shadow:0 1px 5px #0005; pointer-events:none; }
+.nav-unread-badge.is-overflow { min-width:25px; font-size:8px; }
+@media(max-width:767px){ .nav-icon-wrap { flex-basis:22px; width:22px; height:22px; } .nav-unread-badge { top:-6px; right:-9px; min-width:16px; max-width:25px; height:16px; font-size:8px; padding:0 3px; } .nav-unread-badge.is-overflow { min-width:23px; } }
 .nav-btn.active .chat-nav-icon { fill:currentColor; }
 .sidebar-footer { margin-top:auto; display:flex; justify-content:center; }
 .sidebar-footer button { padding:8px; }
@@ -5160,7 +5165,7 @@ function chatNavUnreadCount(){
 function chatNavUnreadBadge(){
   const count=chatNavUnreadCount();
   if(!count)return '';
-  return '<span class="nav-unread-badge" aria-label="'+count+' 筆未讀訊息">'+(count>99?'99+':count)+'</span>';
+  return '<span class="nav-unread-badge'+(count>99?' is-overflow':'')+'" aria-label="'+(count>99?'99 則以上未讀訊息':count+' 筆未讀訊息')+'">'+(count>99?'99+':count)+'</span>';
 }
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
@@ -5177,7 +5182,7 @@ function renderShell() {
   const html = labels.map(([page,label]) => `
     <button class="nav-btn ${navPage === page ? 'active' : ''}"
             data-action="nav" data-page="${page}">
-      ${ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>${page === 'chat' ? chatNavUnreadBadge() : ''}
+      ${page === 'chat' ? '<span class="nav-icon-wrap">'+ICON.chat+chatNavUnreadBadge()+'</span>' : ICON[page === 'citymap' ? 'home' : page]}<span class="nav-label">${label}</span>
     </button>`).join('');
   $('desktopNav').innerHTML = html;
   $('mobileNav').innerHTML = html;
