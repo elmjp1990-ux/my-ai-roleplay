@@ -4,6 +4,7 @@ import fs from 'node:fs';
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
+const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
 assert.match(html,/session_id:metadata->>session_id/,
   'Encounter diary list must select only the session ID from JSON metadata');
 assert.doesNotMatch(html,/select\('id,summary,occurred_at,metadata'\)/,
@@ -278,6 +279,8 @@ assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 assert.match(cityMap, /const isSleepingSchedule=.*睡夢.*淺眠/);
+assert.doesNotMatch(fixedSceneMigration, /marker_[xy]\\s*=\\s*EXCLUDED\\.marker_[xy]/,
+  'Scene catalog upserts must preserve the already-curated marker coordinates.');
 assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneKey\)/,
   'Sleeping characters must remain visible in their current city scene.');
 assert.match(cityMap, /\.find\(item=>item\?\.location_key===sceneKey\)/,
