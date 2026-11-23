@@ -38,6 +38,7 @@ type RequestOptions = {
   responseFormat?: { type: "json_object" };
   provider?: ApprovedOpenRouterProvider;
   disableProviderFallback?: boolean;
+  retrySameProviderOnRateLimit?: boolean;
 };
 
 const asRow = (value: unknown): Record<string, unknown> =>
@@ -151,7 +152,13 @@ export async function requestOpenRouterChatCompletion(options: RequestOptions): 
   const [defaultPrimaryProvider, defaultFallbackProvider] = APPROVED_OPENROUTER_PROVIDERS;
   const primaryProvider = options.provider || defaultPrimaryProvider;
   const primary = await requestFromProvider(options, model, primaryProvider);
-  if (options.disableProviderFallback || !isTransientProviderFailure(primary)) return primary;
+  if (options.disableProviderFallback) {
+    if (options.retrySameProviderOnRateLimit && primary.httpStatus === 429) {
+      return await requestFromProvider(options, model, primaryProvider);
+    }
+    return primary;
+  }
+  if (!isTransientProviderFailure(primary)) return primary;
   const fallbackProvider = primaryProvider === defaultPrimaryProvider ? defaultFallbackProvider : defaultPrimaryProvider;
   return await requestFromProvider(options, model, fallbackProvider);
 }
