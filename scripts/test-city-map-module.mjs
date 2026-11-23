@@ -99,7 +99,6 @@ assert.match(liveAffinityMigration,/auth\.uid\(\)/);
 assert.match(liveAffinityMigration,/GRANT EXECUTE ON FUNCTION public\.get_encounter_character_affinity\(uuid\) TO authenticated/);
 const sceneAvailabilityMigration=fs.readFileSync('supabase/migrations/20261118074708_resolve_only_published_encounter_scenes.sql','utf8');
 const hourlyOptionsMigration=fs.readFileSync('supabase/migrations/20261118074718_encounter_hourly_schedule_options.sql','utf8');
-const fixedSceneMigration=fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql','utf8');
 assert.match(fixedSceneMigration,/Returns only the fourteen permanent A–N city scene anchors/);
 assert.match(fixedSceneMigration,/publish_encounter_scene_metadata/);
 assert.match(fixedSceneMigration,/It cannot create, move, rename, activate, or hide map markers/);
