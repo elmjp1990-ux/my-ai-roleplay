@@ -576,7 +576,7 @@ assert.deepEqual(rangeCalls,[[0,9]],"initial history load must fetch only ten re
 assert.equal(historyPerson.encounterHistoryCloud.length,9,"blank discovery-only session is excluded from the visible history");
 assert.match(orFilter,/session_data->>encounterMode/,"legacy sessions marked in session_data remain discoverable");
 const historyHtml=historyApi.renderHistory(historyPerson,historyPerson.encounterHistoryCloud,value=>value,{});
-assert.match(historyHtml,/已結束/,"ended sessions may retain ended-only status");
+assert.doesNotMatch(historyHtml,/city-encounter-history-status/,"ended sessions must not show the ended-status badge");
 assert.match(historyHtml,/data-encounter-history-sentinel/,"more history is exposed through a scroll sentinel");
 assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,"player preview uses you prefix");
 await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});
