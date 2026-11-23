@@ -117,7 +117,7 @@
         <aside class="city-map-info">
           <h2 class="city-map-title"><img src="./LOGO_WEBLOGO.webp" alt="POYOZZ"> <span>城市</span></h2>
           <div id="cityMapDate">台灣時間</div>
-          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span><span id="cityMapRainChance">降雨機率</span></div>
+          <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
           <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
         </aside>
@@ -293,19 +293,15 @@
  if(!stage)return;
  const weatherLabel=$('cityMapWeather');
  const temperatureLabel=$('cityMapTemp');
- const rainChanceLabel=$('cityMapRainChance');
  if(!weather){
  if(weatherLabel)weatherLabel.textContent='多雲';
  if(temperatureLabel)temperatureLabel.textContent='24.0°C';
- if(rainChanceLabel)rainChanceLabel.textContent='降雨機率 --';
  stage.classList.remove('is-raining');
  return;
  }
  if(weatherLabel)weatherLabel.textContent=String(weather.weather_text||'多雲');
  const temperature=Number(weather.temperature_c);
  if(temperatureLabel)temperatureLabel.textContent=Number.isFinite(temperature)?temperature.toFixed(1)+'°C':'24.0°C';
- const rainChance=Number(weather.precipitation_probability);
- if(rainChanceLabel)rainChanceLabel.textContent=Number.isFinite(rainChance)?'降雨 '+Math.max(0,Math.min(100,Math.round(rainChance)))+'%':'降雨機率 --';
  stage.classList.toggle('is-raining',weather.is_raining===true);
  const cores=Number(navigator.hardwareConcurrency||8);
  const memory=Number(navigator.deviceMemory||8);
