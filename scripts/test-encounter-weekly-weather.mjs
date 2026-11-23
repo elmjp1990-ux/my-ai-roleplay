@@ -17,6 +17,7 @@ assert.match(handler,/task==="hourly_update"/);
 assert.match(handler,/forecast_rows_insufficient/);
 assert.match(handler,/request.headers.get\("Authorization"\)!=="Bearer "\+key/);
 assert.match(cityMap,/get_encounter_city_weather_v2/);
+assert.doesNotMatch(cityMap,/get_encounter_city_weather\(\)/);
 assert.match(cityMap,/cityMapRainChance/);
 assert.match(cityMap,/50 \* 60 \* 1000/);
 assert.doesNotMatch(cityMap,/readCityMapCache\('weather',CITY_MAP_WEATHER_CACHE_TTL_MS\)/);
