@@ -339,7 +339,7 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const cityPlaceSceneKeys={waterfront:'水岸港區',commercial:'辦公大樓',airport:'機場',university:'校園',park:'中央公園','shopping-street':'商店街','department-store':'百貨公司',hospital:'中央醫院','night-bar':'夜間酒吧','live-house':'展演空間','luxury-apartment':'高級公寓',apartment:'308公寓','convenience-store':'便利商店','private-club':'高級會所'};
+ const cityPlaceSceneKeys={waterfront:'waterfront',commercial:'commercial',airport:'airport',university:'university',park:'park','shopping-street':'shopping-street','department-store':'department-store',hospital:'hospital','night-bar':'night-bar','live-house':'live-house','luxury-apartment':'luxury-apartment',apartment:'apartment','convenience-store':'convenience-store','private-club':'private-club'};
  const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
  const isCurrentCityCharacterEligible=(person)=>{
  const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
