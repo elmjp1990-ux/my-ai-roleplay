@@ -199,7 +199,7 @@ body.encounter-mode-active .chat-main.encounter-scene .chat-heading [data-encoun
 }
 body.encounter-mode-active .chat-main.encounter-scene .encounter-character-sprite,
 body.encounter-mode-active.chat-keyboard-open .chat-main.encounter-scene .encounter-character-sprite{
-  position:absolute!important;bottom:0!important;transform:none!important;top:auto!important;
+  position:absolute!important;bottom:0!important;left:50%!important;right:auto!important;transform:translateX(-50%)!important;top:auto!important;
 }
 body.encounter-mode-active .chat-main.encounter-scene .composer{padding-bottom:calc(15px + env(safe-area-inset-bottom))!important}
 body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
