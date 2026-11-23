@@ -10,6 +10,7 @@ assert.match(migration,/v_cron_schedule := '55 \* \* \* \*'/);
 assert.match(migration,/v_task := 'weekly_sync'/);
 assert.match(migration,/v_task := 'hourly_update'/);
 assert.match(migration,/get_encounter_city_weather_v2/);
+assert.match(migration,/DROP FUNCTION IF EXISTS public\\.schedule_encounter_weather_sync\\(boolean\\)/);
 assert.match(handler,/forecast_days=7/);
 assert.match(handler,/temperature_2m,precipitation_probability,weather_code/);
 assert.match(handler,/task==="weekly_sync"/);
