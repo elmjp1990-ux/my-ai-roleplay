@@ -42,6 +42,71 @@ $function$;
 REVOKE ALL ON FUNCTION public.persist_encounter_session_pause_resume_metadata(uuid,uuid,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.persist_encounter_session_pause_resume_metadata(uuid,uuid,text) TO service_role;
 
+-- New Encounter sessions without an existing Story/Encounter relationship remain strangers.
+-- Support both the current main definition (which can import a Story relationship)
+-- and the older TEST definition (which only reads an existing Encounter state).
+DO $seed$
+DECLARE
+  v_definition text;
+  v_old text;
+  v_new text;
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.create_encounter_session_with_lifecycle(uuid,uuid,uuid,text,jsonb,jsonb,text,timestamptz,timestamptz)'::regprocedure
+  ) INTO v_definition;
+
+  v_old := $old$    IF NOT FOUND THEN
+      v_affinity:=0;
+      v_relationship_stage:='first_meeting';
+    END IF;
+    INSERT INTO public.encounter_character_state(
+      user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at
+    ) VALUES(p_user_id,p_character_id,v_affinity,v_relationship_stage,clock_timestamp(),clock_timestamp())
+    ON CONFLICT(user_id,character_id) DO NOTHING;
+    -- A concurrent creation may have initialized the row first; read its value.
+    SELECT state.affinity,state.relationship_stage
+    INTO v_affinity,v_relationship_stage
+    FROM public.encounter_character_state AS state
+    WHERE state.user_id=p_user_id AND state.character_id=p_character_id;$old$;
+  v_new := $new$    IF NOT FOUND THEN
+      v_affinity:=0;
+      v_relationship_stage:='stranger';
+    ELSE
+      INSERT INTO public.encounter_character_state(
+        user_id,character_id,affinity,relationship_stage,first_met_at,last_interaction_at
+      ) VALUES(p_user_id,p_character_id,v_affinity,v_relationship_stage,clock_timestamp(),clock_timestamp())
+      ON CONFLICT(user_id,character_id) DO NOTHING;
+      -- A concurrent creation may have initialized the row first; read its value.
+      SELECT state.affinity,state.relationship_stage
+      INTO v_affinity,v_relationship_stage
+      FROM public.encounter_character_state AS state
+      WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+    END IF;$new$;
+
+  IF pg_catalog.strpos(v_definition,v_old)>0 THEN
+    v_definition := pg_catalog.replace(v_definition,v_old,v_new);
+    EXECUTE v_definition;
+  ELSE
+    v_old := $old$  SELECT state.affinity INTO v_affinity FROM public.encounter_character_state state WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+  v_affinity := COALESCE(v_affinity,0);
+  v_stage := public.story_relationship_stage_for_affinity(v_affinity);$old$;
+    v_new := $new$  SELECT state.affinity INTO v_affinity FROM public.encounter_character_state state WHERE state.user_id=p_user_id AND state.character_id=p_character_id;
+  IF NOT FOUND THEN
+    v_affinity := 0;
+    v_stage := 'stranger';
+  ELSE
+    v_stage := public.story_relationship_stage_for_affinity(v_affinity);
+  END IF;$new$;
+
+    IF pg_catalog.strpos(v_definition,v_old)=0 THEN
+      RAISE EXCEPTION 'encounter_session_relationship_seed_anchor_missing';
+    END IF;
+    v_definition := pg_catalog.replace(v_definition,v_old,v_new);
+    EXECUTE v_definition;
+  END IF;
+END;
+$seed$;
+
 -- A scene with no turn evidence is not a first meeting. Cancel it instead of
 -- creating encounter_character_state or making it eligible for diary carry-over.
 DO $migration$
