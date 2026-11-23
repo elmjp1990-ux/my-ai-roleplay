@@ -273,7 +273,7 @@ export function normalizeEncounterSceneKey(
   return null;
 }
 
-const SLEEPING_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢/;
+const SLEEPING_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|睡夢|睡得很沉|淺眠|深層睡眠|入睡|睡去|午睡|補眠|就寢/;
 
 export function resolveEncounterScheduleAvailability(
   activity: unknown,
