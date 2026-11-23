@@ -115,6 +115,12 @@ $legacy_cron$;
 
 DROP FUNCTION IF EXISTS public.schedule_encounter_weather_sync(boolean);
 
+CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_weekly_sync(p_enabled boolean DEFAULT false)
+RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
+AS $ SELECT public.schedule_encounter_worker('weather_sync',p_enabled); $;
+REVOKE ALL ON FUNCTION public.schedule_encounter_weather_weekly_sync(boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_weather_weekly_sync(boolean) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_hourly_update(p_enabled boolean DEFAULT false)
 RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
 AS $$ SELECT public.schedule_encounter_worker('weather_hourly_update',p_enabled); $$;
