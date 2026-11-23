@@ -251,12 +251,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     }
     return beats;
   };
-  const encounterBeatMarkup=(value)=>{
-    const parts=String(value||'').split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean);
-    const hasSpeech=parts.some(part=>!(part.startsWith('*')&&!part.startsWith('**')&&part.endsWith('*')&&!part.endsWith('**'))&&part.trim());
-    const html=parts.map(part=>part.startsWith('*')&&!part.startsWith('**')&&part.endsWith('*')&&!part.endsWith('**')&&part.length>=2?' <em>'+e(part.slice(1,-1))+'</em> ':e(part)).join('');
-    return {html,hasSpeech};
-  };
+  const encounterBeatMarkup=value=>{const parts=String(value||'').split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean),isNarration=p=>p[0]==='*'&&p[1]!=='*'&&p[p.length-1]==='*'&&p[p.length-2]!=='*';return{html:parts.map(p=>isNarration(p)?'<em>'+e(p.slice(1,-1))+'</em>':e(p)).join(''),hasSpeech:parts.some(p=>!isNarration(p)&&p.trim())};};
   const encounterTypingMarkup=(name)=>'<div class="encounter-typing-indicator" role="status" aria-live="polite"><span>'+e(name)+' 正在回覆...</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>';
   // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
   // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
