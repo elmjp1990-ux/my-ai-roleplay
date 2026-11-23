@@ -13,7 +13,7 @@ const nav = between('function chatNavUnreadCount(){', 'function renderShell() {'
 assert.match(nav, /chatHasUnreadAssistantMessage/);
 assert.match(nav, /groupPreviewLastAssistantAt/);
 assert.match(nav, /groupChatReadAt/);
-assert.match(nav, /count>99\?'99\+'/);
+assert.match(nav, /count>=99\?'99\+'/);
 assert.match(nav, /99 則以上未讀訊息/);
 assert.ok(html.includes('nav-unread-badge'));
 assert.ok(html.includes("page === 'chat' ? '<span class=\"nav-icon-wrap\">'+ICON.chat+chatNavUnreadBadge()+'</span>' : ICON["));
