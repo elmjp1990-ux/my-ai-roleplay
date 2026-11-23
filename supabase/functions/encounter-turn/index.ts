@@ -377,21 +377,29 @@ Deno.serve(async (request) => {
     const { data: currentSessionMeta, error: sessionMetaReadError } = await admin.from("chat_sessions")
       .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
     let sessionMetadataSynced = false;
-    if (!sessionMetaReadError && currentSessionMeta) {
+    let sessionUpdatedAt = "";
+    if (sessionMetaReadError) {
+      console.warn("encounter_session_metadata_read_failed", sessionMetaReadError.code || "unknown");
+    } else if (!currentSessionMeta) {
+      console.warn("encounter_session_metadata_row_missing");
+    } else {
       const sessionData = { ...asRow(currentSessionMeta.session_data) };
       const pending = asRow(sessionData.pendingTurn);
       if (asText(pending.turnId) === turnId) delete sessionData.pendingTurn;
       if (visuals) sessionData.encounterVisuals = visuals;
-      const { error: sessionMetaWriteError } = await admin.from("chat_sessions")
-        .update({ session_data: sessionData }).eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null);
-      sessionMetadataSynced = !sessionMetaWriteError;
+      const { data: updatedSessionMeta, error: sessionMetaWriteError } = await admin.from("chat_sessions")
+        .update({ session_data: sessionData }).eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null)
+        .select("updated_at").maybeSingle();
+      sessionMetadataSynced = !sessionMetaWriteError && Boolean(updatedSessionMeta?.updated_at);
+      if (sessionMetadataSynced) sessionUpdatedAt = asText(updatedSessionMeta.updated_at);
       if (sessionMetaWriteError) console.warn("encounter_session_metadata_sync_failed", sessionMetaWriteError.code || "unknown");
+      else if (!updatedSessionMeta) console.warn("encounter_session_metadata_update_returned_no_row");
     }
     return json({
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
       ...(suggestedReplies.length > 0 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
-      encounter: { evidence, sessionMetadataSynced, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
+      encounter: { evidence, sessionMetadataSynced, ...(sessionUpdatedAt ? { sessionUpdatedAt } : {}), ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
     });
   };
   const findSavedReply = async () => await admin.from("chat_messages").select("id,content,role,affinity_delta,suggested_replies")
