@@ -149,7 +149,11 @@ assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status 
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025/, "Illustrative weather must not depend on historical weather imports");
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
-assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_sync\(/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\\.schedule_encounter_weather_weekly_sync\\(/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\\.schedule_encounter_weather_hourly_update\\(/);
+assert.match(pipeline, /0 0 \\* \\* 0/);
+assert.match(pipeline, /55 \\* \\* \\* \\*/);
+assert.doesNotMatch(pipeline, /schedule_encounter_weather_sync|0 \\*\\/6 \\* \\* \\*/);
 assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
@@ -274,7 +278,7 @@ assert.match(html, /不會再次呼叫 AI/);
 assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestTools\(\)/);
 assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
-console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, simulated Taipei weather, queue triggers, and throttling contracts passed.");
+console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, weekly forecast weather, queue triggers, and throttling contracts passed.");
 
 
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
