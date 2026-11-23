@@ -146,6 +146,7 @@ assert.doesNotMatch(pipeline, /IF auth\.role\(\) <> 'service_role'/,
   "Encounter schedule SECURITY DEFINER RPCs must reject missing JWT role claims");
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025|O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY/);
 assert.ok(pipeline.includes("CHECK (asset_path ~ '^([.]/|/)[A-Za-z0-9_./-]+$')"));
+// Weather cache now uses a weekly forecast; the old fictional generator contract is retired.
 const weeklyWeatherMigration = fs.readFileSync("supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql", "utf8");
 assert.match(weeklyWeatherMigration, /encounter_city_weather_forecast_hourly/);
 assert.match(weeklyWeatherMigration, /DROP FUNCTION IF EXISTS public\.schedule_encounter_weather_sync\(boolean\)/);
