@@ -422,18 +422,25 @@ BEGIN
     RAISE EXCEPTION 'scheduler disable check returned NULL';
   END IF;
 
-  v_scheduler_status := public.schedule_encounter_weather_sync(false);
+  v_scheduler_status := public.schedule_encounter_weather_weekly_sync(false);
   IF v_scheduler_status IS NULL THEN
-    RAISE EXCEPTION 'weather scheduler disable check returned NULL';
+    RAISE EXCEPTION 'weekly weather scheduler disable check returned NULL';
+  END IF;
+  v_scheduler_status := public.schedule_encounter_weather_hourly_update(false);
+  IF v_scheduler_status IS NULL THEN
+    RAISE EXCEPTION 'hourly weather scheduler disable check returned NULL';
   END IF;
 
   IF pg_catalog.strpos(
     pg_catalog.pg_get_functiondef(
       'public.schedule_encounter_worker(text,boolean)'::regprocedure
     ),
-    '0 */6 * * *'
+    '0 0 * * 0'
+  ) = 0 OR pg_catalog.strpos(
+    pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),
+    '55 * * * *'
   ) = 0 THEN
-    RAISE EXCEPTION 'weather scheduler must use a six-hour interval';
+    RAISE EXCEPTION 'weather scheduler must use weekly and minute-55 intervals';
   END IF;
 
   IF pg_catalog.strpos(
@@ -459,7 +466,7 @@ BEGIN
   INSERT INTO public.encounter_city_weather (
     city_key, weather_text, temperature_c, is_raining, source, fetched_at, updated_at
   ) VALUES (
-    'taipei', '短暫陣雨', 25, true, 'poyozz_fictional_seasonal',
+    'taipei', '短暫陣雨', 25, true, 'open_meteo_weekly_forecast',
     pg_catalog.now(), pg_catalog.now()
   )
   ON CONFLICT (city_key) DO UPDATE
