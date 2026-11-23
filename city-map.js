@@ -267,14 +267,14 @@
  const loadCitySceneCatalog=async()=>{
  const client=window.mySupabase;
  if(!client)return [];
- const cached=readCityMapCache('scenes-v2',CITY_MAP_SCENES_CACHE_TTL_MS);
+ const cached=readCityMapCache('scenes-v3',CITY_MAP_SCENES_CACHE_TTL_MS);
  if(cached)renderCitySceneCatalog(cached.data);
  if(cached?.fresh)return cached.data;
  try{
  const {data,error}=await client.rpc('get_encounter_scene_catalog');
  if(error)throw error;
  const rows=Array.isArray(data)?data:[];
- writeCityMapCache('scenes-v2',rows);
+ writeCityMapCache('scenes-v3',rows);
  renderCitySceneCatalog(rows);
  return rows;
  }catch(error){
@@ -283,8 +283,8 @@
  }
  };
  activeSceneRefresh=async()=>{
- cityMapMemoryCache.delete('scenes-v2');
- try{sessionStorage.removeItem('poyozz-city-map-scenes-v2-v1');}catch{}
+ cityMapMemoryCache.delete('scenes-v3');
+ try{sessionStorage.removeItem('poyozz-city-map-scenes-v3-v1');}catch{}
  await loadCitySceneCatalog();
  if(locationModal&&!locationModal.hidden)activeVenueRefresh?.();
  };
