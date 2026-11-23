@@ -22,7 +22,7 @@ assert.match(handler,/forecast_rows_insufficient/);
 assert.match(handler,/verify_encounter_weather_cron_key/);
 assert.match(cityMap,/get_encounter_city_weather_v2/);
 assert.doesNotMatch(cityMap,/get_encounter_city_weather\(\)/);
-assert.match(cityMap,/cityMapRainChance/);
+assert.doesNotMatch(cityMap,/cityMapRainChance|precipitation_probability|降雨機率|降雨 \\d/);
 assert.match(cityMap,/50 \* 60 \* 1000/);
 assert.doesNotMatch(cityMap,/readCityMapCache\('weather',CITY_MAP_WEATHER_CACHE_TTL_MS\)/);
 console.log("Encounter weekly forecast/hourly weather contract passed.");
