@@ -33,10 +33,14 @@ Deno.serve(async(request)=>{
  if(request.method!=="POST")return json({error:"method_not_allowed"},405);
  const url=Deno.env.get("SUPABASE_URL")?.trim(),key=Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")?.trim();
  if(!url||!key)return json({error:"server_not_configured"},503);
- if(request.headers.get("Authorization")!=="Bearer "+key)return json({error:"service_role_required"},401);
+ const authorization=request.headers.get("Authorization")||"";
+ const candidate=authorization.startsWith("Bearer ")?authorization.slice(7):"";
+ if(!candidate)return json({error:"service_role_required"},401);
+ const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
+ const {data:authorized,error:authError}=await admin.rpc("verify_encounter_weather_cron_key",{p_candidate:candidate});
+ if(authError||authorized!==true)return json({error:"service_role_required"},401);
  let body:Record<string,unknown>={};try{const parsed=await request.json();if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))body=parsed;}catch{return json({error:"invalid_json"},400);}
  if(body.mode!=="scheduled")return json({error:"scheduled_mode_required"},400);
- const admin=createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false}});
  const now=new Date();
  try{
   if(body.task==="weekly_sync")return json({task:"weekly_sync",...(await weeklySync(admin,now))});
