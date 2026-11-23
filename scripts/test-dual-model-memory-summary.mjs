@@ -29,6 +29,8 @@ assert.match(summary, /不要重述既有摘要/);
 assert.match(summary, /function normalizeStoryMemorySummaryText/);
 assert.match(summary, /chars\.length < 30/);
 assert.match(summary, /chars\.slice\(0, 100\)/);
+assert.match(summary, /existingSummaryLength >= 30 && existingSummaryLength <= 100/);
+assert.match(summary, /Reclaim completed summaries outside the current 30–100 character contract/);
 assert.match(summary, /summary = normalizeStoryMemorySummaryText\(parsed\.summary\)/);
 assert.match(summary, /generation_type: "memory_summary"/);
 assert.match(summary, /generation_type: "chat_response"/);
