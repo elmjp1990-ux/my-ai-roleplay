@@ -13906,18 +13906,10 @@ async function loadCityCharacterSchedules(characterIds=[]){
   const {data,error}=await client.rpc('get_encounter_character_schedules_with_scene',{p_character_ids:ids});
   if(error)throw new Error('讀取角色行程失敗：'+error.message);
   for(const row of Array.isArray(data)?data:[]){
-    const lines=schedules.get(row.character_id)||[];
-    lines.push([
-      row.weekday==null?'*':row.weekday,
-      String(row.start_time||'').slice(0,5),
-      String(row.end_time||'').slice(0,5),
-      row.location_key,
-      row.activity,
-      encodeURIComponent(String(row.scene_description||''))
-    ].join('|'));
-    schedules.set(row.character_id,lines);
+    const rows=schedules.get(row.character_id)||[];
+    rows.push(row);
+    schedules.set(row.character_id,rows);
   }
-  for(const [id,lines] of schedules)schedules.set(id,lines.join('\n'));
   return schedules;
 }
 
