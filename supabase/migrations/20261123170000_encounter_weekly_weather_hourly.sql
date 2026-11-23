@@ -101,6 +101,18 @@ BEGIN
 END;
 $scheduler$;
 
+-- Disable the previous six-hour simulated-weather Cron; new jobs are explicitly enabled later.
+DO $legacy_cron$
+DECLARE v_job_id bigint;
+BEGIN
+  IF pg_catalog.to_regclass('cron.job') IS NOT NULL
+     AND pg_catalog.to_regprocedure('cron.unschedule(bigint)') IS NOT NULL THEN
+    FOR v_job_id IN SELECT jobid FROM cron.job WHERE jobname='poyozz-encounter-weather-sync'
+    LOOP PERFORM cron.unschedule(v_job_id); END LOOP;
+  END IF;
+END;
+$legacy_cron$;
+
 CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_hourly_update(p_enabled boolean DEFAULT false)
 RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
 AS $$ SELECT public.schedule_encounter_worker('weather_hourly_update',p_enabled); $$;
