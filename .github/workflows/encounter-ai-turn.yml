@@ -1,12 +1,21 @@
 name: Encounter AI turn contract
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
+      - ".github/workflows/encounter-ai-turn.yml"
+      - "supabase/migrations/**"
+      - "supabase/drafts/**"
+      - "scripts/test-encounter-schedule-parser.mjs"
+      - "scripts/test-encounter-chat-mode-guard.mjs"
       - "index.html"
       - "encounter-scene.js"
+      - "encounter-history.js"
       - "city-map.js"
       - "scripts/test-city-map-module.mjs"
+      - "scripts/test-chat-keyboard-viewport.mjs"
+      - "supabase/functions/encounter-session-state/**"
       - "scripts/test-encounter-public-character-eligibility.mjs"
       - "supabase/functions/encounter-turn/**"
       - "supabase/functions/encounter-evaluation-worker/**"
@@ -15,6 +24,14 @@ on:
       - "supabase/drafts/schedule-encounter-evaluation-worker.sql"
       - "supabase/functions/encounter-session/**"
       - "supabase/functions/encounter-schedule-organizer/**"
+      - "supabase/functions/_shared/encounter-schedule-organizer-handler.ts"
+      - "supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts"
+      - "api/encounter-schedule-organizer.ts"
+      - "api/package.json"
+      - "scripts/build-vercel-static.mjs"
+      - "package.json"
+      - "tsconfig.json"
+      - "scripts/test-vercel-encounter-schedule-route.mjs"
       - "supabase/functions/_shared/encounter-turn-output.mjs"
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
@@ -32,10 +49,19 @@ on:
       - "supabase/functions/_shared/encounter-response-guidelines.ts"
       - "supabase/functions/_shared/prompt-context.ts"
       - "supabase/functions/_shared/private-context-guard.ts"
+      - "supabase/functions/_shared/ai-generation-diagnostics.ts"
       - "supabase/functions/_shared/openrouter-chat-completions.ts"
+      - "supabase/functions/_shared/openrouter-chat-completions.test.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.ts"
+      - "supabase/functions/_shared/openrouter-provider-policy.test.ts"
+      - "supabase/functions/character-profile-organization-worker/index.ts"
+      - "scripts/test-character-ai-profile-contract.mjs"
       - "supabase/functions/_shared/provider-failure-policy.ts"
       - "supabase/functions/_shared/chat-turn-claim.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
+      - "supabase/functions/chat-turn/**"
+      - "supabase/functions/group-chat-turn/**"
+      - "scripts/test-ai-generation-diagnostics-contract.mjs"
       - "scripts/test-encounter-ai-output.mjs"
 
 jobs:
@@ -46,24 +72,44 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+      - name: Test AI generation diagnostics coverage and 14-day retention
+        run: node scripts/test-ai-generation-diagnostics-contract.mjs
       - name: Test Encounter response schema and length boundaries
         run: node scripts/test-encounter-ai-output.mjs
+      - name: Verify Character AI Profile provider integration contract
+        run: node scripts/test-character-ai-profile-contract.mjs
       - name: Test Encounter session evaluation, affinity settlement and opt-in scheduler
         run: node scripts/test-encounter-session-evaluation-worker.mjs
       - name: Test city map dynamic scene registry contract
         run: node scripts/test-city-map-module.mjs
+      - name: Test Encounter history, end flow, and blank-send UI regressions
+        run: node scripts/test-encounter-chat-mode-guard.mjs
+      - name: Test Android keyboard dismissal and encounter viewport anchoring
+        run: node scripts/test-chat-keyboard-viewport.mjs
       - name: Test public character schedule eligibility and adult visibility
         run: node scripts/test-encounter-public-character-eligibility.mjs
       - name: Test schedule worker security and wallet isolation
         run: node scripts/test-encounter-schedule-worker.mjs
+      - name: Install Vercel function bundler dependency
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Build and verify self-contained Vercel schedule handler artifact
+        run: node scripts/build-vercel-static.mjs
+      - name: Test Vercel long-running schedule route contract
+        run: node scripts/test-vercel-encounter-schedule-route.mjs
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
+      - name: Test approved OpenRouter provider routing and failover
+        run: deno test supabase/functions/_shared/openrouter-provider-policy.test.ts supabase/functions/_shared/openrouter-chat-completions.test.ts
+      # Covers wide natural-place labels, apartment/music scene precedence,
+      # post-show alley matching, and unmapped convenience-store rain alternatives.
       - name: Test AI schedule batch validation and compatibility
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
+      - name: Simulate authenticated manual schedule POST through mocked AI and database publish
+        run: deno test supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts
       - name: Test lightweight seasonal Taipei weather simulation
         run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
-      - name: Type-check Encounter Edge Functions and shared modules
-        run: deno check supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts
+      - name: Type-check Encounter and Character Profile Edge Functions
+        run: deno check supabase/functions/_shared/ai-generation-diagnostics.ts supabase/functions/chat-turn/index.ts supabase/functions/group-chat-turn/index.ts supabase/functions/encounter-turn/index.ts supabase/functions/encounter-evaluation-worker/index.ts supabase/functions/encounter-session/index.ts supabase/functions/encounter-session-state/index.ts supabase/functions/_shared/encounter-schedule-organizer-handler.ts supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts supabase/functions/encounter-schedule-organizer/index.ts supabase/functions/encounter-weather-sync/index.ts supabase/functions/encounter-taiwan-calendar-sync/index.ts supabase/functions/character-profile-organization-worker/index.ts

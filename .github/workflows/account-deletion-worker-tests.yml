@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - 'deno.json'
       - "supabase/functions/_shared/account-deletion-worker.ts"
       - "supabase/functions/_shared/account-deletion-auth-fetch.ts"
       - "supabase/functions/_shared/character-asset-cleanup-worker.ts"

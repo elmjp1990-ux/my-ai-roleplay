@@ -10,12 +10,15 @@ const fileBudgets = {
   'LOGO_WEBLOGO.webp': 40_000,
   'encounter-default-scene.webp': 350_000,
   'index.html': 900_000,
+  'wallet-ui.js': 12_000,
+  'chat-keyboard-viewport.js': 8_000,
   'memory-capture.js': 12_000,
   'chat-render-lifecycle.js': 8_000,
   'image-compression.js': 12_000,
   'signed-url-manager.js': 8_000,
   'core-utils.js': 4_000,
-  'city-map.js': 52_000,
+  'city-map.js': 60_000,
+  'encounter-history.js': 6_000,
   'followed-authors.js': 9_000,
   'list-pagination.js': 2_000,
   'notifications-screen.js': 5_000,
@@ -24,7 +27,8 @@ const fileBudgets = {
   'custom-tag-picker.js': 5_000,
   'memory-album.js': 27_000,
   'poyozz-ui.css': 40_000,
-  'encounter-scene.js': 36_000,
+  // Scene presentation is feature-rich; the global 1.5 MB budget still bounds total output.
+  'encounter-scene.js': 45_000,
   'group-opening-presets.js': 16_000,
 };
 const expectedFiles = Object.keys(fileBudgets).sort();
@@ -44,6 +48,17 @@ assert.ok(!fs.existsSync(staleSentinel), 'Build must remove stale files from the
 
 const actualFiles = fs.readdirSync(outputDir).sort();
 assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only the runtime allowlist.');
+
+// Guard the deployed fixed city map against stale/incomplete scene catalogs.
+const cityMapSource = fs.readFileSync(path.join(outputDir, 'city-map.js'), 'utf8');
+const fixedCitySceneKeys = [
+  'waterfront', 'commercial', 'airport', 'university', 'park', 'shopping-street',
+  'department-store', 'hospital', 'night-bar', 'live-house', 'luxury-apartment',
+  'apartment', 'convenience-store', 'private-club',
+];
+const emittedCitySceneKeys = [...cityMapSource.matchAll(/data-place=["']([^"']+)["']/g)].map((match) => match[1]);
+assert.deepEqual(emittedCitySceneKeys, fixedCitySceneKeys,
+  'Vercel output city map must contain all 14 fixed scene markers in A–N order.');
 
 let totalBytes = 0;
 for (const [file, maxBytes] of Object.entries(fileBudgets)) {
@@ -110,6 +125,8 @@ for (const styleAttr of html.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
 // Literal local asset paths in inline and external runtime JavaScript.
 const runtimeJs = [
   html,
+  fs.readFileSync(path.join(outputDir, 'wallet-ui.js'), 'utf8'),
+  fs.readFileSync(path.join(outputDir, 'chat-keyboard-viewport.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'memory-capture.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'chat-render-lifecycle.js'), 'utf8'),
   fs.readFileSync(path.join(outputDir, 'image-compression.js'), 'utf8'),

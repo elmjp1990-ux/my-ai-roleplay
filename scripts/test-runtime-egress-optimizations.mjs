@@ -193,7 +193,7 @@ assert.match(groupEdge,/buildRoleplayResponseGuidelines\("group"\)/,"group chat 
 assert.match(sharedRoleplayGuidelines,/300～600 字元/,"the shared long-reply target must remain 300–600 characters");
 assert.match(sharedRoleplayGuidelines,/主動敘事與事件推進/,"the shared response contract must include proactive story progression");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group chat must reuse the shared OpenRouter client");
-assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(\)/,"all chat modes must share the approved no-data-collection provider restriction");
+assert.match(sharedOpenRouter,/buildOpenRouterProviderOptions\(/,"all chat modes must share the approved no-training provider allowlist");
 assert.match(sharedOpenRouter,/AbortController/,"the shared provider request must retain a bounded timeout");
 assert.match(groupEdge,/findPrivateContextLeak/,"group output must pass private-context leak screening");
 assert.match(groupEdge,/requestOpenRouterChatCompletion\(/,"group turns must call the shared provider request helper");
@@ -339,8 +339,19 @@ assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
   "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
 assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
   "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/encounter_archived!=='true'/,
-  "unfinished new Encounter sessions must remain hidden from the memory archive");
+assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
+  "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
+const encounterListPage=between("async function loadEncounterMemoryPage(list,session,pager)","let encounterMemoryDetailPager");
+assert.doesNotMatch(encounterListPage,/from\(['"]chat_messages['"]\)/,
+  "Encounter list hydration must not scan message rows just to detect completed sessions");
+const encounterDetail=between("function renderEncounterMemoryDetailDialog()","function renderChatSettingsOverlay");
+assert.match(encounterDetail,/const pageSize=10/);
+assert.match(encounterDetail,/observeEnd\(nextSentinel/);
+assert.match(encounterDetail,/pager\.source==='diary'/);
+assert.match(encounterDetail,/\.limit\(10\)/,
+  "Encounter message and diary details must fetch only ten records per page");
+assert.doesNotMatch(encounterDetail,/載入更早的 5 則訊息/,
+  "Encounter details must use scroll-triggered pagination instead of a manual five-message button");
 assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
   "Encounter memory lists must load the next ten sessions when the user reaches the end");
 assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
@@ -622,9 +633,10 @@ const encounterMemoryDetailStart=html.indexOf('async function openEncounterMemor
 const encounterMemoryDetailEnd=html.indexOf('\nfunction ',encounterMemoryDetailStart+10);
 assert.ok(encounterMemoryDetailStart>=0&&encounterMemoryDetailEnd>encounterMemoryDetailStart,'Encounter memory detail loader must remain identifiable');
 const encounterMemoryDetailSource=html.slice(encounterMemoryDetailStart,encounterMemoryDetailEnd);
-assert.match(encounterMemoryDetailSource,/pageSize\('messages'\)\|\|5/,'Encounter memory transcript must use five-message pages');
+assert.match(encounterMemoryDetailSource,/const pageSize=10/,'Encounter memory transcript must use ten-message pages');
 assert.match(encounterMemoryDetailSource,/\.limit\(pageSize\)/,'Encounter memory transcript query must be bounded');
-assert.match(html,/data-action="encounter-memory-load-older"/,'Encounter memory transcript must expose an older-page action');
+assert.match(html,/data-encounter-memory-detail-sentinel="true"/,'Encounter memory transcript must expose a scroll sentinel');
+assert.match(html,/observeEnd\(nextSentinel/,'Encounter memory transcript must load older pages when scrolled to the end');
 assert.match(html,/async function loadEncounterMemoryDetailOlder\(\)/,'Encounter memory transcript must support loading older pages');
 const exploreLatestSource=html.slice(html.indexOf('function exploreList()'),html.indexOf('function card('));
 assert.doesNotMatch(exploreLatestSource,/\.slice\(0,50\)/,'Explore latest must not truncate the 20-row server-paged stream at 50 candidates');

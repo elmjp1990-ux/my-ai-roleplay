@@ -3,6 +3,7 @@ name: Chat Storage API retry E2E (local only)
 on:
   pull_request:
     paths:
+      - 'deno.json'
       - "scripts/test-chat-storage-api-retry-e2e.ts"
       - "supabase/drafts/chat-deletion-cumulative-turn-statistics-proposal.sql"
       - "supabase/drafts/seed-character-deletion-legacy-fixtures.sql"
@@ -122,8 +123,12 @@ jobs:
 
       - name: Install Playwright and Chromium
         run: |
-          npm install --no-save playwright
-          npx playwright install --with-deps chromium
+          playwright_dir="$RUNNER_TEMP/poyozz-playwright"
+          mkdir -p "$playwright_dir"
+          npm install --prefix "$playwright_dir" --no-save playwright
+          "$playwright_dir/node_modules/.bin/playwright" install --with-deps chromium
+          mkdir -p node_modules
+          ln -s "$playwright_dir/node_modules/playwright" node_modules/playwright
 
       - name: Exercise browser multi-tab and cross-device deletion reconciliation
         run: node scripts/test-chat-deletion-browser-e2e.mjs

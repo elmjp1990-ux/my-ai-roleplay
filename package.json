@@ -1,0 +1,9 @@
+{
+  "name": "poyozz-vercel-functions",
+  "private": true,
+  "version": "1.0.0",
+  "dependencies": {
+    "@supabase/supabase-js": "2.119.2",
+    "esbuild": "0.25.12"
+  }
+}

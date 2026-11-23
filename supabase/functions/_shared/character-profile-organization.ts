@@ -15,6 +15,7 @@ const CHARACTER_PROFILE_SOURCE_KEYS = [
   "character_private_info.personality_profile.dislikes",
   "character_private_info.personality_profile.boundaries",
   "character_private_info.personality_profile.relationshipPacing",
+  "character_private_info.personality_profile.occupation",
 ] as const;
 
 const PROFILE_SECTIONS = [
@@ -28,10 +29,16 @@ const PROFILE_SECTIONS = [
   "appearance_markers",
 ] as const;
 
+const LIFE_CONTEXT_SECTIONS = [
+  "work_environment", "residence_environment", "daily_routines", "interests_and_leisure",
+  "social_circles", "recurring_places", "environmental_constraints",
+] as const;
+
 const ROOT_KEYS = [
   "schema_version",
   ...PROFILE_SECTIONS,
   "speech_style",
+  "life_context",
   "author_private_context",
   "ooc_rules",
   "unknowns",
@@ -181,7 +188,7 @@ export function validateCharacterAiProfile(
   const errors: string[] = [];
   if (!hasExactKeys(value, ROOT_KEYS)) return { ok: false, errors: ["root_keys_mismatch"] };
   validateProfileOutputBounds(value, errors);
-  if (value.schema_version !== "1.0") errors.push("schema_version_invalid");
+  if (value.schema_version !== "1.1") errors.push("schema_version_invalid");
 
   const sourceKeys = new Set(
     Object.entries(sourcePayload)
@@ -204,6 +211,23 @@ export function validateCharacterAiProfile(
     }
     if (section.status === "populated" && sectionItems.length === 0) {
       errors.push(sectionName + "_populated_empty");
+    }
+  }
+
+  const lifeContext = value.life_context;
+  if (!hasExactKeys(lifeContext, LIFE_CONTEXT_SECTIONS)) {
+    errors.push("life_context_invalid");
+  } else {
+    for (const sectionName of LIFE_CONTEXT_SECTIONS) {
+      const section = lifeContext[sectionName];
+      if (!hasExactKeys(section, ["status", "items"]) || !["populated", "not_provided", "conflict"].includes(String(section.status))) {
+        errors.push("life_context_" + sectionName + "_invalid");
+        continue;
+      }
+      const items = Array.isArray(section.items) ? section.items : [];
+      validateEvidenceItems(items, sourceKeys, errors, "life_context_" + sectionName);
+      if (section.status === "not_provided" && items.length !== 0) errors.push("life_context_" + sectionName + "_not_provided_has_items");
+      if (section.status === "populated" && items.length === 0) errors.push("life_context_" + sectionName + "_populated_empty");
     }
   }
 
@@ -314,6 +338,9 @@ export function buildCharacterProfileMessages(sourcePayload: CharacterProfileSou
     "缺少資料時標記 not_provided 並留空 items；來源矛盾時標記 conflict 並在 source_conflicts 列出所有衝突欄位，要求作者釐清，不可自行選邊。",
     "OOC 規則需至少三條且每條都要有來源依據；只有來源不足以支持三條實質規則時，才使用 insufficient_source，最多兩條，並說明原因。不可湊數。",
     "speech_style.creator_defined_quirks 只收錄作者明確寫出的固定慣用詞或口頭禪，必須引用 speechStyle 來源；作者未提供則空陣列。speech_style.example_lines 永遠是空陣列。",
+    "life_context 必須整理 work_environment（工作型態／工作場所）、residence_environment（住所型態／居住條件）、daily_routines（日常作息）、interests_and_leisure（興趣休閒）、social_circles（社交圈）、recurring_places（常去場所）、environmental_constraints（生活限制）。每一類均為 {status,items}；缺資料標 not_provided，不得猜造具體地點或硬套地圖場景名稱。",
+    "生活環境只可根據角色卡、作者私密設定及個性欄位中有來源支持的資訊整理。明確內容標 author_explicit，合理但非明說的推論標 ai_inference 並降低 confidence；每項必須附 source_refs。不得將未知資訊當成事實。",
+    "life_context 是角色既有資料整理的一部分，與人格摘要同一次生成，不得另行產生第二次 AI 呼叫。行程生成只讀取已保存的 life_context，不應在行程請求中重新分析角色。",
     "author_private_context.visibility 必須是 server_only；只整理私密來源中明確存在的內容。此欄位永遠只供伺服器內部 prompt 使用。",
     "不整理手機設定、行程表、即時位置或即時狀態；它們每回合由對話程式另外載入。",
     "所有 section 都必須符合 schema：{status,items}；status 只能是 populated、not_provided、conflict，not_provided 的 items 必須為空，populated 的 items 不可為空。",
@@ -322,7 +349,8 @@ export function buildCharacterProfileMessages(sourcePayload: CharacterProfileSou
     "ooc_rules 必須是 {status:ready|insufficient_source,rules:[{rule,why_it_matters,prohibited_deviation,allowed_growth,source_refs}],insufficient_source_reason:string|null}；ready 至少 3 條且 reason 為 null；insufficient_source 最多 2 條且 reason 不可為空。",
     "source_conflicts 每項必須是 {topic,conflicting_source_refs:[至少兩個來源路徑],description,resolution_status:needs_author_clarification}。unknowns 是字串陣列。",
     "每個物件只允許 schema 明列的 key，不得新增其他欄位。",
-    "輸出 root keys 必須完整且僅包含：schema_version, identity_background, core_personality, inner_motivations, emotional_response_patterns, relationship_dynamics, behavior_and_agency, knowledge_boundaries, speech_style, appearance_markers, author_private_context, ooc_rules, unknowns, source_conflicts。schema_version 固定 1.0。",
+    "life_context 必須完整包含 work_environment, residence_environment, daily_routines, interests_and_leisure, social_circles, recurring_places, environmental_constraints 七個 {status,items} 區塊。",
+    "輸出 root keys 必須完整且僅包含：schema_version, identity_background, core_personality, inner_motivations, emotional_response_patterns, relationship_dynamics, behavior_and_agency, knowledge_boundaries, speech_style, appearance_markers, life_context, author_private_context, ooc_rules, unknowns, source_conflicts。schema_version 必須是字串 \"1.1\"（JSON 格式為 \"schema_version\": \"1.1\"），不可輸出數字 1.1。",
   ].join("\n");
   return [
     { role: "system", content: system },

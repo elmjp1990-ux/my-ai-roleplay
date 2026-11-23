@@ -1,4 +1,5 @@
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
+import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "./ai-generation-diagnostics.ts";
 
 type DbRow = Record<string, unknown>;
 const SUMMARY_MODEL = "openai/gpt-oss-20b";
@@ -315,7 +316,22 @@ export async function processDueStoryMemorySummary(
 
   const { summary, affinityCorrection, affinityReason } = generated;
   const response = generated.response;
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "memory_summary", userId, characterId: str(session.character_id),
+    sessionId, batchNumber, model: response.model, provider: response.provider,
+    requestId: response.requestId, httpStatus: response.httpStatus, finishReason: response.finishReason,
+    responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
+    responseParsed: response.responseParsed,
+    rawOutputText: response.rawOutputText || (response.result.kind === "generated" ? response.result.text : ""),
+    rawResponseBody: response.rawResponseBody,
+    refusalText: response.rawRefusalText, usage: response.usage,
+    status: summary && response.result.kind === "generated" ? "received" : "failed",
+    failureStage: summary && response.result.kind === "generated" ? null : "summary_output_validation",
+    failureCode: summary ? null : response.result.kind === "provider_error" ? response.result.code :
+      response.result.kind === "content_rejected" ? "provider_content_rejected" : "memory_summary_invalid",
+  });
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "summary_output_validation", failureCode: "memory_summary_invalid" });
     await admin.from("ai_model_usage").update({
       status: "failed",
       ...summaryUsageMetadata(generated),
@@ -335,6 +351,7 @@ export async function processDueStoryMemorySummary(
     p_evaluation: { reason: affinityReason, source: "five_turn_summary_calibration" },
   });
   if (relationshipBatchError) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "summary_persistence", failureCode: "story_relationship_batch_persist_failed" });
     await admin.from("ai_model_usage").update({ status: "failed", processed_at: new Date().toISOString() })
       .eq("id", batchRowId).eq("status", "processing");
     throw new Error("story_relationship_batch_persist_failed");
@@ -346,7 +363,11 @@ export async function processDueStoryMemorySummary(
     ...summaryUsageMetadata(generated),
     processed_at: new Date().toISOString(),
   }).eq("id", batchRowId).eq("status", "processing");
-  if (completeError) throw new Error("memory_summary_result_persist_failed");
+  if (completeError) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "summary_persistence", failureCode: "memory_summary_result_persist_failed" });
+    throw new Error("memory_summary_result_persist_failed");
+  }
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
 }
 
 /**
@@ -523,7 +544,22 @@ export async function processDueGroupMemorySummary(
 
   const { summary } = generated;
   const response = generated.response;
+  const diagnosticId = await recordAiGenerationDiagnostic(admin, {
+    generationType: "memory_summary", userId, sourceRef: groupId, batchNumber,
+    model: response.model, provider: response.provider, requestId: response.requestId,
+    httpStatus: response.httpStatus, finishReason: response.finishReason,
+    responseContentType: response.responseContentType, responseBodyLength: response.responseBodyLength,
+    responseParsed: response.responseParsed,
+    rawOutputText: response.rawOutputText || (response.result.kind === "generated" ? response.result.text : ""),
+    refusalText: response.rawRefusalText, usage: response.usage,
+    status: summary && response.result.kind === "generated" ? "received" : "failed",
+    failureStage: summary && response.result.kind === "generated" ? null : "group_summary_output_validation",
+    failureCode: summary ? null : response.result.kind === "provider_error" ? response.result.code :
+      response.result.kind === "content_rejected" ? "provider_content_rejected" : "group_memory_summary_invalid",
+    metadata: { scope: "group", source_turn_ids: sourceTurnIds },
+  });
   if (response.httpStatus < 200 || response.httpStatus >= 300 || !summary) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "group_summary_output_validation", failureCode: "group_memory_summary_invalid" });
     await admin.from("chat_group_memory_summaries").update({
       status: "failed",
       ...summaryUsageMetadata(generated),
@@ -538,5 +574,9 @@ export async function processDueGroupMemorySummary(
     ...summaryUsageMetadata(generated),
     processed_at: new Date().toISOString(),
   }).eq("id", batchRowId).eq("status", "processing").select("id").maybeSingle();
-  if (completeError || !completed) throw new Error("group_memory_summary_result_persist_failed");
+  if (completeError || !completed) {
+    await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "failed", failureStage: "group_summary_persistence", failureCode: "group_memory_summary_result_persist_failed" });
+    throw new Error("group_memory_summary_result_persist_failed");
+  }
+  await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
 }

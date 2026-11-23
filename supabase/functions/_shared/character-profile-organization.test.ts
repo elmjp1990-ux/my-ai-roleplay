@@ -18,11 +18,12 @@ const sourcePayload: CharacterProfileSourcePayload = {
   "character_private_info.personality_profile.dislikes": "失約",
   "character_private_info.personality_profile.boundaries": "不接受欺騙",
   "character_private_info.personality_profile.relationshipPacing": "需要時間建立信任",
+  "character_private_info.personality_profile.occupation": "咖啡師",
 };
 
 const emptySection = () => ({ status: "not_provided", items: [] });
 const makeProfile = (): Record<string, unknown> => ({
-  schema_version: "1.0",
+  schema_version: "1.1",
   identity_background: emptySection(),
   core_personality: emptySection(),
   inner_motivations: emptySection(),
@@ -31,6 +32,15 @@ const makeProfile = (): Record<string, unknown> => ({
   behavior_and_agency: emptySection(),
   knowledge_boundaries: emptySection(),
   appearance_markers: emptySection(),
+  life_context: {
+    work_environment: emptySection(),
+    residence_environment: emptySection(),
+    daily_routines: emptySection(),
+    interests_and_leisure: emptySection(),
+    social_circles: emptySection(),
+    recurring_places: emptySection(),
+    environmental_constraints: emptySection(),
+  },
   speech_style: {
     status: "not_provided",
     tendencies: [],

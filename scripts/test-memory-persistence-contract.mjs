@@ -85,7 +85,7 @@ assert.match(cloudSave, /'updated_at'/, "cloud-owned session checks must fetch t
 assert.match(cloudSave, /expectedUpdatedAt = existing\.data\.updated_at/);
 assert.match(memoryCapture, /function nextSessionUpdatedAt\(previous, now = Date\.now\(\)\)/);
 assert.match(memoryCapture, /Math\.max\(clockMs, previousMs \+ 1\)/);
-assert.match(storySession, /character_snapshot,chat_mode,deleted_at,updated_at/);
+assert.match(storySession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
 assert.match(encounterSession, /character_snapshot,session_data,chat_mode,deleted_at,updated_at/);
 assert.match(cloudSave, /s\.cloudCharacterSnapshotLoaded===true\?\[\]:\['character_snapshot'\]/,
   "already hydrated snapshots must not be fetched again during session saves");

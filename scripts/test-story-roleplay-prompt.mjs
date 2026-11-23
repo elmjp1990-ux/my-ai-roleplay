@@ -53,8 +53,8 @@ assert.ok(
 );
 
 assert.ok(
-  prompt.includes("每則 30～80 字"),
-  "Each of the three player suggestions must target 30–80 characters",
+  prompt.includes("每則 30～90 字"),
+  "Each of the three player suggestions must target 30–90 characters",
 );
 assert.ok(
   prompt.includes("玩家旁白／動作（*...*）以及玩家實際說出口的自然對白"),
@@ -75,12 +75,12 @@ assert.ok(
   "The chat UI must preserve single-asterisk narration rendering",
 );
 assert.ok(
-  uiSource.includes("Array.from(value).length>=30&&Array.from(value).length<=80"),
+  uiSource.includes("Array.from(value).length>=30&&Array.from(value).length<=90"),
   "Persisted Story suggestions must use the same 30–80 character bound",
 );
 assert.ok(
-  !uiSource.includes("Array.from(value).length<=90"),
-  "The old 90-character Story suggestion limit must be removed",
+  !uiSource.includes("Array.from(value).length<=80"),
+  "The old 80-character Story suggestion limit must be removed",
 );
 assert.ok(
   !prompt.includes("每次至少包含兩段動作／背景描寫與兩處角色對話"),

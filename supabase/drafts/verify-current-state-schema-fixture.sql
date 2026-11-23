@@ -26,9 +26,20 @@ BEGIN
   SELECT count(*) INTO v_sequences FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='S';
   SELECT count(*) INTO v_rls FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND c.relrowsecurity;
   IF (v_tables,v_columns,v_view_columns,v_constraints,v_indexes,v_policies,v_triggers,v_routines,v_views,v_sequences,v_rls)
-     IS DISTINCT FROM (47,410,6,288,140,95,23,77,1,2,47) THEN
+     IS DISTINCT FROM (47,412,6,290,140,95,23,77,1,2,47) THEN
     RAISE EXCEPTION 'disposable schema fingerprint mismatch: tables %, table columns %, view columns %, constraints %, indexes %, policies %, triggers %, routines %, views %, sequences %, rls %',
       v_tables,v_columns,v_view_columns,v_constraints,v_indexes,v_policies,v_triggers,v_routines,v_views,v_sequences,v_rls;
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='chat_messages'
+      AND column_name='suggested_replies' AND data_type='jsonb' AND is_nullable='NO'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='chat_group_turns'
+      AND column_name='suggested_replies' AND data_type='jsonb' AND is_nullable='NO'
+  ) THEN
+    RAISE EXCEPTION 'suggested_replies_columns_missing_from_current_state_fixture';
   END IF;
   FOR v_nonempty IN
     SELECT format('%I.%I', n.nspname, c.relname)

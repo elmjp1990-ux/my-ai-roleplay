@@ -11,3 +11,19 @@ verify_jwt = false
 [functions.purge-character-assets]
 # The handler validates the named Supabase Secret Key via @supabase/server.
 verify_jwt = false
+
+[functions.encounter-weather-sync]
+# The handler validates the service-role key and generates lightweight seasonal Taipei weather locally.
+verify_jwt = false
+
+[functions.encounter-taiwan-calendar-sync]
+# The handler validates the service-role key before importing official workdays.
+verify_jwt = false
+
+[functions.encounter-evaluation-worker]
+# The worker verifies the exact service-role bearer token before claiming due jobs.
+verify_jwt = false
+
+[functions.character-profile-organization-worker]
+# The worker verifies user JWTs for manual TEST actions and named secret keys for future internal scheduling.
+verify_jwt = false
