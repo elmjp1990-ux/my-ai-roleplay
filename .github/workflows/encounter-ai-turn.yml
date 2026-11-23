@@ -36,12 +36,9 @@ on:
       - "supabase/functions/_shared/encounter-schedule-generation.ts"
       - "supabase/functions/_shared/encounter-schedule-generation.test.ts"
       - "scripts/test-encounter-schedule-worker.mjs"
-      - "scripts/import-encounter-weather-baseline-2025.mjs"
       - "supabase/drafts/encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/functions/encounter-weather-sync/**"
-      - "supabase/functions/_shared/encounter-weather.mjs"
-      - "supabase/functions/_shared/encounter-weather.test.ts"
       - "supabase/functions/encounter-taiwan-calendar-sync/**"
       - "supabase/functions/_shared/taiwan-calendar.mjs"
       - "supabase/functions/_shared/taiwan-calendar.test.ts"
@@ -108,7 +105,6 @@ jobs:
       - name: Simulate authenticated manual schedule POST through mocked AI and database publish
         run: deno test supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts
       - name: Test lightweight seasonal Taipei weather simulation
-        run: deno test supabase/functions/_shared/encounter-weather.test.ts
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
       - name: Type-check Encounter and Character Profile Edge Functions
