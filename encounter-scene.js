@@ -111,13 +111,13 @@ body.encounter-mode-active .chat-main.encounter-scene .typing-dots i{animation:e
 body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(2){animation-delay:.16s!important}
 body.encounter-mode-active .chat-main.encounter-scene .typing-dots i:nth-child(3){animation-delay:.32s!important}
 @keyframes encounterTypingPulse{0%,80%,100%{opacity:.28;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-@media(max-width:767px){.encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}.encounter-character-sprite{width:min(108%,680px)!important;height:78lvh!important}.encounter-scene .composer{max-height:calc(var(--poyozz-chat-viewport-height,100dvh) - 60px)!important}.encounter-scene .messages{padding:8px 14px!important}}
+@media(max-width:767px){.encounter-scene .chat-heading{padding-top:calc(8px + env(safe-area-inset-top))!important}.encounter-character-sprite{width:min(108%,680px)!important;height:78lvh!important}.encounter-scene .composer{max-height:min(44dvh,340px)!important;padding-bottom:calc(10px + env(safe-area-inset-bottom))!important;overflow-y:auto!important}.encounter-scene .suggestions-panel{max-height:15dvh!important}.encounter-scene .suggestion-cards{max-height:12dvh!important}.encounter-scene .composer-input-row{flex-shrink:0!important}.encounter-scene .composer-bottom-row{position:sticky!important;bottom:0!important;z-index:5!important;flex-shrink:0!important;min-height:48px!important;padding:6px 0 calc(4px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,rgba(30,25,37,.72),rgba(30,25,37,.96))!important;visibility:visible!important}.encounter-scene .composer-icon-button,.encounter-scene .composer-send{visibility:visible!important;display:inline-flex!important;opacity:1!important}.encounter-scene .messages{padding:8px 14px!important}}
 
 /* Consolidated final Encounter polish. */
 body.encounter-mode-active .chat-main.encounter-scene:before{background-image:linear-gradient(180deg,rgba(10,9,17,.08),rgba(10,9,17,.06) 42%,rgba(10,9,17,.20) 72%,rgba(10,9,17,.30) 100%),var(--encounter-scene-photo,none),radial-gradient(ellipse at 70% 22%,#6a5a65 0%,#322b36 48%,#17141b 100%)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading{background:linear-gradient(110deg,rgba(25,22,35,.30),rgba(45,38,55,.18) 52%,rgba(25,22,35,.10))!important;border-color:rgba(255,255,255,.12)!important;box-shadow:0 8px 28px rgba(8,6,14,.08)!important;backdrop-filter:blur(12px)!important}
 body.encounter-mode-active .chat-main.encounter-scene .chat-heading .row.grow{max-width:calc(100% - 12px)!important;gap:8px!important}
-body.encounter-mode-active .chat-main.encounter-scene .messages .encounter-dialogue-beat{position:relative;z-index:2;width:min(100%,760px)!important;margin:0 auto!important;gap:9px!important;padding:17px 19px 12px!important;color:rgba(255,250,247,.96)!important;background:linear-gradient(135deg,rgba(35,29,43,.54),rgba(61,48,66,.43) 48%,rgba(31,28,42,.48))!important;border-color:rgba(255,237,242,.22)!important;box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px rgba(255,255,255,.10)!important;backdrop-filter:blur(15px)!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-stack{display:flex!important;flex-direction:column!important;align-items:center!important;gap:8px!important;width:100%!important}\nbody.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text em{font-style:italic!important}\nbody.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-replay{align-self:flex-end!important;padding:6px 13px!important;border:1px solid rgba(255,255,255,.24)!important;border-radius:999px!important;background:rgba(35,29,43,.56)!important;color:#fff!important;font-size:12px!important}\nbody.encounter-mode-active .chat-main.encounter-scene .encounter-typing-indicator{display:flex!important;align-items:center!important;gap:9px!important;width:max-content!important;max-width:90%!important;margin:10px auto!important;padding:9px 14px!important;border:1px solid rgba(255,255,255,.2)!important;border-radius:999px!important;background:rgba(35,30,43,.62)!important;color:#fff!important;font-size:13px!important;backdrop-filter:blur(12px)!important}\nbody.encounter-mode-active .chat-main.encounter-scene .encounter-typing-indicator .typing-dots i{display:inline-block;width:5px;height:5px;margin:0 2px;border-radius:50%;background:#fff;animation:encounterTypingPulse 1.15s infinite ease-in-out}\nbody.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{position:relative;z-index:2;width:min(100%,760px)!important;margin:0 auto!important;gap:9px!important;padding:17px 19px 12px!important;color:rgba(255,250,247,.96)!important;background:linear-gradient(135deg,rgba(35,29,43,.54),rgba(61,48,66,.43) 48%,rgba(31,28,42,.48))!important;border-color:rgba(255,237,242,.22)!important;box-shadow:0 10px 32px rgba(10,7,16,.12),inset 0 1px rgba(255,255,255,.10)!important;backdrop-filter:blur(15px)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-speaker-label{align-self:flex-start!important;display:inline-flex!important;max-width:72%!important;padding:4px 12px!important;margin:0 0 1px!important;border-radius:5px 11px 11px 5px!important;font-size:12px!important;font-weight:650!important;letter-spacing:.08em!important;color:rgba(255,239,224,.98)!important;background:linear-gradient(100deg,rgba(205,164,177,.32),rgba(167,150,196,.20) 60%,rgba(255,255,255,.08))!important;border-left:2px solid rgba(244,204,218,.72)!important;box-shadow:inset 0 1px rgba(255,255,255,.12)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-text{font-size:15px!important;line-height:1.9!important;font-weight:450!important;text-shadow:0 1px 8px rgba(0,0,0,.16)!important}
 body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{align-self:flex-end!important;padding:3px 8px!important;border-radius:999px!important;color:rgba(255,255,255,.58)!important;background:rgba(255,255,255,.045)!important;font-size:10px!important}
@@ -223,7 +223,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const paragraphs=source.split(/\n+/).map(x=>x.trim()).filter(Boolean);
     const beats=[];
     const pushSentence=(text)=>{
-      const cleaned=String(text||'').replace(/^\s*[-*•]+\s*/,'').replace(/^\*+|\*+$/g,'').trim();
+      const cleaned=String(text||'').replace(/^\s*[-•]+\s*/,'').trim();
       if(!cleaned)return;
       // Long, unpunctuated prose is broken into readable visual-novel beats too.
       if(cleaned.length>58){
@@ -251,7 +251,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     }
     return beats;
   };
-  // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
+  const encounterBeatMarkup=(value)=>{\n    const parts=String(value||'').split(/(\\*(?!\\*)[^*]+?\\*(?!\\*))/gu).filter(Boolean);\n    const hasSpeech=parts.some(part=>!(part.startsWith('*')&&!part.startsWith('**')&&part.endsWith('*')&&!part.endsWith('**'))&&part.trim());\n    const html=parts.map(part=>part.startsWith('*')&&!part.startsWith('**')&&part.endsWith('*')&&!part.endsWith('**')&&part.length>=2?' <em>'+e(part.slice(1,-1))+'</em> ':e(part)).join('');\n    return {html,hasSpeech};\n  };\n  const encounterTypingMarkup=(name)=>'<div class="encounter-typing-indicator" role="status" aria-live="polite"><span>'+e(name)+' 正在回覆...</span><span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span></div>';\n  // Re-apply the visual-novel beat after BOTH full conversation renders and message-only renders.
   // The base chat renderer can replace #messages after renderConversation finishes; this hook prevents it
   // from restoring ordinary chat bubbles and silently cancelling progressive dialogue.
   const applyEncounterDialogue=(panel,session)=>{
@@ -280,7 +280,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       if(suggestions)suggestions.hidden=!hasAssistantTurnReply;
     }
     if(!hasStarted){
-      messages.innerHTML='';
+      messages.innerHTML=session.activeTurnInFlight?encounterTypingMarkup(String(sessionCharacter(session)?.name||'角色')):'';
       messages.classList.remove('encounter-dialogue-ready');
       messages.dataset.encounterBeatKey='opening-input:'+session.id;
       messages.dataset.encounterBeatIndex='0';
@@ -292,9 +292,14 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const idx=Math.min(Math.max(0,Number(session.encounterBeatIndex)||0),Math.max(0,beats.length-1));
     const speakerCharacter=sessionCharacter(session);
     const speakerName=String(speakerCharacter?.name||speakerCharacter?.display_name||speakerCharacter?.character_name||'角色').trim();
-    messages.innerHTML=beats.length
-      ? '<button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情"><span class="encounter-speaker-label">'+e(speakerName)+'</span><span class="encounter-dialogue-text">'+e(beats[idx])+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'
+    const beat=beats[idx]||'';
+    const formattedBeat=encounterBeatMarkup(beat);
+    const speakerLabel=formattedBeat.hasSpeech?'<span class="encounter-speaker-label">'+e(speakerName)+'</span>':'';
+    const replayButton=idx===beats.length-1?'<button type="button" class="encounter-dialogue-replay" data-action="encounter-replay-beat">再看一次</button>':'';
+    const dialogueMarkup=beats.length
+      ? '<div class="encounter-dialogue-stack"><button type="button" class="encounter-dialogue-beat" data-action="encounter-next-beat" aria-label="點擊繼續劇情">'+speakerLabel+'<span class="encounter-dialogue-text">'+formattedBeat.html+'</span><span class="encounter-dialogue-hint">'+(idx<beats.length-1?'點擊繼續　⌄':'劇情已讀完')+'</span></button>'+replayButton+'</div>'
       : '<div class="encounter-dialogue-empty" aria-hidden="true"></div>';
+    messages.innerHTML=dialogueMarkup+(session.activeTurnInFlight&&!hasAssistantTurnReply?encounterTypingMarkup(speakerName):'');
     messages.classList.toggle('encounter-dialogue-ready',beats.length>0);
     if(composer){
       const suggestions=composer.querySelector('.suggestions');
@@ -426,7 +431,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     });
   }
   document.addEventListener('click',event=>{
-    const target=event.target.closest('[data-action="encounter-next-beat"]');
+    const target=event.target.closest('[data-action="encounter-next-beat"],[data-action="encounter-replay-beat"]');
     if(!target)return;
     const session=currentSession();
     if(!session?.encounterMode)return;
@@ -438,7 +443,10 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
     const raw=String(latestReply?.text||latestReply?.content||'').trim();
     const beats=splitEncounterBeats(raw);
     if(session.encounterBeatKey!==key){session.encounterBeatKey=key;session.encounterBeatIndex=0;}
-    if((session.encounterBeatIndex||0)<beats.length-1){session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;persist();renderConversation();}
+    if(target.dataset.action==='encounter-replay-beat')session.encounterBeatIndex=0;
+    else if((session.encounterBeatIndex||0)<beats.length-1)session.encounterBeatIndex=(session.encounterBeatIndex||0)+1;
+    else return;
+    persist();renderConversation();
   });
 
 
