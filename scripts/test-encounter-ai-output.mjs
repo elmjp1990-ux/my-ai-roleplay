@@ -95,7 +95,10 @@ assert.match(frontend, /Number\.isFinite\(score\)&&score>0/ , "Positive affinity
 assert.doesNotMatch(frontend, /progress\+'%'/, "Story relationship rendering must not reference a missing progress variable");
 assert.match(frontend, /encounterAffinity=affinityResult\.affinity/);
 assert.match(scene, /目前關係：/);
-assert.match(scene, /PoyozzAffinityUI\?\.render\(session\.encounterAffinity,session\.encounterRelationshipStage\|\|'first_meeting','encounter'\)/, 'Encounter affinity must use the shared affinity renderer.');
+assert.match(scene, /PoyozzAffinityUI\?\.render\(session\.encounterAffinity,session\.encounterRelationshipStage\|\|'stranger','encounter'\)/, 'Encounter affinity must show stranger before a player turn.');
+const emptyEncounterMigration = fs.readFileSync("supabase/migrations/20261123140000_encounter_empty_session_no_relationship.sql", "utf8");
+assert.match(emptyEncounterMigration, /v_relationship_stage:='stranger'/);
+assert.match(emptyEncounterMigration, /v_stage := 'stranger'/);
 const sessionCreator = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");
 const storySession = fs.readFileSync("supabase/functions/story-session/index.ts", "utf8");
 assert.match(storySession, /\.\.\.existingSessionData, affinityMode, affinitySyncVersion: 1/);
