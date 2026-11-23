@@ -22,6 +22,13 @@ assert.match(source, /currentUser\(\)\?\.uid!==requestUid/);
 assert.match(source, /cloudCommentHydrationInflight\.get\(cacheKey\)===request/);
 assert.match(source, /cloudCommentHydrationInflight\.delete\(cacheKey\)/);
 assert.match(source, /\.rpc\('get_character_comments_safe_page'/);
+assert.match(source, /function isMissingCommentPageRpc\(error\)/);
+assert.match(source, /code==='42883'\|\|code==='PGRST202'/);
+assert.match(source, /if\(pageResult\.error&&isMissingCommentPageRpc\(pageResult\.error\)\)/);
+assert.match(source, /\.rpc\('get_character_comments_safe'/);
+assert.match(source, /cloudCommentLegacyRowsCache\.get\(cacheKey\)/);
+assert.match(source, /legacyCache\.rows\.slice\(pager\.offset,pager\.offset\+pageSize\)/);
+assert.match(source, /cloudCommentLegacyRowsCache\.delete\(cacheKey\)/);
 assert.match(source, /\.select\('comment_id,user_id'\)/);
 
 const renderSource = commentRenderer;
