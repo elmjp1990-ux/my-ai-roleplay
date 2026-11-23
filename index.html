@@ -5494,7 +5494,7 @@ async function loadPublicCharacterPrimaryIllustration(characterId) {
 }
 const publicCharacterIllustrationHydration = new Map();
 const publicCharacterDetailMetadataInflight = new Map();
-const publicCharacterStoryOpeningLoaded = new Set();
+const publicCharacterDetailMetadataLoaded = new Set();
 const publicAuthorProfileInflight = new Map();
 const publicAuthorProfileLoaded = new Set();
 async function hydratePublicAuthorProfile(authorId) {
@@ -5534,38 +5534,23 @@ async function hydratePublicAuthorProfile(authorId) {
 async function hydratePublicCharacterDetailMetadata(characterId) {
   const existing=state.characters.find(character=>character.id===characterId);
   const client=window.mySupabase;
-  if(!existing||!client||publicCharacterStoryOpeningLoaded.has(characterId))return;
+  if(!existing||!client||publicCharacterDetailMetadataLoaded.has(characterId))return;
   if(publicCharacterDetailMetadataInflight.has(characterId))return publicCharacterDetailMetadataInflight.get(characterId);
   const request=(async()=>{
-    const [storyResult,characterResult]=await Promise.all([
-      client.from('character_stories')
-        .select('opening_message')
-        .eq('character_id',characterId)
-        .eq('visibility','public')
-        .order('created_at',{ascending:false})
-        .limit(1)
-        .maybeSingle(),
-      client.from('characters')
-        .select('phone_settings,nsfw_workplace_warning')
-        .eq('id',characterId)
-        .eq('visibility','public')
-        .is('deleted_at',null)
-        .maybeSingle()
-    ]);
-    if(storyResult.error)throw storyResult.error;
-    if(characterResult.error)throw characterResult.error;
+    const {data:characterData,error}=await client.from('characters')
+      .select('phone_settings,nsfw_workplace_warning')
+      .eq('id',characterId)
+      .eq('visibility','public')
+      .is('deleted_at',null)
+      .maybeSingle();
+    if(error)throw error;
     const current=state.characters.find(character=>character.id===characterId);
     if(!current)return;
-    current.opening=storyResult.data?.opening_message||'';
-    current.phoneSettings=characterResult.data?.phone_settings&&typeof characterResult.data.phone_settings==='object'
-      ?characterResult.data.phone_settings:{};
-    current.nsfwWorkplaceWarning=characterResult.data?.nsfw_workplace_warning===true;
-    publicCharacterStoryOpeningLoaded.add(characterId);
+    current.phoneSettings=characterData?.phone_settings&&typeof characterData.phone_settings==='object'
+      ?characterData.phone_settings:{};
+    current.nsfwWorkplaceWarning=characterData?.nsfw_workplace_warning===true;
+    publicCharacterDetailMetadataLoaded.add(characterId);
     persist();
-    if(route?.page==='detail'&&route.id===characterId){
-      const opening=document.querySelector('[data-character-opening]');
-      if(opening)opening.textContent=replaceRoleplayVariables(current.opening,currentUser()?.nickname||'你',current.name);
-    }
   })().catch(error=>{
     console.warn('角色開場白延遲載入失敗：',error?.message||error);
   });
@@ -5706,7 +5691,7 @@ function renderDetail() {
   $('view').innerHTML = `
     <div class="stack">
       <button class="ghost" data-action="back">← 返回上一頁</button>
-      ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介與開場白，但不能開啟新對話。</div>' : ''}
+      ${offline ? '<div class="character-status-banner">● 此角色目前離線或已下架。你仍可查看這段既有聊天所保留的角色簡介，但不能開啟新對話。</div>' : ''}
       <div class="detail-layout">
         <div class="detail-portrait">
 ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline-image' : ''}" data-character-video="${e(c.avatarVideoPath)}" poster="${e(safeImage(c.image))}" autoplay muted loop playsinline aria-label="${e(c.name)} 的角色影片"></video>` : `<img class="detail-image ${offline ? 'character-offline-image' : ''}" src="${e(safeImage(c.image))}" ${(c.primaryIllustrationPath||c.imagePath) ? 'data-character-illustration-path="'+e(c.primaryIllustrationPath||c.imagePath)+'"' : ''} alt="${e(c.name)}">`}
@@ -5725,10 +5710,9 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
            ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
-          <div><h3>開場白</h3><div class="prose muted" data-character-opening>${e(replaceRoleplayVariables(c.opening, currentUser()?.nickname || '你', c.name))}</div></div>
-          ${offline
+${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
-            : `<div class="row wrap">
+            : `<div class="row wrap" data-character-actions>
                 <button class="chat-cta" data-action="start-chat" data-id="${e(c.id)}">開始聊天</button>
                 <button data-action="share" data-kind="detail" data-id="${e(c.id)}">↗ 分享</button>
                 <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
@@ -5859,7 +5843,14 @@ function updateCharacterTurnCountElements(characterId,count) {
 const CLOUD_COMMENT_CACHE_TTL_MS = 30_000;
 const cloudCommentHydrationCache = new Map();
 const cloudCommentHydrationInflight = new Map();
+const cloudCommentLegacyRowsCache = new Map();
 const cloudCommentPageStates = new Map();
+function isMissingCommentPageRpc(error){
+  const code=String(error?.code||'');
+  const message=String(error?.message||'');
+  return code==='42883'||code==='PGRST202'||
+    /get_character_comments_safe_page.*(not found|schema cache)|could not find the function.*get_character_comments_safe_page/i.test(message);
+}
 async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   const client=window.mySupabase;
   if(!client||!characterId)return;
@@ -5869,7 +5860,7 @@ async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   if(!loadMore&&(!pager||force)){
     pager={offset:0,hasMore:true,loading:false};
     cloudCommentPageStates.set(cacheKey,pager);
-    if(force){state.comments[characterId]=[];cloudCommentHydrationCache.delete(cacheKey);}
+    if(force){state.comments[characterId]=[];cloudCommentHydrationCache.delete(cacheKey);cloudCommentLegacyRowsCache.delete(cacheKey);}
   }
   if(!pager||pager.loading||(!pager.hasMore&&loadMore))return;
   const cached=cloudCommentHydrationCache.get(cacheKey);
@@ -5883,11 +5874,27 @@ async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
   const request=(async()=>{
   try {
     const pageSize=window.PoyozzListPagination?.pageSize('characterComments')||10;
-    const {data:rows,error}=await client.rpc('get_character_comments_safe_page',{
+    const pageResult=await client.rpc('get_character_comments_safe_page',{
       p_character_id:characterId,p_limit:pageSize,p_offset:pager.offset
     });
-    if(error)throw error;
-    const safeRows=rows||[];
+    let safeRows;
+    if(pageResult.error&&isMissingCommentPageRpc(pageResult.error)){
+      // Older hosted databases may not yet have the bounded page RPC migration.
+      // Fall back to the existing SECURITY DEFINER RPC and paginate its safe rows locally.
+      let legacyCache=cloudCommentLegacyRowsCache.get(cacheKey);
+      if(!legacyCache||Date.now()-legacyCache.loadedAt>=CLOUD_COMMENT_CACHE_TTL_MS){
+        const {data:legacyRows,error:legacyError}=await client.rpc('get_character_comments_safe',{
+          p_character_id:characterId
+        });
+        if(legacyError)throw legacyError;
+        legacyCache={loadedAt:Date.now(),rows:Array.isArray(legacyRows)?legacyRows:[]};
+        cloudCommentLegacyRowsCache.set(cacheKey,legacyCache);
+      }
+      safeRows=legacyCache.rows.slice(pager.offset,pager.offset+pageSize);
+    }else{
+      if(pageResult.error)throw pageResult.error;
+      safeRows=Array.isArray(pageResult.data)?pageResult.data:[];
+    }
     // The SECURITY DEFINER page RPC preserves owner/public, NSFW and whisper-ancestry checks.
     const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
     if(profileIds.length){
