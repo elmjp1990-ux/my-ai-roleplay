@@ -462,6 +462,22 @@ Deno.test("recognizes contemporary musician settings and saved Profile context",
   }
 });
 
+Deno.test("recognizes contemporary nightlife host settings as modern", () => {
+  const nightlifeRole = source(id1, {
+    name: "陳曜陽－LUCID",
+    intro: "在繁華夜生活的心臟地帶，頂級男公關俱樂部 LUCID 是現代都市中的高級娛樂場所。",
+    tags: ["牛郎", "男公關", "毒舌"],
+    world_era: "現代夜生活與男公關俱樂部",
+    modern_setting_compatible: false,
+    schedule_description: "傍晚進入俱樂部，在 VIP 私人工作室接待客人，平日住在公寓。",
+  });
+  const classification = classifyEncounterWorldview(nightlifeRole);
+  if (classification.category !== "modern" || !classification.modern_map_compatible ||
+      getEncounterWorldviewScheduleDisposition(classification) !== "generate") {
+    throw new Error("contemporary nightlife host setting must proceed to modern-map schedule generation: " + JSON.stringify(classification));
+  }
+});
+
 Deno.test("classifies worldviews locally and keeps species separate from era", () => {
   const modernVampire = source(id1, {
     race: "吸血鬼",
