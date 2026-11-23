@@ -242,7 +242,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
       const cleaned=String(text||'').replace(/^\s*[-•]+\s*/,'').trim();
       if(!cleaned)return;
       // Long, unpunctuated prose is broken into readable visual-novel beats too.
-      if(cleaned.length>58){
+      if(cleaned.length>58&&!cleaned.includes('*')){
         const clauses=cleaned.split(/(?<=[，,、；;：:])/u).map(x=>x.trim()).filter(Boolean);
         if(clauses.length>1){
           let chunk='';
