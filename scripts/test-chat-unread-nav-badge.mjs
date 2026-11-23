@@ -8,7 +8,7 @@ assert.match(nav,/groupPreviewLastAssistantAt/);
 assert.match(nav,/groupChatReadAt/);
 assert.match(nav,/count>99\?'99\+'/);
 assert.match(html,/nav-unread-badge/);
-assert.match(html,/page === 'chat' \? chatNavUnreadBadge\(\) : ''/);
+assert.match(html,/page === 'chat' \? '<span class=\\"nav-icon-wrap\\">'\+ICON\.chat\+chatNavUnreadBadge\(\)\+'<\\/span>' : ICON/);\nassert.match(html,/nav-unread-badge'\+\(count>99\?' is-overflow':''\)/);\nassert.match(html,/99 則以上未讀訊息/);\nassert.match(html,/\.nav-icon-wrap \\{ position:relative/);\nassert.doesNotMatch(html,/\\\\n\\.nav-btn/);
 const send=between('async function groupSendTurn() {','async function groupRefreshList()');
 assert.match(send,/g\.groupPreviews\[activeGroupId\]=\{group_id:activeGroupId/);
 assert.match(send,/refreshChatEntryList\(\);\s*renderShell\(\);/);
