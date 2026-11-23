@@ -93,7 +93,7 @@ BEGIN
      OR pg_catalog.strpos(v_def,v_old_format)=0 THEN
     RAISE EXCEPTION 'weather_cron_function_anchor_missing';
   END IF;
-  v_def := pg_catalog.replace(v_def,'  v_timeout integer;','  v_timeout integer;\n  v_task text;');
+  v_def := pg_catalog.replace(v_def,'  v_timeout integer;','  v_timeout integer;' || pg_catalog.chr(10) || '  v_task text;');
   v_def := pg_catalog.replace(v_def,v_old,v_new);
   v_def := pg_catalog.replace(v_def,v_old_body,v_new_body);
   v_def := pg_catalog.replace(v_def,v_old_format,v_new_format);
