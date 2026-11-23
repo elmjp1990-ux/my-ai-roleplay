@@ -4761,6 +4761,16 @@ async function executePendingChatTurn(s) {
     return;
   }
 
+  // The Encounter Edge Function updates session_data after settlement. Carry
+  // its confirmed updated_at token forward so the next user turn does not fail
+  // the optimistic-concurrency check against a server-side write we initiated.
+  const encounterSessionUpdatedAt=result.encounter?.sessionUpdatedAt;
+  if(s.encounterMode===true&&typeof encounterSessionUpdatedAt==='string'&&Number.isFinite(Date.parse(encounterSessionUpdatedAt))){
+    s.cloudUpdatedAt=encounterSessionUpdatedAt;
+    const currentSession=state.sessions?.[s.id];
+    if(currentSession&&currentSession!==s)currentSession.cloudUpdatedAt=encounterSessionUpdatedAt;
+  }
+
   if(result.encounter?.visuals&&s.encounterMode===true){
     const visual=result.encounter.visuals;
     s.encounterVisuals={
