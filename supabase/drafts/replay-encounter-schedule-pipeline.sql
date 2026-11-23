@@ -422,11 +422,11 @@ BEGIN
     RAISE EXCEPTION 'scheduler disable check returned NULL';
   END IF;
 
-  v_scheduler_status := public.schedule_encounter_weather_weekly_sync(false);
+  v_scheduler_status := public.schedule_encounter_worker('weather_weekly_sync', false);
   IF v_scheduler_status IS NULL THEN
     RAISE EXCEPTION 'weekly weather scheduler disable check returned NULL';
   END IF;
-  v_scheduler_status := public.schedule_encounter_weather_hourly_update(false);
+  v_scheduler_status := public.schedule_encounter_worker('weather_hourly_update', false);
   IF v_scheduler_status IS NULL THEN
     RAISE EXCEPTION 'hourly weather scheduler disable check returned NULL';
   END IF;
