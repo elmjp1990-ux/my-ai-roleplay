@@ -520,8 +520,9 @@ const encounterOutputParser = fs.readFileSync("supabase/functions/_shared/encoun
 assert.match(encounterOutputParser, /\.filter\(Boolean\)\.slice\(0, 3\)/);
 assert.doesNotMatch(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
-assert.match(frontend, /encounter-dialogue-text em/);
-assert.match(frontend, /composer-bottom-row\{position:sticky/);
+const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
+assert.match(encounterSceneCss, /encounter-dialogue-text em/);
+assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
 assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/);
 assert.match(cityMap, /const liveAge=\[person\.age,person\.characterAge,person\.character_age\]\.map\(value=>value==null\?\x27\x27:String\(value\)\.trim\(\)\)\.find\(Boolean\)\|\|\x27\x27/);
