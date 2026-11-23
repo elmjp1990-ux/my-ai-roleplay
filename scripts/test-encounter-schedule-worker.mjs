@@ -154,7 +154,6 @@ assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_we
 assert.match(pipeline, /0 0 \* \* 0/);
 assert.match(pipeline, /55 \* \* \* \*/);
 assert.doesNotMatch(pipeline, /schedule_encounter_weather_sync|0 \*\/6 \* \* \*/);
-assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
 assert.match(fixedSceneMigration,/Returns only the fourteen permanent A–N city scene anchors/);
