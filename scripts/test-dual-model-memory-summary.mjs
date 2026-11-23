@@ -62,6 +62,7 @@ assert.doesNotMatch(summaryRequest, /max_tokens\s*:/, "summary request must not 
 assert.match(summaryRequest, /model: SUMMARY_MODEL/);
 assert.match(summaryRequest, /provider: "deepinfra"/);
 assert.match(summaryRequest, /disableProviderFallback: true/);
+assert.match(summaryRequest, /retrySameProviderOnRateLimit: true/);
 assert.match(openRouterShared, /disableProviderFallback\?: boolean/);
 assert.match(openRouterShared, /options\.disableProviderFallback/);
 assert.match(summaryRequest, /timeoutMs: 45_000/);
