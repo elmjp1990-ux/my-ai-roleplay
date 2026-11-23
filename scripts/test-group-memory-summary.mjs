@@ -32,6 +32,8 @@ assert.match(helper,/\.from\("chat_group_turns"\)/);
 assert.match(helper,/\.eq\("status", "completed"\)/);
 assert.match(helper,/normalizeStoryMemorySummaryText\(parsed\.summary\)/);
 assert.match(helper,/const SUMMARY_INTERVAL = 5/);
+assert.match(helper,/existingSummaryLength >= 30 && existingSummaryLength <= 100/);
+assert.match(helper,/Reclaim older completed summaries outside the current 30–100 character contract/);
 assert.match(helper,/const SUMMARY_MODEL = "openai\/gpt-oss-20b"/);
 assert.match(migration,/CREATE TABLE IF NOT EXISTS public\.chat_group_memory_summaries/);
 assert.match(migration,/UPDATE public\.chat_group_members[\s\S]*phone_notifications/);
