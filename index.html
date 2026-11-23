@@ -8757,7 +8757,7 @@ async function groupSendTurn() {
     if(latestAssistantMessage){
       g.groupPreviews ||= {};
       g.groupPreviews[activeGroupId]={group_id:activeGroupId,content:latestAssistantMessage.content||'',
-        created_at:latestAssistantMessage.createdAt||'',speaker_type:'character'};
+        created_at:latestAssistantMessage.createdAt||'',speaker_type:'character'};\n      refreshChatEntryList();\n      renderShell();
     }
     // Refresh cumulative character-card counts after a group turn has been saved.
     // The database RPC already includes group messages; invalidate the stale frontend cache.
