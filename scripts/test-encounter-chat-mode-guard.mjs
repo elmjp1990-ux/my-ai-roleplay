@@ -490,7 +490,7 @@ assert.match(encounterPresentation, /先跟'\+characterName\+'打招呼/);
 assert.match(encounterPresentation, /留空發送，角色會繼續說下去/);
 assert.match(encounterPresentation, /encounter-affinity-chip/);
 assert.match(encounterPresentation, /controlsRow\.insertBefore\(tag,menuButton\|\|null\)/);
-assert.match(encounterPresentation, /position:absolute!important;bottom:0!important;transform:none!important/);
+assert.match(encounterPresentation, /position:absolute!important;bottom:0!important;left:50%!important;right:auto!important;transform:translateX\(-50%\)!important;top:auto!important/);
 assert.match(encounterPresentation, /width:calc\(5\.5em \+ 30px\)!important/);
 assert.match(encounterPresentation, /data-kind="search"/);
 assert.match(encounterPresentation, /data-action="phone-open"/);
