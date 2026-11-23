@@ -16,7 +16,7 @@ assert.match(handler,/temperature_2m,precipitation_probability,weather_code/);
 assert.match(handler,/task==="weekly_sync"/);
 assert.match(handler,/task==="hourly_update"/);
 assert.match(handler,/forecast_rows_insufficient/);
-assert.match(handler,/request.headers.get\("Authorization"\)!=="Bearer "\+key/);
+assert.match(handler,/verify_encounter_weather_cron_key/);
 assert.match(cityMap,/get_encounter_city_weather_v2/);
 assert.doesNotMatch(cityMap,/get_encounter_city_weather\(\)/);
 assert.match(cityMap,/cityMapRainChance/);
