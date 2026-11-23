@@ -104,7 +104,6 @@ jobs:
         run: deno test supabase/functions/_shared/encounter-schedule-generation.test.ts
       - name: Simulate authenticated manual schedule POST through mocked AI and database publish
         run: deno test supabase/functions/_shared/encounter-schedule-organizer-handler.integration.test.ts
-      - name: Test lightweight seasonal Taipei weather simulation
       - name: Test Taiwan holiday and make-up workday parser
         run: deno test supabase/functions/_shared/taiwan-calendar.test.ts
       - name: Type-check Encounter and Character Profile Edge Functions
