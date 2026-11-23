@@ -11,3 +11,14 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-input-row{flex:0
 body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{position:sticky!important;bottom:0!important;z-index:8!important;display:flex!important;visibility:visible!important;opacity:1!important;flex:0 0 auto!important;min-height:48px!important;padding:6px 0 calc(4px + env(safe-area-inset-bottom))!important;background:linear-gradient(180deg,rgba(30,25,37,.78),rgba(30,25,37,.98))!important}
 body.encounter-mode-active .chat-main.encounter-scene .composer-icon-button,body.encounter-mode-active .chat-main.encounter-scene .composer-send{display:inline-flex!important;visibility:visible!important;opacity:1!important}
 }
+
+/* Keep the completed-state action inside the same dialogue card and align it with the ending label. */
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-stack{align-items:stretch!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat{cursor:pointer!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-footer{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;width:100%!important;margin-top:2px!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-replay{align-self:center!important;flex:0 0 auto!important;margin:0!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-hint{margin-left:auto!important;white-space:nowrap!important}
+body.encounter-mode-active .chat-main.encounter-scene .encounter-dialogue-beat:focus-visible{outline:2px solid rgba(224,214,244,.85)!important;outline-offset:3px!important}
+@media(min-width:768px){
+ body.encounter-mode-active .chat-main.encounter-scene .messages{bottom:calc(var(--poyozz-encounter-composer-height,190px) - 34px)!important}
+}
