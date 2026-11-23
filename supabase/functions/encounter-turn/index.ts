@@ -371,9 +371,25 @@ Deno.serve(async (request) => {
       return json({ status: "needs_reconciliation", error: "encounter_evidence_persistence_failed", retryAllowed: true }, 503);
     }
     const visuals = visualOverride || await loadEncounterVisuals(admin, asText(reply.id));
+    // The assistant reply and charge are already durable. Clear the matching pending
+    // client marker server-side so a stale client metadata snapshot cannot leave this
+    // settled Encounter turn looking permanently in-flight after a version conflict.
+    const { data: currentSessionMeta, error: sessionMetaReadError } = await admin.from("chat_sessions")
+      .select("session_data").eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null).maybeSingle();
+    let sessionMetadataSynced = false;
+    if (!sessionMetaReadError && currentSessionMeta) {
+      const sessionData = { ...asRow(currentSessionMeta.session_data) };
+      const pending = asRow(sessionData.pendingTurn);
+      if (asText(pending.turnId) === turnId) delete sessionData.pendingTurn;
+      if (visuals) sessionData.encounterVisuals = visuals;
+      const { error: sessionMetaWriteError } = await admin.from("chat_sessions")
+        .update({ session_data: sessionData }).eq("id", sessionId).eq("user_id", user.id).is("deleted_at", null);
+      sessionMetadataSynced = !sessionMetaWriteError;
+      if (sessionMetaWriteError) console.warn("encounter_session_metadata_sync_failed", sessionMetaWriteError.code || "unknown");
+    }
     return json({
       status: settled, assistantMessage: { id: reply.id, content: reply.content, role: "assistant" },
-      ...(suggestedReplies.length === 3 ? { suggestedReplies } : {}),
+      ...(suggestedReplies.length > 0 ? { suggestedReplies } : {}),
       ...(idempotent ? { idempotent: true } : {}),
       encounter: { evidence, ...(affinityResult ? { affinity: affinityResult } : { affinityLegacyTurn: true }), ...(visuals ? { visuals } : {}) },
     });
