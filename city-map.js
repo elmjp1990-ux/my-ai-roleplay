@@ -324,7 +324,7 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
+ const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|睡夢|睡得很沉|淺眠|深層睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
  const isCurrentCityCharacterEligible=(person)=>{
  const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
  return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
@@ -335,10 +335,10 @@
  return (Array.isArray(sourceCharacters)?sourceCharacters:[]).filter(character=>{
  if(character?.visibility!=='public'||character.deletedAt||!accessible(character))return false;
  const schedules=Array.isArray(character.encounterSchedules)?character.encounterSchedules:[];
- return schedules.some(row=>row?.location_key===sceneKey&&!isSleepingSchedule(row.activity,row.scene_description));
+ return schedules.some(row=>row?.location_key===sceneKey);
  }).map(character=>{
  const row=(Array.isArray(character.encounterSchedules)?character.encounterSchedules:[])
- .find(item=>item?.location_key===sceneKey&&!isSleepingSchedule(item.activity,item.scene_description));
+ .find(item=>item?.location_key===sceneKey);
  return {...character,cityStartTime:String(row?.start_time||'').slice(0,5),cityEndTime:String(row?.end_time||'').slice(0,5),cityActivity:row?.activity||'',citySceneDescription:row?.scene_description||''};
  });
  };
