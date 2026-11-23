@@ -250,7 +250,7 @@
  const renderCitySceneCatalog=(rows)=>{
  for(const row of (Array.isArray(rows)?rows:[])){
  const key=String(row?.location_key||'').trim();
- if(!Object.prototype.hasOwnProperty.call(cityPlaceSceneKeys,key)&&!Object.values(cityPlaceSceneKeys).includes(key))continue;
+ if(!Array.from(document.querySelectorAll('.city-place-marker[data-place]')).some(marker=>marker.dataset.place===key))continue;
  const previous=cityVenueScenes[key]||{};
  cityPlaceNames[key]=String(row.display_name||key);
  const scene={
@@ -324,14 +324,13 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const cityPlaceSceneKeys={waterfront:'waterfront',commercial:'commercial',airport:'airport',university:'university',park:'park','shopping-street':'shopping-street','department-store':'department-store',hospital:'hospital','night-bar':'night-bar','live-house':'live-house','luxury-apartment':'luxury-apartment',apartment:'apartment','convenience-store':'convenience-store','private-club':'private-club'};
  const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
  const isCurrentCityCharacterEligible=(person)=>{
  const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
  return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
  };
  const getCityPresence=(place,sourceCharacters=state.characters)=>{
- const sceneKey=cityPlaceSceneKeys[place];
+ const sceneKey=place;
  if(!sceneKey)return [];
  return (Array.isArray(sourceCharacters)?sourceCharacters:[]).filter(character=>{
  if(character?.visibility!=='public'||character.deletedAt||!accessible(character))return false;
