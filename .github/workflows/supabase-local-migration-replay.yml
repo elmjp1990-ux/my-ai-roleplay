@@ -527,8 +527,8 @@ jobs:
             IF pg_catalog.to_regprocedure('public.get_encounter_city_weather_v2()') IS NULL THEN
               RAISE EXCEPTION 'weather v2 RPC missing';
             END IF;
-            IF pg_catalog.position('55 * * * *' in pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure))=0
-               OR pg_catalog.position('0 0 * * 0' in pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure))=0 THEN
+            IF pg_catalog.strpos(pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),'55 * * * *')=0
+               OR pg_catalog.strpos(pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),'0 0 * * 0')=0 THEN
               RAISE EXCEPTION 'weekly/hourly weather cron schedule missing';
             END IF;
           END
