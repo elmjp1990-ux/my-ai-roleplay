@@ -5,6 +5,7 @@ on:
       - "city-map.js"
       - "supabase/functions/encounter-weather-sync/**"
       - "supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql"
+      - "supabase/migrations/20261123193000_verify_encounter_weather_cron_key.sql"
       - "scripts/test-encounter-weekly-weather.mjs"
       - ".github/workflows/encounter-weekly-weather.yml"
   push:
