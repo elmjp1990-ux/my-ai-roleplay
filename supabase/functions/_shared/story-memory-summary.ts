@@ -76,6 +76,8 @@ async function generateMemorySummary(
     messages,
     apiKey,
     model: SUMMARY_MODEL,
+    provider: "deepinfra",
+    disableProviderFallback: true,
     timeoutMs: 45_000,
     temperature: 0.2,
     responseFormat: { type: "json_object" },
