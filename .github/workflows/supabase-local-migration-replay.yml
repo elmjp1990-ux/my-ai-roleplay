@@ -518,6 +518,7 @@ jobs:
         run: |
           set -euo pipefail
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261123170000_encounter_weekly_weather_hourly.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261123193000_verify_encounter_weather_cron_key.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
           DO $weather_check$
           BEGIN
@@ -526,6 +527,9 @@ jobs:
             END IF;
             IF pg_catalog.to_regprocedure('public.get_encounter_city_weather_v2()') IS NULL THEN
               RAISE EXCEPTION 'weather v2 RPC missing';
+            END IF;
+            IF pg_catalog.to_regprocedure('public.verify_encounter_weather_cron_key(text)') IS NULL THEN
+              RAISE EXCEPTION 'Vault-backed weather cron key verifier missing';
             END IF;
             IF pg_catalog.strpos(pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),'55 * * * *')=0
                OR pg_catalog.strpos(pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure),'0 0 * * 0')=0 THEN
