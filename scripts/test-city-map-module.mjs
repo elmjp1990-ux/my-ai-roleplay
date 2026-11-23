@@ -278,8 +278,8 @@ assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 assert.match(cityMap, /const isSleepingSchedule=.*睡夢.*淺眠/);
-assert.match(fixedSceneMigration, /marker_x\\s*=\\s*EXCLUDED\\.marker_x/);
-assert.match(fixedSceneMigration, /marker_y\\s*=\\s*EXCLUDED\\.marker_y/);
+assert.match(fixedSceneMigration, /marker_x\s*=\s*EXCLUDED\.marker_x/);
+assert.match(fixedSceneMigration, /marker_y\s*=\s*EXCLUDED\.marker_y/);
 assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneKey\)/,
   'Sleeping characters must remain visible in their current city scene.');
 assert.match(cityMap, /\.find\(item=>item\?\.location_key===sceneKey\)/,
