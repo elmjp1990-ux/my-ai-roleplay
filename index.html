@@ -9978,7 +9978,21 @@ function classifyEncounterRepairSpace(activityValue,locationValue,requestedOutdo
 function autoCorrectEncounterScheduleOutput(rawText){
   const parsed=JSON.parse(String(rawText||''));
   if(!parsed||!Array.isArray(parsed.characters))throw new Error('行程 JSON 格式不正確');
-  const fallbackLocations=new Set(['機場','公司','酒吧','Live House','住所','百貨公司','書店','咖啡廳']);
+  // Keep the repair fallback allowlist aligned with RAIN_FALLBACK_SCENE_KEYS
+  // and the fixed scene catalog display names used by the schedule publisher.
+  const fallbackLocations=new Set(['辦公大樓','機場','校園','百貨公司','中央醫院','夜間酒吧','展演空間','高級公寓','308公寓','便利商店','高級會所']);
+  const locationAliases=new Map([
+    ['livehouse','展演空間'],['live-house','展演空間'],['練團室','展演空間'],['展演廳','展演空間'],
+    ['頂樓出租屋','308公寓'],['出租屋','308公寓'],['住所','308公寓'],
+    ['公司','辦公大樓'],['辦公室','辦公大樓'],['酒吧','夜間酒吧'],['百貨','百貨公司'],
+    ['學校','校園'],['大學','校園'],['醫院','中央醫院'],['便利店','便利商店'],
+    ['路邊攤','商店街'],['小吃店','商店街'],['書店','商店街'],['咖啡廳','商店街'],['咖啡店','商店街'],['後巷','商店街']
+  ]);
+  const normalizeRepairLocation=value=>{
+    const label=String(value||'').trim().normalize('NFKC');
+    const compact=label.toLocaleLowerCase().replace(/\\s+/g,'');
+    return locationAliases.get(compact)||label;
+  };
   let changed=0;
   for(const character of parsed.characters){
     for(const dayType of ['weekday','holiday']){
@@ -9987,6 +10001,11 @@ function autoCorrectEncounterScheduleOutput(rawText){
       for(const block of blocks){
         for(const option of (Array.isArray(block&&block.options)?block.options:[])){
           const activity=String(option.activity||'').trim();
+          const normalizedLocation=normalizeRepairLocation(option.location);
+          if(normalizedLocation!==String(option.location||'').trim()){
+            option.location=normalizedLocation;
+            changed++;
+          }
           const space=classifyEncounterRepairSpace(activity,option.location,option.is_outdoor===true);
           if(space==='vehicle'){
             if(/餐廳|小吃店/.test(String(option.location||''))){option.location='街頭';changed++;}
@@ -10006,12 +10025,17 @@ function autoCorrectEncounterScheduleOutput(rawText){
             option.rain_fallback_location=null;
             option.rain_fallback_activity=null;
           }else{
-            const fallbackLocation=String(option.rain_fallback_location||'').trim();
+            const originalFallbackLocation=String(option.rain_fallback_location||'').trim();
+            const fallbackLocation=normalizeRepairLocation(originalFallbackLocation);
+            if(fallbackLocation!==originalFallbackLocation){
+              option.rain_fallback_location=fallbackLocation;
+              changed++;
+            }
             const originalFallback=String(option.rain_fallback_activity||'');
             const fallbackActivity=compactEncounterScheduleDescription(originalFallback);
-            if(!fallbackLocations.has(fallbackLocation)||Array.from(originalFallback).length<10||Array.from(originalFallback).length>30){
-              option.rain_fallback_location='咖啡廳';
-              option.rain_fallback_activity='改到咖啡廳內等雨停，喝杯熱飲休息。';
+            if(!fallbackLocations.has(fallbackLocation)||Array.from(fallbackActivity).length<8||Array.from(fallbackActivity).length>30){
+              option.rain_fallback_location='便利商店';
+              option.rain_fallback_activity='改到便利商店內避雨，買杯熱飲休息。';
               changed++;
             }else if(fallbackActivity!==originalFallback){
               option.rain_fallback_activity=fallbackActivity;changed++;

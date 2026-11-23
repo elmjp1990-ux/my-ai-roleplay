@@ -213,6 +213,20 @@ const detailMetadata = html.slice(detailMetadataStart, detailMetadataEnd);
 assert.ok(!detailMetadata.includes("character_stories") && !detailMetadata.includes("opening_message"), "Public character detail must not fetch opening text.");
 assert.ok(!html.includes(".select('id, character_id, story_name, description, opening_message, visibility, created_at')"));
 
+// Manual schedule repair must use only supported rainy-day scene labels and canonicalize common aliases.
+const scheduleRepairStart = html.indexOf("function autoCorrectEncounterScheduleOutput");
+const scheduleRepairEnd = html.indexOf("async function loadEncounterScheduleRepairOutputs", scheduleRepairStart);
+assert.ok(scheduleRepairStart >= 0 && scheduleRepairEnd > scheduleRepairStart, "schedule repair normalizer must exist");
+const scheduleRepair = html.slice(scheduleRepairStart, scheduleRepairEnd);
+assert.match(scheduleRepair, /\['livehouse','展演空間'\]/);
+assert.match(scheduleRepair, /\['練團室','展演空間'\]/);
+assert.match(scheduleRepair, /\['頂樓出租屋','308公寓'\]/);
+assert.match(scheduleRepair, /'便利商店','高級會所'/);
+assert.match(scheduleRepair, /option\.rain_fallback_location='便利商店'/);
+assert.match(scheduleRepair, /改到便利商店內避雨，買杯熱飲休息/);
+assert.doesNotMatch(scheduleRepair, /option\.rain_fallback_location='咖啡廳'/);
+assert.doesNotMatch(scheduleRepair, /'書店','咖啡廳'/);
+
 // Unknown worldview review is author-scoped and decisions never invoke AI inline.
 assert.match(scheduleOrganizer, /\.eq\("status", "needs_review"\)\.eq\("author_id", actorUserId\)/);
 assert.match(scheduleOrganizer, /\.eq\("status", "pending"\)\.eq\("author_id", actorUserId\)/);
