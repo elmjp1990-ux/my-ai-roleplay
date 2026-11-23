@@ -67,17 +67,36 @@ DECLARE
       v_cron_schedule := '0 0 * * 0';
       v_endpoint := 'encounter-weather-sync';
       v_timeout := 60000;
+      v_task := 'weekly_sync';
     WHEN 'weather_hourly_update' THEN
       v_job_name := 'poyozz-encounter-weather-hourly-update';
       v_cron_schedule := '55 * * * *';
       v_endpoint := 'encounter-weather-sync';
-      v_timeout := 30000;$new$;
+      v_timeout := 30000;
+      v_task := 'hourly_update';$new$;
+  v_old_body text := $oldbody$        body := '{"mode":"scheduled"}'::jsonb,
+        timeout_milliseconds := %s$oldbody$;
+  v_new_body text := $newbody$        body := jsonb_build_object('mode', 'scheduled', 'task', '%s'),
+        timeout_milliseconds := %s$newbody$;
+  v_old_format text := $oldformat$    v_endpoint,
+    v_timeout
+  );$oldformat$;
+  v_new_format text := $newformat$    v_endpoint,
+    v_task,
+    v_timeout
+  );$newformat$;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef('public.schedule_encounter_worker(text,boolean)'::regprocedure) INTO v_def;
-  IF pg_catalog.strpos(v_def,v_old)=0 THEN
-    RAISE EXCEPTION 'weather_cron_schedule_anchor_missing';
+  IF pg_catalog.strpos(v_def,'  v_timeout integer;')=0
+     OR pg_catalog.strpos(v_def,v_old)=0
+     OR pg_catalog.strpos(v_def,v_old_body)=0
+     OR pg_catalog.strpos(v_def,v_old_format)=0 THEN
+    RAISE EXCEPTION 'weather_cron_function_anchor_missing';
   END IF;
+  v_def := pg_catalog.replace(v_def,'  v_timeout integer;','  v_timeout integer;\n  v_task text;');
   v_def := pg_catalog.replace(v_def,v_old,v_new);
+  v_def := pg_catalog.replace(v_def,v_old_body,v_new_body);
+  v_def := pg_catalog.replace(v_def,v_old_format,v_new_format);
   EXECUTE v_def;
 END;
 $scheduler$;
