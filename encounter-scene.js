@@ -443,7 +443,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
   });
   document.addEventListener('keydown',event=>{
     if(event.key!=='Enter'&&event.key!==' ')return;
-    const beat=event.target.closest('.encounter-dialogue-beat[role="button"]');
+    const beat=event.target.closest('.encounter-dialogue-beat[role="group"]');
     if(!beat||event.target.closest('.encounter-dialogue-replay'))return;
     event.preventDefault();
     beat.click();
