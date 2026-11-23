@@ -37,20 +37,25 @@ assert.match(publicLoader, /if\(!characterId&&rowsVersion!==publicCharacterRowsC
 assert.match(html, /upsert\(row, \{ onConflict: 'id' \}\);[\s\S]{0,180}invalidatePublicCharacterRowsCache\(\);/);
 assert.match(html, /rpc\('soft_delete_character',[\s\S]{0,300}invalidatePublicCharacterRowsCache\(\);/);
 
-// Opening text and creator-only runtime settings are loaded only when a public character detail is opened.
+// Opening text remains a chat-startup concern; detail hydration only loads creator-only runtime settings.
 assert.match(html, /async function hydratePublicCharacterDetailMetadata\(characterId\)/);
-assert.match(html, /publicCharacterStoryOpeningLoaded\.has\(characterId\)/);
+assert.match(html, /publicCharacterDetailMetadataLoaded\.has\(characterId\)/);
 assert.match(html, /async function hydratePublicAuthorProfile\(authorId\)/);
 assert.match(html, /publicAuthorProfileLoaded\.has\(authorId\)/);
 assert.match(authorProfile, /publicAuthorProfileLoaded\.has\(authorId\)/);
 assert.match(html, /if\(c\.authorId\)void hydratePublicAuthorProfile\(c\.authorId\)/);
-assert.match(html, /\.select\('opening_message'\)/);
 const detailMetadata = between("async function hydratePublicCharacterDetailMetadata", "async function hydratePublicCharacterIllustrations");
 assert.match(detailMetadata, /\.select\('phone_settings,nsfw_workplace_warning'\)/);
+assert.doesNotMatch(detailMetadata, /character_stories|opening_message|current\.opening/);
 assert.match(detailMetadata, /current\.phoneSettings=/);
 assert.match(detailMetadata, /current\.nsfwWorkplaceWarning=/);
 assert.match(html, /\.select\('id,handle,nickname,avatar_url,bio,follower_count'\)/);
-assert.match(html, /data-character-opening/);
+assert.doesNotMatch(html, /data-character-opening/);
+const detailRender = between("function renderDetail()", "async function loadCharacterTurnCounts");
+assert.doesNotMatch(detailRender, /<h3>開場白<\/h3>|data-character-opening/);
+assert.match(detailRender, /<div class="row wrap" data-character-actions>/);
+assert.ok(detailRender.indexOf("data-character-actions") > detailRender.indexOf("角色介紹"));
+assert.ok(detailRender.indexOf("data-character-actions") > detailRender.indexOf("(c.tags || []).map(tagButton)"));
 assert.match(html, /data-character-author-name/);
 
 // Primary art is fetched only for visible cards, an opened detail, or a selected city character.
