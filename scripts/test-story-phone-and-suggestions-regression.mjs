@@ -115,7 +115,7 @@ assert.match(memoryBlankMigration, /btrim\(u\.summary\) <> ''/);
 assert.match(memoryBlankMigration, /SET summary = COALESCE\(v_summary, ''\)/);
 assert.match(memoryBlankMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
 assert.match(edge, /\.neq\("summary", ""\)/);
-assert.match(html, /maxlength="1000" aria-label="編輯回憶內容"/);
+assert.match(html, /maxlength="100" aria-label="編輯回憶內容"/);
 assert.match(memoryBlankMigration, /btrim\(u\.summary\) <> ''/);
 assert.match(memoryBlankMigration, /SET summary = COALESCE\(v_summary, ''\)/);
 assert.match(memoryBlankMigration, /important = CASE WHEN v_summary IS NULL THEN false ELSE u\.important END/);
