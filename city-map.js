@@ -319,12 +319,8 @@
  if(cached)applyCityWeather(cached.data);
  if(cached?.fresh)return;
  try{
- let {data,error}=await client.rpc('get_encounter_city_weather_v2');
- if(error){
- const legacy=await client.rpc('get_encounter_city_weather');
- if(legacy.error)throw error;
- data=legacy.data;
- }
+ const {data,error}=await client.rpc('get_encounter_city_weather_v2');
+ if(error)throw error;
  const weather=Array.isArray(data)?data[0]:data;
  if(weather)writeCityMapCache('weather-v2',weather);
  applyCityWeather(weather);
