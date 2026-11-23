@@ -9836,6 +9836,7 @@ async function renderPhoneModal() {
   ensurePhoneModalHistoryGuard();
   document.body.appendChild(modal);modal.querySelector('[data-phone-action="close"]')?.focus();
 }
+// Single and group diary editors follow the generated 30–100 character summary contract.
 function normalizeStoryMemorySummaryText(value) {
   const text=String(value??'').replace(/\s+/g,' ').trim();
   const chars=Array.from(text);
