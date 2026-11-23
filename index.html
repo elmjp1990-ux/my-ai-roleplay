@@ -11544,7 +11544,7 @@ document.addEventListener('click',async event => {
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
         const messages=session.messages||[];
-        if(messages.length===0){
+        if(!messages.some(m=>m.role==='user'&&String(m.text||m.content||'').trim())){
           try{
             const lifecycle=await setEncounterLifecycleState(session.id,'end');
             delete state.sessions[session.id];
