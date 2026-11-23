@@ -23,7 +23,6 @@ const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migrati
 const replaySchedule = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
 const replayEncounterState = fs.readFileSync("supabase/drafts/replay-encounter-relationship-greeting-pools.sql", "utf8");
 const weatherWorker = fs.readFileSync("supabase/functions/encounter-weather-sync/index.ts", "utf8");
-const weatherParser = fs.readFileSync("supabase/functions/_shared/encounter-weather.mjs", "utf8");
 
 assert.match(worker, /requestOpenRouterChatCompletion/);
 assert.match(worker, /POYOZZ_DEFAULT_CHAT_MODEL/);
@@ -150,8 +149,11 @@ assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status 
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025/, "Illustrative weather must not depend on historical weather imports");
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
-assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_sync\(/);
-assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_weekly_sync\(/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_hourly_update\(/);
+assert.match(pipeline, /0 0 \* \* 0/);
+assert.match(pipeline, /55 \* \* \* \*/);
+assert.doesNotMatch(pipeline, /schedule_encounter_weather_sync|0 \*\/6 \* \* \*/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
 assert.match(fixedSceneMigration,/Returns only the fourteen permanent A–N city scene anchors/);
@@ -251,17 +253,15 @@ assert.match(sceneDescriptionMigration, /get_encounter_character_schedules_with_
 assert.match(sceneDescriptionMigration, /poyozz-encounter-schedule-v5-natural-locations-scene-descriptions-2026-11-18/);
 assert.match(fs.readFileSync("index.html", "utf8"), /get_encounter_character_schedules_with_scene/);
 assert.match(fs.readFileSync("city-map.js", "utf8"), /citySceneDescription/);
-assert.match(weatherWorker, /createEncounterWeather/);
-assert.match(weatherWorker, /previousSlot === weather\.slot/);
-assert.match(weatherWorker, /previous\.source === weather\.source/);
-assert.match(weatherWorker, /previous\?\.source === weather\.source/);
-assert.match(weatherWorker, /encounter_city_weather/);
-assert.doesNotMatch(weatherWorker, /O-A0001-001|O-A0002-001|CWA_OPEN_DATA_API_KEY|fetch\(/);
+assert.match(weatherWorker, /forecast_days=7/);
+assert.match(weatherWorker, /weeklySync/);
+assert.match(weatherWorker, /hourlyUpdate/);
+assert.match(weatherWorker, /task==="weekly_sync"/);
+assert.match(weatherWorker, /task==="hourly_update"/);
+assert.match(weatherWorker, /precipitation_probability/);
+assert.match(weatherWorker, /open-meteo\.com/);
+assert.doesNotMatch(weatherWorker, /CWA_OPEN_DATA_API_KEY|createEncounterWeather|poyozz_fictional_seasonal/);
 assert.doesNotMatch(weatherWorker, /reserve_chat_turn|settle_chat_turn/);
-assert.match(weatherParser, /Asia\/Taipei/);
-assert.match(weatherParser, /poyozz_fictional_seasonal/);
-assert.match(weatherParser, /isRainWeatherText/);
-assert.doesNotMatch(weatherParser, /Past1hr|CWA_OPEN_DATA_API_KEY/);
 assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organizer\(true\)/,
   "Migration draft must not activate the hosted cron job automatically");
 
@@ -277,7 +277,7 @@ assert.match(html, /不會再次呼叫 AI/);
 assert.match(html, /case 'environment':[\s\S]*?void loadEncounterScheduleTestTools\(\)/);
 assert.doesNotMatch(html, /kind==='album'&&CHAT_DATA_TEST_MODE/);
 
-console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, simulated Taipei weather, queue triggers, and throttling contracts passed.");
+console.log("Encounter schedule worker, conditional holidays, existing-scene-only rules, sparse encounter windows, weekly forecast weather, queue triggers, and throttling contracts passed.");
 
 
 const encounterSession = fs.readFileSync("supabase/functions/encounter-session/index.ts", "utf8");

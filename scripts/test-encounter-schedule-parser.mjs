@@ -22,10 +22,10 @@ assert.doesNotMatch(html, /function parseEncounterScheduleText\(raw\)/);
 assert.doesNotMatch(html, /星期\(0=日、1=一/);
 
 // City weather and dynamic scenes are session-cached to avoid repeat RPC egress on map re-entry.
-assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 6 \* 60 \* 60 \* 1000/);
+assert.match(cityMap, /CITY_MAP_WEATHER_CACHE_TTL_MS = 50 \* 60 \* 1000/);
 assert.match(cityMap, /CITY_MAP_SCENES_CACHE_TTL_MS = 30 \* 60 \* 1000/);
 assert.match(cityMap, /sessionStorage\.getItem\('poyozz-city-map-/);
-assert.match(cityMap, /readCityMapCache\('weather'/);
+assert.match(cityMap, /readCityMapCache\('weather-v2'/);
 assert.match(cityMap, /readCityMapCache\('scenes-v3'/);
 assert.match(cityMap, /if\(cached\?\.fresh\)return/);
 
@@ -246,3 +246,6 @@ assert.match(html, /modern_map_compatible/);
 assert.match(html, /not_applicable/);
 
 console.log("Author schedule and illustration signed-URL refresh contract tests passed.");
+
+assert.match(cityMap, /get_encounter_city_weather_v2/);
+assert.doesNotMatch(cityMap, /get_encounter_city_weather\(\)/);

@@ -422,18 +422,23 @@ BEGIN
     RAISE EXCEPTION 'scheduler disable check returned NULL';
   END IF;
 
-  v_scheduler_status := public.schedule_encounter_weather_sync(false);
+  -- This replay runs before the weekly-weather migration, so only the legacy
+  -- weather worker exists at this point. The following migration adds the two new jobs.
+  v_scheduler_status := public.schedule_encounter_worker('weather_sync', false);
   IF v_scheduler_status IS NULL THEN
-    RAISE EXCEPTION 'weather scheduler disable check returned NULL';
+    RAISE EXCEPTION 'legacy weather scheduler disable check returned NULL';
   END IF;
 
+  -- This replay runs before the weekly-weather migration. Verify the legacy
+  -- six-hour worker here; the following migration step verifies the new
+  -- weekly and minute-55 schedules after they have actually been installed.
   IF pg_catalog.strpos(
     pg_catalog.pg_get_functiondef(
       'public.schedule_encounter_worker(text,boolean)'::regprocedure
     ),
     '0 */6 * * *'
   ) = 0 THEN
-    RAISE EXCEPTION 'weather scheduler must use a six-hour interval';
+    RAISE EXCEPTION 'legacy weather scheduler interval is missing before migration';
   END IF;
 
   IF pg_catalog.strpos(
@@ -459,7 +464,7 @@ BEGIN
   INSERT INTO public.encounter_city_weather (
     city_key, weather_text, temperature_c, is_raining, source, fetched_at, updated_at
   ) VALUES (
-    'taipei', '短暫陣雨', 25, true, 'poyozz_fictional_seasonal',
+    'taipei', '短暫陣雨', 25, true, 'open_meteo_weekly_forecast',
     pg_catalog.now(), pg_catalog.now()
   )
   ON CONFLICT (city_key) DO UPDATE

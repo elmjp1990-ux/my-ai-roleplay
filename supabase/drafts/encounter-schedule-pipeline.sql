@@ -201,24 +201,11 @@ CREATE TABLE IF NOT EXISTS public.encounter_city_weather (
   is_raining boolean NOT NULL DEFAULT false,
   observed_at timestamptz,
   fetched_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp(),
-  source text NOT NULL DEFAULT 'poyozz_fictional_seasonal',
+  source text NOT NULL DEFAULT 'open_meteo_weekly_forecast',
   updated_at timestamptz NOT NULL DEFAULT pg_catalog.clock_timestamp()
 );
 
-ALTER TABLE public.encounter_city_weather ALTER COLUMN source SET DEFAULT 'poyozz_fictional_seasonal';
-
-UPDATE public.encounter_city_weather
-SET weather_text = '多雲',
-    temperature_c = 24,
-    precipitation_1h_mm = NULL,
-    is_raining = false,
-    observed_at = pg_catalog.now(),
-    fetched_at = pg_catalog.now(),
-    source = 'poyozz_fallback',
-    updated_at = pg_catalog.now()
-WHERE source IS DISTINCT FROM 'poyozz_fictional_seasonal'
-  AND source IS DISTINCT FROM 'poyozz_fallback';
-
+ALTER TABLE public.encounter_city_weather ALTER COLUMN source SET DEFAULT 'open_meteo_weekly_forecast';
 
 
 CREATE INDEX IF NOT EXISTS encounter_city_weather_fetched_idx
@@ -1774,7 +1761,7 @@ REVOKE ALL ON FUNCTION public.get_encounter_city_weather() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_encounter_city_weather() TO anon, authenticated, service_role;
 
 COMMENT ON TABLE public.encounter_city_weather IS
-  'One cached fictional Taipei weather state generated every six hours; no external weather API, forecast, or historical baseline dependency.';
+  'Shared Taipei current weather state selected from the weekly Open-Meteo forecast cache by the hourly worker.';
 
 CREATE OR REPLACE FUNCTION public.get_encounter_scene_registry()
 RETURNS TABLE (
@@ -1852,6 +1839,7 @@ DECLARE
   v_cron_schedule text;
   v_endpoint text;
   v_timeout integer;
+  v_task text;
   v_project_url text;
   v_service_key text;
   v_job_id bigint;
@@ -1867,11 +1855,18 @@ BEGIN
       v_cron_schedule := '*/15 * * * *';
       v_endpoint := 'encounter-schedule-organizer';
       v_timeout := 120000;
-    WHEN 'weather_sync' THEN
-      v_job_name := 'poyozz-encounter-weather-sync';
-      v_cron_schedule := '0 */6 * * *';
+    WHEN 'weather_weekly_sync' THEN
+      v_job_name := 'poyozz-encounter-weather-weekly-sync';
+      v_cron_schedule := '0 0 * * 0';
+      v_endpoint := 'encounter-weather-sync';
+      v_timeout := 60000;
+      v_task := 'weekly_sync';
+    WHEN 'weather_hourly_update' THEN
+      v_job_name := 'poyozz-encounter-weather-hourly-update';
+      v_cron_schedule := '55 * * * *';
       v_endpoint := 'encounter-weather-sync';
       v_timeout := 30000;
+      v_task := 'hourly_update';
     WHEN 'taiwan_calendar_sync' THEN
       v_job_name := 'poyozz-encounter-taiwan-calendar-sync';
       v_cron_schedule := '0 19 1 * *';
@@ -1923,11 +1918,12 @@ BEGIN
           ),
           'Content-Type', 'application/json'
         ),
-        body := '{"mode":"scheduled"}'::jsonb,
+        body := jsonb_build_object('mode', 'scheduled', 'task', '%s'),
         timeout_milliseconds := %s
       );
     $encounter_cron_command$,
     v_endpoint,
+    v_task,
     v_timeout
   );
 
@@ -1957,16 +1953,21 @@ AS $schedule_organizer_wrapper$
   SELECT public.schedule_encounter_worker('schedule_organizer', p_enabled);
 $schedule_organizer_wrapper$;
 
-CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_sync(
+CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_weekly_sync(
   p_enabled boolean DEFAULT false
 )
-RETURNS text
-LANGUAGE sql
-SECURITY DEFINER
-SET search_path = ''
-AS $weather_sync_wrapper$
-  SELECT public.schedule_encounter_worker('weather_sync', p_enabled);
-$weather_sync_wrapper$;
+RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
+AS $weather_weekly_wrapper$
+  SELECT public.schedule_encounter_worker('weather_weekly_sync', p_enabled);
+$weather_weekly_wrapper$;
+
+CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_hourly_update(
+  p_enabled boolean DEFAULT false
+)
+RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
+AS $weather_hourly_wrapper$
+  SELECT public.schedule_encounter_worker('weather_hourly_update', p_enabled);
+$weather_hourly_wrapper$;
 
 CREATE OR REPLACE FUNCTION public.schedule_encounter_taiwan_calendar_sync(
   p_enabled boolean DEFAULT false
@@ -1981,12 +1982,15 @@ $calendar_sync_wrapper$;
 
 REVOKE ALL ON FUNCTION public.schedule_encounter_schedule_organizer(boolean)
   FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.schedule_encounter_weather_sync(boolean)
+REVOKE ALL ON FUNCTION public.schedule_encounter_weather_weekly_sync(boolean)
+  FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.schedule_encounter_weather_hourly_update(boolean)
   FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.schedule_encounter_taiwan_calendar_sync(boolean)
   FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) TO service_role;
-GRANT EXECUTE ON FUNCTION public.schedule_encounter_weather_sync(boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_weather_weekly_sync(boolean) TO service_role;
+GRANT EXECUTE ON FUNCTION public.schedule_encounter_weather_hourly_update(boolean) TO service_role;
 GRANT EXECUTE ON FUNCTION public.schedule_encounter_taiwan_calendar_sync(boolean) TO service_role;
 
 COMMENT ON TABLE public.encounter_schedule_generation_jobs IS
@@ -2003,8 +2007,10 @@ COMMENT ON FUNCTION public.schedule_encounter_worker(text, boolean) IS
   'Allowlisted opt-in scheduler for Encounter background workers. No jobs are activated by migration.';
 COMMENT ON FUNCTION public.schedule_encounter_schedule_organizer(boolean) IS
   'Opt-in 15-minute schedule organizer cron wrapper; manual test trigger is separate.';
-COMMENT ON FUNCTION public.schedule_encounter_weather_sync(boolean) IS
-  'Opt-in six-hour deterministic seasonal Taipei weather simulation; no external weather API or historical baseline.';
+COMMENT ON FUNCTION public.schedule_encounter_weather_weekly_sync(boolean) IS
+  'Opt-in weekly Taipei forecast cache refresh; no external weather request per user.';
+COMMENT ON FUNCTION public.schedule_encounter_weather_hourly_update(boolean) IS
+  'Opt-in hourly weather state update from the shared forecast cache, scheduled at minute 55.';
 COMMENT ON FUNCTION public.schedule_encounter_taiwan_calendar_sync(boolean) IS
   'Opt-in monthly Taiwan official calendar refresh wrapper. Runs at 03:00 Asia/Taipei on the first day of each month.';
 

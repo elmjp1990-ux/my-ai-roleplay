@@ -5,7 +5,7 @@
  let activeSceneRefresh = null;
  let activeScheduleRefresh = null;
  let activeVenueRefresh = null;
- const CITY_MAP_WEATHER_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+ const CITY_MAP_WEATHER_CACHE_TTL_MS = 50 * 60 * 1000;
  const CITY_MAP_SCENES_CACHE_TTL_MS = 30 * 60 * 1000;
  const cityMapMemoryCache = new Map();
  const cityCharacterAffinityCache = new Map();
@@ -311,14 +311,14 @@
  const client=window.mySupabase;
  const stage=$('cityMapStage');
  if(!client||!stage)return;
- const cached=readCityMapCache('weather',CITY_MAP_WEATHER_CACHE_TTL_MS);
+ const cached=readCityMapCache('weather-v2',CITY_MAP_WEATHER_CACHE_TTL_MS);
  if(cached)applyCityWeather(cached.data);
  if(cached?.fresh)return;
  try{
- const {data,error}=await client.rpc('get_encounter_city_weather');
+ const {data,error}=await client.rpc('get_encounter_city_weather_v2');
  if(error)throw error;
  const weather=Array.isArray(data)?data[0]:data;
- if(weather)writeCityMapCache('weather',weather);
+ if(weather)writeCityMapCache('weather-v2',weather);
  applyCityWeather(weather);
  }catch(error){
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
