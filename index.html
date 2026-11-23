@@ -6641,7 +6641,7 @@ async function createEncounterSession(character) {
     encounterDay: new Date().toLocaleDateString('en-CA'),
     encounterVisuals: data.session.character_snapshot?.defaultVisuals || null,
     encounterAffinity: Number.isInteger(data.session.session_data?.encounter?.affinity)?data.session.session_data.encounter.affinity:0,
-    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'first_meeting',
+    encounterRelationshipStage: typeof data.session.session_data?.encounter?.relationshipStage==='string'?data.session.session_data.encounter.relationshipStage:'stranger',
     messages: [],
     memories: [],
     album: [],
