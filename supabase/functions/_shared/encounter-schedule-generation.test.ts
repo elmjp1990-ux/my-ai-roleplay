@@ -546,9 +546,18 @@ Deno.test("keeps incompatible historical characters off the modern map", () => {
   if (forced.ok) throw new Error("ancient role forced onto modern map");
 });
 
-Deno.test("keeps sleeping detection based on concise activity text", () => {
-  if (resolveEncounterScheduleAvailability("正在熟睡") !== "sleeping") throw new Error("sleeping activity not detected");
-  if (resolveEncounterScheduleAvailability("在家休息") !== "available") throw new Error("ordinary rest incorrectly blocked");
+Deno.test("keeps sleeping detection aligned across frontend and server availability", () => {
+  for (const activity of ["正在熟睡", "睡夢中，隱約聽到樓下早餐店的聲音", "深層睡眠中", "淺眠中", "睡得很沉"]) {
+    if (resolveEncounterScheduleAvailability(activity) !== "sleeping") {
+      throw new Error("sleeping activity not detected: " + activity);
+    }
+  }
+  if (resolveEncounterScheduleAvailability("準備睡覺前整理房間") !== "available") {
+    throw new Error("preparing for sleep incorrectly blocked");
+  }
+  if (resolveEncounterScheduleAvailability("在家休息") !== "available") {
+    throw new Error("ordinary rest incorrectly blocked");
+  }
 });
 
 Deno.test("rejects airport as a generic everyday location without character context", () => {
