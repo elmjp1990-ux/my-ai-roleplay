@@ -128,7 +128,7 @@ assert.match(cityMap, /activeScheduleRefresh = null/, 'Destroying the active cit
 assert.match(cityMap, /await loadCityPeoplePage\(activePlace\)/);
 assert.match(cityMap, /activeVenueRefresh=renderVenue/);
 assert.match(cityMap, /const latestScene=cityVenueScenes\[place\]\|\|scene/);
-assert.match(cityMap, /poyozz-city-map-scenes-v2-v1/);
+assert.match(cityMap, /poyozz-city-map-scenes-v3-v1/);
 
 assert.ok(cityMap.indexOf("void loadCitySceneCatalog();") > cityMap.indexOf("const cityVenueScenes"),
   "scene catalog loading must start after the fixed scene-key map is initialized");
