@@ -149,11 +149,11 @@ assert.match(pipeline, /WHEN public\.encounter_schedule_generation_jobs\.status 
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_city_weather/);
 assert.doesNotMatch(pipeline, /encounter_weather_baseline_2025/, "Illustrative weather must not depend on historical weather imports");
 assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.get_encounter_city_weather\(\)/);
-assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\\.schedule_encounter_weather_weekly_sync\\(/);
-assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\\.schedule_encounter_weather_hourly_update\\(/);
-assert.match(pipeline, /0 0 \\* \\* 0/);
-assert.match(pipeline, /55 \\* \\* \\* \\*/);
-assert.doesNotMatch(pipeline, /schedule_encounter_weather_sync|0 \\*\\/6 \\* \\* \\*/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_weekly_sync\(/);
+assert.match(pipeline, /CREATE OR REPLACE FUNCTION public\.schedule_encounter_weather_hourly_update\(/);
+assert.match(pipeline, /0 0 \* \* 0/);
+assert.match(pipeline, /55 \* \* \* \*/);
+assert.doesNotMatch(pipeline, /schedule_encounter_weather_sync|0 \*\/6 \* \* \*/);
 assert.match(pipeline, /'0 \*\/6 \* \* \*'/);
 assert.match(pipeline, /FROM public\.get_encounter_city_weather\(\) AS weather/);
 assert.match(pipeline, /CREATE TABLE IF NOT EXISTS public\.encounter_scene_registry/);
@@ -260,7 +260,7 @@ assert.match(weatherWorker, /hourlyUpdate/);
 assert.match(weatherWorker, /task==="weekly_sync"/);
 assert.match(weatherWorker, /task==="hourly_update"/);
 assert.match(weatherWorker, /precipitation_probability/);
-assert.match(weatherWorker, /open-meteo\\.com/);
+assert.match(weatherWorker, /open-meteo\.com/);
 assert.doesNotMatch(weatherWorker, /CWA_OPEN_DATA_API_KEY|createEncounterWeather|poyozz_fictional_seasonal/);
 assert.doesNotMatch(weatherWorker, /reserve_chat_turn|settle_chat_turn/);
 assert.doesNotMatch(pipeline, /SELECT public\.schedule_encounter_schedule_organizer\(true\)/,
