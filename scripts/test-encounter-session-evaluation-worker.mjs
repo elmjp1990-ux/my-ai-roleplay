@@ -147,5 +147,8 @@ const emptyEncounterMigration = fs.readFileSync("supabase/migrations/20261123140
 assert.match(emptyEncounterMigration, /l\.turn_count=0/);
 assert.match(emptyEncounterMigration, /status='cancelled'/);
 assert.match(emptyEncounterMigration, /no_interaction/);
+assert.match(emptyEncounterMigration, /v_relationship_stage:='stranger'/);
+assert.match(emptyEncounterMigration, /v_stage := 'stranger'/);
+assert.match(emptyEncounterMigration, /encounter_session_relationship_seed_anchor_missing/);
 assert.doesNotMatch(worker, /affinity_delta.*整場相遇|relationship_stage.*八種階段/);
 console.log("Encounter session evaluator summary/memory parser, lifecycle gates, manual end, wallet isolation, and opt-in worker schedule contracts passed.");
