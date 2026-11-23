@@ -5552,7 +5552,7 @@ async function hydratePublicCharacterDetailMetadata(characterId) {
     publicCharacterDetailMetadataLoaded.add(characterId);
     persist();
   })().catch(error=>{
-    console.warn('角色開場白延遲載入失敗：',error?.message||error);
+    console.warn('角色詳細資料延遲載入失敗：',error?.message||error);
   });
   publicCharacterDetailMetadataInflight.set(characterId,request);
   try{return await request;}finally{
@@ -5895,7 +5895,7 @@ async function loadCloudComments(characterId,{force=false,loadMore=false}={}) {
       if(pageResult.error)throw pageResult.error;
       safeRows=Array.isArray(pageResult.data)?pageResult.data:[];
     }
-    // The SECURITY DEFINER page RPC preserves owner/public, NSFW and whisper-ancestry checks.
+    // Both safe RPCs preserve owner/public, NSFW and whisper-ancestry checks.
     const profileIds=[...new Set(safeRows.map(row=>row.author_id).filter(Boolean))];
     if(profileIds.length){
       const {data:profiles,error:profilesError}=await client.from('public_profiles')
