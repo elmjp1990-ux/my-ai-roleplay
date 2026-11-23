@@ -92,6 +92,8 @@ const frontend = fs.readFileSync("index.html", "utf8");
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 assert.match(encounterSceneCss, /encounter-dialogue-text em/);
 assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
+assert.match(frontend, /event\.key!=='Enter'&&event\.key!==' '/);
+assert.match(frontend, /event\.target\?\.closest\?\.\('\.encounter-dialogue-replay'\)/);
 assert.match(frontend, /encounterMetadataSaved = s\.encounterMode === true && result\.encounter\?\.sessionMetadataSynced === true/);
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sharedRelationshipLabels = "hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'";
