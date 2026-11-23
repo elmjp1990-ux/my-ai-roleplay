@@ -32,8 +32,10 @@ assert.match(encounterScene, /background:transparent!important/);
 assert.match(encounterScene, /image\.onerror=\(\)=>\{[\s\S]*?encounter-auto-bg-fallback/,
   "Portrait backdrop processing must gracefully mark cross-origin or canvas failures");
 assert.match(html, /data-action="encounter-temporary-leave"/);
-assert.match(html, /data-action="encounter-end-prompt"/);
+assert.doesNotMatch(html, /data-action="encounter-end-prompt"/);
 assert.match(html, /data-action="encounter-end-confirm"/);
+assert.match(encounterScene, /left:50%!important;right:auto!important;transform:translateX\(-50%\)!important/);
+assert.doesNotMatch(encounterScene, /\.encounter-character-sprite\{[^}]*right:-2%/);
 assert.match(html, /function conversationTypingIndicatorHTML/);
 assert.match(html, /activeTurnInFlight\)\$\('messages'\)\.insertAdjacentHTML\('beforeend',conversationTypingIndicatorHTML\(\)\)/);
 assert.match(html, /function conversationSuggestionsHTML/);
