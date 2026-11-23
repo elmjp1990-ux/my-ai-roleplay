@@ -5709,7 +5709,6 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
           <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
-           ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
 ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
             : `<div class="row wrap" data-character-actions>
@@ -5718,6 +5717,7 @@ ${offline
                 <button data-action="favorite" data-id="${e(c.id)}">${state.favorites.includes(c.id) ? '♥ 已喜愛' : '♡ 喜愛'}</button>
                 <button data-action="report" data-kind="角色" data-id="${e(c.id)}">⚑ 檢舉</button>
               </div>`}
+          ${c.isNSFW === true ? '<div class="nsfw-card-badge nsfw-detail-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
         </section>
       </div>
       ${offline || route.page === 'session-detail' ? '' : `<section class="panel">
