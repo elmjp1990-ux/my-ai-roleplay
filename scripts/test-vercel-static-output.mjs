@@ -49,6 +49,17 @@ assert.ok(!fs.existsSync(staleSentinel), 'Build must remove stale files from the
 const actualFiles = fs.readdirSync(outputDir).sort();
 assert.deepEqual(actualFiles, expectedFiles, 'Vercel output must contain only the runtime allowlist.');
 
+// Guard the deployed fixed city map against stale/incomplete scene catalogs.
+const cityMapSource = fs.readFileSync(path.join(outputDir, 'city-map.js'), 'utf8');
+const fixedCitySceneKeys = [
+  'waterfront', 'commercial', 'airport', 'university', 'park', 'shopping-street',
+  'department-store', 'hospital', 'night-bar', 'live-house', 'luxury-apartment',
+  'apartment', 'convenience-store', 'private-club',
+];
+const emittedCitySceneKeys = [...cityMapSource.matchAll(/data-place=["']([^"']+)["']/g)].map((match) => match[1]);
+assert.deepEqual(emittedCitySceneKeys, fixedCitySceneKeys,
+  'Vercel output city map must contain all 14 fixed scene markers in A–N order.');
+
 let totalBytes = 0;
 for (const [file, maxBytes] of Object.entries(fileBudgets)) {
   const filePath = path.join(outputDir, file);
