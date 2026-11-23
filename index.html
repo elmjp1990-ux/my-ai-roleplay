@@ -14328,5 +14328,8 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
 </style>
 <script src="./chat-keyboard-viewport.js"></script>
 
+<script>
+document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const target=event.target?.closest?.('.encounter-dialogue-beat');if(!target||event.target?.closest?.('.encounter-dialogue-replay'))return;event.preventDefault();target.click();});
+</script>
 </body>
 </html>
