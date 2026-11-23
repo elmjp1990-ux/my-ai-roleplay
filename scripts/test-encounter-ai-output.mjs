@@ -87,6 +87,10 @@ assert.match(endpoint, /不得輸出總好感度或關係階段/);
 assert.match(endpoint, /恰好三則玩家下一步建議回覆/);
 assert.match(endpoint, /suggestedReplies\.length > 0/);
 assert.match(endpoint, /sessionMetadataSynced/);
+assert.match(endpoint, /select\("updated_at"\)\.maybeSingle\(\)/,
+  "Encounter settlement must return the database version after its own session metadata update");
+assert.match(endpoint, /sessionUpdatedAt/,
+  "Encounter response must include the confirmed session version for the next client save");
 
 const frontend = fs.readFileSync("index.html", "utf8");
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
@@ -95,6 +99,8 @@ assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
 assert.match(frontend, /event\.key!=='Enter'&&event\.key!==' '/);
 assert.match(frontend, /event\.target\?\.closest\?\.\('\.encounter-dialogue-replay'\)/);
 assert.match(frontend, /encounterMetadataSaved = s\.encounterMode === true && result\.encounter\?\.sessionMetadataSynced === true/);
+assert.match(frontend, /s\.cloudUpdatedAt=encounterSessionUpdatedAt/,
+  "The client must adopt the version returned by Encounter metadata sync before saving the next turn");
 const scene = fs.readFileSync("encounter-scene.js", "utf8");
 const sharedRelationshipLabels = "hostile:'敵對',dislike:'反感',wary:'戒備',first_meeting:'初次見面',acquaintance:'熟識',close:'親近',intimate:'親密',special:'特殊羈絆'";
 assert.ok(frontend.includes(sharedRelationshipLabels), "All UI surfaces must use the canonical eight relationship labels");
