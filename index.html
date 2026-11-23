@@ -6690,7 +6690,7 @@ function showEncounterLeaveDialog(session) {
     '<p class="small muted">選擇暫時離開，或結束這次相遇並整理相遇日記。</p>'+
     '<div class="stack" style="gap:10px;margin-top:14px">'+
     '<button type="button" class="profile-setting" data-action="encounter-temporary-leave" data-id="'+e(session.id)+'"><span><strong>暫時離開</strong><small>保留今天同一地標的相遇，稍後可以接續。</small></span><span>›</span></button>'+
-    '<button type="button" class="profile-setting" data-action="encounter-end-prompt" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
+    '<button type="button" class="profile-setting" data-action="encounter-end-confirm" data-id="'+e(session.id)+'"><span><strong>結束相遇</strong><small>結束本次相遇，整理好感度與相遇日記。</small></span><span>›</span></button>'+
     '</div>');
 }
 
@@ -11541,13 +11541,27 @@ document.addEventListener('click',async event => {
         }
         $('modal')?.close();hideList=false;go({page:'citymap'});break;
       }
-      case 'encounter-end-prompt': {
-        const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
-        showDialog('結束相遇','<p>結束後將整理好感度與相遇日記，今天無法續談。</p><div class="row" style="justify-content:flex-end"><button data-action="encounter-dialog-dismiss">取消</button><button class="primary" data-action="encounter-end-confirm" data-id="'+e(session.id)+'">確定結束</button></div>');break;
-      }
       case 'encounter-end-confirm': {
         const session=state.sessions[key]||currentSession();if(!session?.encounterMode)break;
         const messages=session.messages||[];
+        if(messages.length===0){
+          try{
+            const lifecycle=await setEncounterLifecycleState(session.id,'end');
+            delete state.sessions[session.id];
+            if(!persist()){
+              state.sessions[session.id]=session;
+              throw new Error('本機聊天狀態無法保存。');
+            }
+            $('modal')?.close();hideList=false;go({page:'citymap'});
+            toast(lifecycle?.status==='cancelled'
+              ? '本次相遇已結束；因沒有互動，未建立好感度或相遇日記。'
+              : '本次相遇已結束，系統正在確認互動紀錄。');
+          }catch(error){
+            console.error('空白相遇結束失敗：',error);
+            toast(error?.message||'結束相遇失敗，請稍後再試。');
+          }
+          break;
+        }
         const lastCharacter=messages.filter(m=>m.role!=='user'&&String(m.text||m.content||'').trim()).slice(-1)[0];
         const isEncounterSystemMessage=message=>['[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','（請接續目前的故事。）'].includes(String(message?.text||message?.content||'').trim());
          const lastUser=messages.filter(m=>m.role==='user'&&String(m.text||m.content||'').trim()&&!isEncounterSystemMessage(m)).slice(-1)[0];
