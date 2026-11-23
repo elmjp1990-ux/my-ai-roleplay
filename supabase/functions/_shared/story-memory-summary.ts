@@ -160,9 +160,11 @@ export async function processDueStoryMemorySummary(
   for (let candidate = 1; candidate <= eligibleBatchCount; candidate++) {
     const found = rows.find((item: DbRow) => Number(item.batch_number) === candidate) || null;
     if (found?.status === "completed") {
-      if (normalizeStoryMemorySummaryText(found.summary)) continue;
-      // Older workers could mark an empty summary completed. Reclaim only that
-      // exact empty row so the five-turn batch can be regenerated safely.
+      const existingSummary = str(found.summary);
+      const existingSummaryLength = Array.from(existingSummary).length;
+      if (existingSummaryLength >= 30 && existingSummaryLength <= 100 && normalizeStoryMemorySummaryText(existingSummary)) continue;
+      // Reclaim completed summaries outside the current 30–100 character contract.
+      // The next turn regenerates this exact five-turn batch using the current prompt.
       const { data: released, error: releaseError } = await admin
         .from("ai_model_usage")
         .update({ status: "failed", processed_at: new Date().toISOString() })
@@ -407,8 +409,21 @@ export async function processDueGroupMemorySummary(
   let existingBatch: DbRow | null = null;
   for (let candidate = 1; candidate <= eligibleBatchCount; candidate++) {
     const found = rows.find((item: DbRow) => Number(item.batch_number) === candidate) || null;
-    if (found?.status === "completed") continue;
-    if (found?.status === "processing") {
+    if (found?.status === "completed") {
+      const existingSummary = str(found.summary);
+      const existingSummaryLength = Array.from(existingSummary).length;
+      if (existingSummaryLength >= 30 && existingSummaryLength <= 100 && normalizeStoryMemorySummaryText(existingSummary)) continue;
+      // Reclaim older completed summaries outside the current 30–100 character contract.
+      const { data: released, error: releaseError } = await admin
+        .from("chat_group_memory_summaries")
+        .update({ status: "failed", processed_at: new Date().toISOString() })
+        .eq("id", str(found.id))
+        .eq("status", "completed")
+        .select("id")
+        .maybeSingle();
+      if (releaseError || !released) return;
+      existingBatch = { ...found, status: "failed" };
+    } else if (found?.status === "processing") {
       const createdAt = Date.parse(str(found.created_at));
       if (!Number.isFinite(createdAt) || Date.now() - createdAt < 120_000) return;
       const { data: released, error: releaseError } = await admin
