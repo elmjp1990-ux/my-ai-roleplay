@@ -7978,10 +7978,10 @@ async function loadEncounterMemoryPage(list,session,pager){
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇日記。');
-    const pageSize=window.PoyozzListPagination.pageSize('encounterMemories');
+    const pageSize=10; // Diary pages are always ten encounter records.
     const pageStart=pager.offset;
     let sessionQuery=client.from('chat_sessions')
-      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_place:session_data->>encounterPlace,encounter_summary:session_data->>encounterSummary,last_message_preview:session_data->>lastMessagePreview')
+      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_ended_at:session_data->>encounterEndedAt,encounter_ended:session_data->>ended,encounter_place:session_data->>encounterPlace,encounter_summary:session_data->>encounterSummary,last_message_preview:session_data->>lastMessagePreview')
       .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
       .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
       .order('updated_at',{ascending:false}).order('id',{ascending:false})
@@ -8005,7 +8005,7 @@ async function loadEncounterMemoryPage(list,session,pager){
         if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
       }
     }
-    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||diaryBySession.has(row.id));
+    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||!!row.encounter_ended_at||row.encounter_ended==='true'||diaryBySession.has(row.id));
     const cards=[];
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
     for(const sessionRow of completedSessions){
@@ -8160,9 +8160,9 @@ async function openEncounterMemoryDetail(button){
     let messageCursor=null;
     if(isUuid(sessionId)){
       const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
-        .select('id,user_id,character_id,chat_mode').eq('id',sessionId)
+        .select('id,user_id,character_id,chat_mode,encounter_mode:session_data->>encounterMode').eq('id',sessionId)
         .eq('user_id',uid).eq('character_id',session.characterId)
-        .eq('chat_mode','encounter').maybeSingle();
+        .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true').maybeSingle();
       if(sessionError)throw sessionError;
       if(ownedSession){
         const pageSize=10;
@@ -10219,6 +10219,7 @@ async function loadEncounterScheduleTestTools(){
       if(profileError||!profileData)throw profileError||new Error('profile_status_unavailable');
       profileReady=profileData.profile_ready===true;
       profileTargetAvailable=!!profileData.next_character_id;
+      if(profileButton)profileButton.dataset.profileCharacterId=String(profileData.next_character_id||'');
       profileJobStatus=String(profileData.profile_job_status||'missing');
       profileTargetName=String(profileData.next_character_name||'角色');
       profileAvailableAt=profileData.profile_available_at?new Date(profileData.profile_available_at).getTime():0;
@@ -10230,7 +10231,7 @@ async function loadEncounterScheduleTestTools(){
           :profileJobStatus==='processing'
             ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
             :profileJobStatus==='failed'
-              ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。保留失敗紀錄，不會自動重試。'
+              ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。失敗紀錄已保留；可手動重試（若前次 AI 實際完成，可能產生重複服務成本）。'
               :profileWaiting
                 ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
                 :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
@@ -10238,8 +10239,10 @@ async function loadEncounterScheduleTestTools(){
         ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
         :'';
       if(profileButton){
-        const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing'&&profileJobStatus!=='failed';
+        const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing';
         profileButton.dataset.aiEnabled=enabled?'true':'false';
+        profileButton.dataset.profileRetry=profileJobStatus==='failed'?'true':'false';
+        profileButton.textContent=profileJobStatus==='failed'?'手動重試 AI 整理':'AI 整理下一位角色資料';
         profileButton.disabled=!enabled;
       }
     }catch(profileError){
@@ -10315,11 +10318,22 @@ document.addEventListener('click',async event=>{
   if(profileButton){
     event.preventDefault();
     if(profileButton.dataset.aiEnabled!=='true'||profileButton.disabled)return;
-    if(!window.confirm('將使用 AI 整理目前下一位待生成行程角色的資料，會產生模型服務成本，但不扣玩家銀幣或鑽石。每次只處理一位；完成後先檢查結果，再決定是否執行行程生成。要繼續嗎？'))return;
+    const retryFailed=profileButton.dataset.profileRetry==='true';
+    const confirmMessage=retryFailed
+      ?'上次 AI 整理結果不確定（provider_outcome_unknown）。再次執行可能造成前次已完成的模型請求重複計費。是否明確重新整理目前角色？不扣玩家銀幣或鑽石。'
+      :'將使用 AI 整理目前下一位待生成行程角色的資料，會產生模型服務成本，但不扣玩家銀幣或鑽石。每次只處理一位；完成後先檢查結果，再決定是否執行行程生成。要繼續嗎？';
+    if(!window.confirm(confirmMessage))return;
     profileButton.disabled=true;
     const profileStatus=document.getElementById('characterProfileTestStatus');
-    if(profileStatus)profileStatus.textContent='正在整理下一位角色資料，請稍候…';
+    if(profileStatus)profileStatus.textContent=retryFailed?'正在明確重新排入失敗角色並重新整理…':'正在整理下一位角色資料，請稍候…';
     try{
+      if(retryFailed){
+        const characterId=String(profileButton.dataset.profileCharacterId||'');
+        if(!characterId)throw new Error('profile_retry_character_missing');
+        const {data:enqueueData,error:enqueueError}=await window.mySupabase.rpc('enqueue_character_profile_organization',{p_character_id:characterId});
+        if(enqueueError)throw enqueueError;
+        if(!enqueueData||!['pending','processing','completed'].includes(String(enqueueData.status||'')))throw new Error('profile_retry_enqueue_not_confirmed');
+      }
       const {data,error}=await window.mySupabase.functions.invoke('character-profile-organization-worker',{body:{mode:'manual'}});
       if(error)throw error;
       if(data?.status==='completed'){
