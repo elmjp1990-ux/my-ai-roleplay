@@ -113,6 +113,8 @@ BEGIN
 END;
 $legacy_cron$;
 
+DROP FUNCTION IF EXISTS public.schedule_encounter_weather_sync(boolean);
+
 CREATE OR REPLACE FUNCTION public.schedule_encounter_weather_hourly_update(p_enabled boolean DEFAULT false)
 RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path = ''
 AS $$ SELECT public.schedule_encounter_worker('weather_hourly_update',p_enabled); $$;
