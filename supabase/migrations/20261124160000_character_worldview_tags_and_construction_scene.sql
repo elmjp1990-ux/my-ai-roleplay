@@ -91,23 +91,8 @@ BEGIN
 END;
 $trigger_function$;
 
--- Re-queue only active AI schedules that used the generic "工地" label.
--- The Edge Function must be deployed before this migration is applied.
-DO $requeue$
-DECLARE
-  v_character_id uuid;
-BEGIN
-  FOR v_character_id IN
-    SELECT DISTINCT character_id
-    FROM public.character_schedules
-    WHERE source_type = 'ai'
-      AND is_active IS TRUE
-      AND location_description LIKE '%工地%'
-  LOOP
-    PERFORM public.enqueue_encounter_schedule_generation_internal(v_character_id);
-  END LOOP;
-END;
-$requeue$;
+-- Existing schedule rows are retained in place. Construction wording and scene
+-- resolution are repaired without re-queuing characters or calling an AI provider.
 
 -- A worldview change must refresh the source hash and enqueue a new schedule.
 DROP TRIGGER IF EXISTS characters_enqueue_encounter_schedule_ai ON public.characters;
