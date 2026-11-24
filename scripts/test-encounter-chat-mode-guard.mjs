@@ -497,6 +497,8 @@ assert.deepEqual(
   "Encounter narration must appear as its own beat before the character's spoken dialogue",
 );
 assert.match(encounterHistory, /loadCloudHistory/);
+assert.match(encounterHistory, /const previewText=s=>clean\(s\?\.lastMessagePreview\|\|s\?\.encounterSummary/);
+assert.match(encounterHistory, /g\.PoyozzEncounterHistory=Object\.freeze\(\{renderHistory,loadCloudHistory,openHistory,previewText\}\)/);
 assert.match(encounterHistory, /const N=10/);
 assert.match(encounterHistory, /range\(offset,offset\+N-1\)/);
 assert.match(encounterHistory, /session_data->>encounterMode/);
