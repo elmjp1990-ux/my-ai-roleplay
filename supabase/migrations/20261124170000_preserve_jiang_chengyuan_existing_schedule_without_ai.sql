@@ -45,6 +45,26 @@ BEGIN
     AND location_description = '工地'
     AND is_outdoor IS FALSE;
 
+  -- Reuse existing city scenes for the character's known studio, office, and home.
+  -- Keep the authored location labels and activities unchanged.
+  UPDATE public.character_schedules
+  SET location_key = 'commercial',
+      updated_at = pg_catalog.now()
+  WHERE character_id = v_character_id
+    AND source_type = 'ai'
+    AND is_active IS TRUE
+    AND location_key IS NULL
+    AND location_description IN ('事務所', '工作室');
+
+  UPDATE public.character_schedules
+  SET location_key = 'apartment',
+      updated_at = pg_catalog.now()
+  WHERE character_id = v_character_id
+    AND source_type = 'ai'
+    AND is_active IS TRUE
+    AND location_key IS NULL
+    AND location_description = '你家';
+
   -- The nearby lunch stop already resolves to shopping-street and is untouched.
   -- Cancel only the zero-attempt requeue; future real source edits can enqueue again.
   UPDATE public.encounter_schedule_generation_jobs
