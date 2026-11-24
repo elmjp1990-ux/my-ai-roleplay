@@ -7960,10 +7960,9 @@ function loadEncounterMemoryList(panel,session){
   const uid=currentUser()?.uid;
   if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇日記。</div>';return;}
   const pager=window.PoyozzListPagination.createState('encounterMemories');
-  // Legacy diary rows have no chat_sessions row; start their independent cursor on page one.
-  pager.legacyHasMore=true;
-  pager.legacyOffset=0;
-  pager.buffer=[];
+  // Both Encounter views use the same session query and player-message eligibility rules.
+  pager.historyPerson={id:session.characterId,encounterHistoryCloud:[],encounterHistoryOffset:0,encounterHistoryHasMore:true};
+  pager.renderedCount=0;
   list._encounterPager=pager;
   if(!list.dataset.paginationBound){
     list.dataset.paginationBound='true';
@@ -7976,84 +7975,36 @@ function loadEncounterMemoryList(panel,session){
   void loadEncounterMemoryPage(list,session,pager);
 }
 async function loadEncounterMemoryPage(list,session,pager){
-  if(!list?.isConnected||pager.loading||(!pager.hasMore&&!pager.buffer?.length))return;
+  if(!list?.isConnected||pager.loading||(!pager.hasMore&&pager.renderedCount>0))return;
   const client=window.mySupabase,uid=currentUser()?.uid;
   if(!client||!uid||session?.cloudOwnerUid!==uid)return;
   pager.loading=true;
   try{
-    const {data:{user},error:authError}=await client.auth.getUser();
-    if(authError||!user||user.id!==uid||currentUser()?.uid!==uid)throw new Error('登入狀態已失效，請重新登入後查看相遇日記。');
-    const pageSize=10; // Diary pages are always ten encounter records.
-    const pageStart=pager.offset;
-    let sessionQuery=client.from('chat_sessions')
-      .select('id,chat_mode,updated_at,encounter_mode:session_data->>encounterMode,encounter_day:session_data->>encounterDay,encounter_archived:session_data->>archived,encounter_ended_at:session_data->>encounterEndedAt,encounter_ended:session_data->>ended,encounter_place:session_data->>encounterPlace,encounter_summary:session_data->>encounterSummary,last_message_preview:session_data->>lastMessagePreview')
-      .eq('user_id',uid).eq('character_id',session.characterId).is('deleted_at',null)
-      .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')
-      .order('updated_at',{ascending:false}).order('id',{ascending:false})
-      .range(pageStart,pageStart+pageSize-1);
-    const {data:sessionRows,error:sessionError}=await sessionQuery;
-    if(sessionError)throw sessionError;
+    const historyApi=window.PoyozzEncounterHistory;
+    if(!historyApi?.loadCloudHistory)throw new Error('相遇紀錄模組尚未載入，請稍後重試。');
+    const person=pager.historyPerson;
+    const append=person.encounterHistoryLoaded===true;
+    await historyApi.loadCloudHistory(person,currentUser,client,{append});
     if(!list.isConnected||currentUser()?.uid!==uid)return;
-    const rows=sessionRows||[];
-    const sessionIds=rows.map(row=>row.id).filter(isUuid);
-    const diaryBySession=new Map();
-    if(sessionIds.length){
-      const {data:diaryRows,error:diaryError}=await client.from('encounter_diary')
-        .select('id,event_type,summary,occurred_at,session_id:metadata->>session_id')
-        .eq('user_id',uid).eq('character_id',session.characterId)
-        .in('metadata->>session_id',sessionIds)
-        .order('occurred_at',{ascending:false}).limit(pageSize);
-      if(diaryError)throw diaryError;
-      for(const row of diaryRows||[]){
-        const rawId=row.session_id;
-        if(!isUuid(rawId))continue;
-        if(!diaryBySession.has(rawId))diaryBySession.set(rawId,row);
-      }
-    }
-    const completedSessions=rows.filter(row=>row.encounter_archived==='true'||!!row.encounter_ended_at||row.encounter_ended==='true'||diaryBySession.has(row.id));
-    const cards=[];
+    const records=person.encounterHistoryCloud||[];
+    const newRecords=records.slice(pager.renderedCount);
     const placeNames={airport:'機場',commercial:'商業大樓','night-bar':'夜間酒吧','live-house':'Live House／音樂酒吧',apartment:'308 公寓','department-store':'百貨公司',bookstore:'書店',cafe:'咖啡廳',park:'中央公園','shopping-street':'商店街','night-market':'夜市',restaurant:'餐廳',university:'大學',hospital:'醫院',gym:'健身房',cinema:'電影院',museum:'博物館',hotel:'飯店','train-station':'車站',library:'圖書館',theater:'劇院','art-gallery':'藝廊','community-center':'社區中心','music-studio':'音樂工作室',bakery:'麵包店','coworking-space':'共享辦公室'};
-    for(const sessionRow of completedSessions){
-      const newest=diaryBySession.get(sessionRow.id);
-      const preview=String(newest?.summary||sessionRow.encounter_summary||sessionRow.last_message_preview||'這次相遇留下了一段回憶。').slice(0,180);
-      const at=newest?.occurred_at||sessionRow.updated_at;
-      const date=new Date(at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-      const rawPlace=typeof sessionRow.encounter_place==='string'?sessionRow.encounter_place:'';
-      const place=rawPlace?(placeNames[rawPlace]||rawPlace):'地點資料未保存';
-      cards.push({at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(sessionRow.id)+'" data-memory-id="'+e(newest?.id||'')+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">相遇紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>'});
-    }
-    // Preserve legacy diary rows without session_id, using their own bounded cursor.
-    let legacyCount=0;
-    if(pager.legacyHasMore){
-      const {data:legacyRows,error:legacyError}=await client.from('encounter_diary')
-        .select('id,summary,occurred_at')
-        .eq('user_id',uid).eq('character_id',session.characterId)
-        .is('metadata->>session_id',null)
-        .order('occurred_at',{ascending:false}).order('id',{ascending:false})
-        .range(pager.legacyOffset,pager.legacyOffset+pageSize-1);
-      if(legacyError)throw legacyError;
-      legacyCount=(legacyRows||[]).length;
-      for(const row of legacyRows||[]){
-        const date=new Date(row.occurred_at||Date.now()).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
-        const preview=String(row.summary||'這次相遇留下了一段回憶。').slice(0,180);
-        cards.push({at:row.occurred_at,html:'<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="" data-memory-id="'+e(row.id)+'" data-place="地點資料未保存"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">舊版回憶</span></span><span class="small muted encounter-memory-place">📍 地點資料未保存</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=180?'…':'')+'</p><span class="small muted">點擊查看完整回憶　›</span></button>'});
-      }
-    }
-    pager.offset=pageStart+rows.length;
-    pager.hasMore=rows.length===pageSize;
-    pager.legacyOffset+=legacyCount;
-    pager.legacyHasMore=legacyCount===pageSize;
-    pager.hasMore=pager.hasMore||pager.legacyHasMore;
-    const combinedCards=[...(pager.buffer||[]),...cards].sort((a,b)=>new Date(b.at||0)-new Date(a.at||0));
-    const visibleCards=combinedCards.slice(0,pageSize);
-    pager.buffer=combinedCards.slice(pageSize);
-    const markup=visibleCards.map(item=>item.html).join('');
+    const cards=newRecords.map(record=>{
+      const at=record.startedAt||Date.now();
+      const date=new Date(at).toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const place=record.encounterPlace?(placeNames[record.encounterPlace]||record.encounterPlace):'地點資料未保存';
+      const preview=historyApi.previewText(record);
+      return '<button type="button" class="archive-card encounter-memory-card" data-action="encounter-memory-open" data-id="'+e(record.id)+'" data-place="'+e(place)+'"><span class="row between" style="gap:8px"><strong>相遇 · '+e(date)+'</strong><span class="small muted">相遇紀錄</span></span><span class="small muted encounter-memory-place">📍 '+e(place)+'</span><p class="encounter-memory-excerpt">'+e(preview)+(preview.length>=50?'…':'')+'</p><span class="small muted">點擊查看完整對話　›</span></button>';
+    });
+    pager.renderedCount=records.length;
+    pager.hasMore=person.encounterHistoryHasMore===true;
+    const markup=cards.join('');
     const empty=list.querySelector('.empty');
     if(empty)empty.remove();
     if(markup)list.insertAdjacentHTML('beforeend',markup);
     list.querySelector('[data-encounter-memory-sentinel]')?.remove();
     pager.observer?.disconnect();
-    if(pager.hasMore||pager.buffer.length){
+    if(pager.hasMore){
       const sentinel=document.createElement('div');
       sentinel.dataset.encounterMemorySentinel='true';
       sentinel.className='small muted';
@@ -8062,8 +8013,8 @@ async function loadEncounterMemoryPage(list,session,pager){
       list.appendChild(sentinel);
       pager.observer=window.PoyozzListPagination.observeEnd(sentinel,()=>void loadEncounterMemoryPage(list,session,pager));
     }
-    if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore&&!pager.buffer.length){
-      list.innerHTML='<div class="empty"><p>這裡收藏你與'+e(sessionCharacter(session)?.name||'角色')+'的過往相遇</p><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，系統會自動保存回憶。</p></div>';
+    if(!list.querySelector('.encounter-memory-card')&&!pager.hasMore){
+      list.innerHTML='<div class="empty"><p>這裡收藏你與'+e(sessionCharacter(session)?.name||'角色')+'的過往相遇</p><strong>你們的相遇，正等待被收藏</strong><p>完成相遇對話後，紀錄會同步顯示於相遇日記與相遇紀錄。</p></div>';
     }
   }catch(error){
     console.error('載入相遇日記失敗：',error);
