@@ -78,8 +78,8 @@ assert.ok(rawOutputSoftHideMigration.includes("REVOKE DELETE ON TABLE public.enc
 assert.match(rawOutputSoftHideReplay, /encounter_schedule_output_physical_delete_still_granted/);
 assert.match(worker, /repairableJobByCharacter/);
 assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/);
-assert.match(worker, /job\.status !== "failed"/,
-  "Publishing remains restricted to failed jobs even though reconciliation drafts are visible");
+assert.match(worker, /!\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/,
+  "Publishing may resume from reconciliation only after the guarded DB claim");
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputIdByCharacter\.get\(item\.sourceId\)[\s\S]*?"completed"/);
 
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputId/);
