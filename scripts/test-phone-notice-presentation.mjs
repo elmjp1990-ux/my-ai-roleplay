@@ -124,10 +124,12 @@ assert.ok(!chatEntriesBlock.includes('last?.at'), 'Chat list must not reference 
 
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
-const editorStart = html.indexOf('function normalizePhoneNoticeRows');
-const editorEnd = html.indexOf('function saveEditorDraft()', editorStart);
-assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Structured author phone editor helpers must exist');
-const editorHelpers = html.slice(editorStart, editorEnd);
+const cityMap = fs.readFileSync('city-map.js', 'utf8');
+const editorStart = cityMap.indexOf('const normalizePhoneNoticeRows');
+const editorEnd = cityMap.indexOf('const editorCharacterFingerprint', editorStart);
+assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Shared phone normalization helpers must exist in the extracted city-map module');
+const editorHelpers = cityMap.slice(editorStart, editorEnd) +
+  html.slice(html.indexOf('function renderPhoneSettingsFields'), html.indexOf('function saveEditorDraft()'));
 assert.match(editorHelpers, /source\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
