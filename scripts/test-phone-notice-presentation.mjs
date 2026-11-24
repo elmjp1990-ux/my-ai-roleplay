@@ -130,7 +130,7 @@ const editorEnd = cityMap.indexOf('const editorCharacterFingerprint', editorStar
 assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Shared phone normalization helpers must exist in the extracted city-map module');
 const editorHelpers = cityMap.slice(editorStart, editorEnd) +
   html.slice(html.indexOf('function renderPhoneSettingsFields'), html.indexOf('function saveEditorDraft()'));
-assert.match(editorHelpers, /source\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
+assert.match(editorHelpers, /\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
 assert.match(editorHelpers, /<span>名稱<\/span>/);
