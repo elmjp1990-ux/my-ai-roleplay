@@ -6321,13 +6321,15 @@ function clearEditorDraft() {
   try { localStorage.removeItem(key); } catch (_) {}
   try { sessionStorage.removeItem(key); } catch (_) {}
 }
-let editorCloudRefresh = { characterId:null, status:'idle', error:null, promise:null };
-function refreshOwnedCharacterForEditor(characterId) {
-  return window.PoyozzCityMap.refreshOwnedCharacterForEditor({
+const editorCloudRefreshController=window.PoyozzCityMap.createEditorCloudRefreshController({
+  refresh:characterId=>window.PoyozzCityMap.refreshOwnedCharacterForEditor({
     characterId,client:window.mySupabase,currentUser,getVerifiedAuthUser,state,
     normalizePersonalityProfile,normalizeCharacterTagsForRead,persist
-  });
-}
+  }),
+  isCurrent:characterId=>route.page==='editor'&&route.id===characterId,
+  onReady:refreshed=>{draftCharacter=clone(refreshed);render();},
+  onError:error=>{console.error('角色編輯器雲端資料刷新失敗：',error);render();}
+});
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = normalizeCharacterTagsForRead(c?.tags || []);
@@ -6342,24 +6344,7 @@ function startEditor(c = null) {
     ?{characterId:c.id,status:'loading',error:null,promise:null}
     :{characterId:null,status:'idle',error:null,promise:null};
   visit('editor',c?.id);
-  if(c?.id){
-    const characterId=c.id;
-    const promise=refreshOwnedCharacterForEditor(characterId);
-    editorCloudRefresh.promise=promise;
-    promise.then(refreshed=>{
-      draftCharacter=clone(refreshed);
-      if(route.page==='editor'&&route.id===characterId&&editorCloudRefresh.characterId===characterId){
-        editorCloudRefresh={characterId,status:'ready',error:null,promise:null};
-        render();
-      }
-    }).catch(error=>{
-      console.error('角色編輯器雲端資料刷新失敗：',error);
-      if(route.page==='editor'&&route.id===characterId&&editorCloudRefresh.characterId===characterId){
-        editorCloudRefresh={characterId,status:'error',error,promise:null};
-        render();
-      }
-    });
-  }
+  if(c?.id)editorCloudRefreshController.start(c.id);
 }
 async function hydrateCharacterIllustrationsIntoEditor(characterId) {
   const client=window.mySupabase;
@@ -6398,13 +6383,11 @@ function renderCharacterIllustrationGallery(items = []) {
 }
 
 function renderEditor() {
-  if(route.id&&editorCloudRefresh.characterId===route.id&&editorCloudRefresh.status==='loading'){
-    $('view').innerHTML='<div class="panel form-width"><h2>正在讀取角色雲端設定…</h2><p class="muted">為避免舊資料覆蓋已保存的內容，請稍候片刻。</p></div>';
-    return;
-  }
-  if(route.id&&editorCloudRefresh.characterId===route.id&&editorCloudRefresh.status==='error'){
-    $('view').innerHTML='<div class="panel form-width"><h2>角色設定暫時無法載入</h2><p class="muted">'+e(editorCloudRefresh.error?.message||'雲端資料讀取失敗')+'</p><button type="button" class="primary" data-action="retry-editor-cloud">重新讀取角色設定</button></div>';
-    return;
+  if(route.id){
+    const cloudState=editorCloudRefreshController.getState();
+    const cloudMarkup=cloudState.characterId===route.id
+      ?window.PoyozzCityMap.renderEditorCloudStatus(cloudState,e):'';
+    if(cloudMarkup){$('view').innerHTML=cloudMarkup;return;}
   }
   let savedDraft = readEditorDraft();
   const original = state.characters.find(c => c.id === route.id) || draftCharacter || {};
@@ -12166,27 +12149,7 @@ document.addEventListener('click',async event => {
         if (owned(c)) startEditor(c);
         break;
       }
-      case 'retry-editor-cloud': {
-        const characterId=route.id;
-        if(!characterId||editorCloudRefresh.status==='loading')break;
-        editorCloudRefresh={characterId,status:'loading',error:null,promise:null};
-        render();
-        const promise=refreshOwnedCharacterForEditor(characterId);
-        editorCloudRefresh.promise=promise;
-        promise.then(refreshed=>{
-          draftCharacter=clone(refreshed);
-          if(route.page==='editor'&&route.id===characterId){
-            editorCloudRefresh={characterId,status:'ready',error:null,promise:null};
-            render();
-          }
-        }).catch(error=>{
-          if(route.page==='editor'&&route.id===characterId){
-            editorCloudRefresh={characterId,status:'error',error,promise:null};
-            render();
-          }
-        });
-        break;
-      }
+      case 'retry-editor-cloud': editorCloudRefreshController.start(route.id); break;
       case 'visibility': {
         const c = state.characters.find(c => c.id === key);
         if (!owned(c)) break;
