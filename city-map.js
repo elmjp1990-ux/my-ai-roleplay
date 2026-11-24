@@ -40,7 +40,25 @@
  cleanup();
  };
 
+ const WORLDVIEW_TAG_VALUES = new Set(["modern", "ancient", "fantasy"]);
+ const normalizeWorldviewTags = values => [...new Set((Array.isArray(values) ? values : []).filter(value => WORLDVIEW_TAG_VALUES.has(value)))];
+ const readWorldviewTags = formData => normalizeWorldviewTags(formData.getAll("worldviewTags"));
+ const renderWorldviewField = character => {
+   const selected = new Set(normalizeWorldviewTags(character?.worldviewTags));
+   return `<section class="memory-item stack" style="gap:8px">
+     <strong>這個角色的世界觀分類：</strong>
+     <small>可複選，若種族非人類，建議勾選奇幻搭配現代或古代世界觀分類</small>
+     <div style="display:flex;flex-direction:column;gap:9px">
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="modern" ${selected.has("modern") ? "checked" : ""}> 現代</label>
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="ancient" ${selected.has("ancient") ? "checked" : ""}> 古代</label>
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="fantasy" ${selected.has("fantasy") ? "checked" : ""}> 奇幻</label>
+     </div>
+   </section>`;
+ };
  global.PoyozzCityMap = Object.freeze({
+ normalizeWorldviewTags,
+ readWorldviewTags,
+ renderWorldviewField,
  destroy: destroyActiveMap,
  refreshScenes() {
  return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
@@ -89,6 +107,27 @@
  document.body.classList.add('city-map-mode');
  const view=$('view');
   view.innerHTML=`
+    <style id="poyozz-city-map-shared-primary-nav">
+body.city-map-mode .city-map-bottom .nav-btn{
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  gap:4px!important;min-width:0!important;padding:6px 1px!important;font-size:10px!important;line-height:1.2!important;
+  text-align:center!important;white-space:nowrap!important;background:transparent!important;border:1px solid transparent!important;
+  border-radius:10px!important;color:rgba(255,255,255,.88)!important;text-shadow:0 1px 8px rgba(5,10,24,.55)!important;
+  box-shadow:none!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn svg{width:20px!important;height:20px!important;filter:drop-shadow(0 1px 5px rgba(5,10,24,.42))}
+body.city-map-mode .city-map-bottom .nav-btn .nav-label{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:clip!important}
+body.city-map-mode .city-map-bottom .nav-btn.active,
+body.city-map-mode .city-map-bottom .nav-btn[aria-current="page"]{
+  background:linear-gradient(135deg,rgba(183,157,255,.24),rgba(255,178,210,.17))!important;
+  border-color:rgba(225,210,255,.3)!important;color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn:hover,
+body.city-map-mode .city-map-bottom .nav-btn:focus-visible{
+  background:rgba(255,255,255,.12)!important;border-color:rgba(255,255,255,.18)!important;color:#fff!important;
+}
+</style>
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
       <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
         <div class="city-map-river"></div>
