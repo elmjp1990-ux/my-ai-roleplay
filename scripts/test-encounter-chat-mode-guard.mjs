@@ -479,6 +479,13 @@ assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
 
 const encounterPresentation = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
+assert.ok(cityMap.includes("meetButton.textContent='正在建立相遇…'"),
+  "the city-map Encounter action must show immediate pending feedback");
+assert.ok(cityMap.includes("if(meetButton?.disabled)return"),
+  "the city-map Encounter action must reject duplicate clicks");
+assert.ok(encounterHistory.includes("等他發現你"),
+  "the discovery sentinel must be presented as 等他發現你 in Encounter history");
+
 const splitBeatsSource = encounterPresentation.slice(
   encounterPresentation.indexOf("const splitEncounterBeats="),
   encounterPresentation.indexOf("const encounterBeatMarkup="),
