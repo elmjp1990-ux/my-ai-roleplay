@@ -154,15 +154,24 @@
   return refreshed;
 }
  const createEditorCloudRefreshController = ({refresh,isCurrent,onReady,onError}) => {
-   let state={characterId:null,status:'idle',error:null,promise:null};
+   let state={characterId:null,status:'idle',error:null,promise:null,requestId:0};
+   let sequence=0;
    const getState=()=>state;
    const start=characterId=>{
-     if(!characterId||state.status==='loading'&&state.characterId===characterId)return;
-     state={characterId,status:'loading',error:null,promise:null};
+     if(!characterId)return;
+     const requestId=++sequence;
+     state={characterId,status:'loading',error:null,promise:null,requestId};
      const promise=Promise.resolve().then(()=>refresh(characterId));
      state.promise=promise;
-     promise.then(value=>{if(isCurrent(characterId)){state={characterId,status:'ready',error:null,promise:null};onReady(value);}})
-       .catch(error=>{if(isCurrent(characterId)){state={characterId,status:'error',error,promise:null};onError(error);}});
+     promise.then(value=>{
+       if(state.requestId===requestId&&isCurrent(characterId)){
+         state={characterId,status:'ready',error:null,promise:null,requestId};onReady(value);
+       }
+     }).catch(error=>{
+       if(state.requestId===requestId&&isCurrent(characterId)){
+         state={characterId,status:'error',error,promise:null,requestId};onError(error);
+       }
+     });
    };
    return {getState,start};
  };
