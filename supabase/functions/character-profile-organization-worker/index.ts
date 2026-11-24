@@ -225,6 +225,7 @@ async function generateProfile(
             requestId: response.headers.get("x-request-id"),
             usage: {},
             httpStatus: response.status,
+            responseContentType: response.headers.get("content-type") || "",
             requestTrace,
           });
         }
@@ -239,7 +240,7 @@ async function generateProfile(
       }
 
       let result: any;
-      let responseText: string;
+      let responseText = "";
       try {
         responseText = await readBoundedResponseText(response);
         await trace("body_received", provider, { body_length: responseText.length });
@@ -252,6 +253,9 @@ async function generateProfile(
             provider,
             requestId: response.headers.get("x-request-id"),
             usage: {},
+            httpStatus: response.status,
+            responseContentType: response.headers.get("content-type") || "",
+            requestTrace,
           });
         }
         throw new ProfileGenerationError("provider_outcome_unknown", {
@@ -282,6 +286,7 @@ async function generateProfile(
         "upstream_busy",
       ].some((code) => errorCode.includes(code));
       if (isExplicitOverload && provider === APPROVED_OPENROUTER_PROVIDERS[0]) {
+        await response.body?.cancel();
         continue;
       }
       if (result?.error != null) {
