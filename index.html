@@ -5174,6 +5174,7 @@ function chatNavUnreadBadge(){
 }
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
+    : route.page === 'citymap' ? 'home'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
