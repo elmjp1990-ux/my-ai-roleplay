@@ -55,10 +55,47 @@
      </div>
    </section>`;
  };
+ const editorCharacterFingerprint = character => {
+   const c = character || {};
+   const profile = c.personalityProfile || {};
+   const phone = c.phoneSettings || {};
+   const source = JSON.stringify([
+     String(c.name || ""), String(c.intro || ""), String(c.opening || ""),
+     String(c.privateInfo || ""), String(c.style || ""),
+     ["coreTraits", "values", "speechStyle", "behaviorRules", "boundaries", "relationshipPacing", "likes", "dislikes", "primaryIllustrationName"].map(key => String(profile[key] || "")),
+     (Array.isArray(phone.noticePrompts) ? phone.noticePrompts : Array.isArray(phone.notices) ? phone.notices : []).map(value => String(value))
+   ]);
+   let hash = 2166136261;
+   for (let index = 0; index < source.length; index++) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+   return (hash >>> 0).toString(16);
+ };
+ const reconcileEditorDraft = (character, draft) => {
+   const fingerprint = editorCharacterFingerprint(character);
+   if (draft.baseFingerprint) return { stale: draft.baseFingerprint !== fingerprint, draft, fingerprint };
+   const next = { ...draft };
+   for (const key of ["intro", "opening", "privateInfo", "style"]) {
+     if (!String(next[key] || "").trim() && String(character?.[key] || "").trim()) next[key] = character[key];
+   }
+   const originalProfile = character?.personalityProfile || {};
+   const draftProfile = next.personalityProfile || {};
+   const mergedProfile = { ...originalProfile, ...draftProfile };
+   for (const key of ["coreTraits", "values", "speechStyle", "behaviorRules", "boundaries", "relationshipPacing", "likes", "dislikes", "primaryIllustrationName"]) {
+     if (!String(draftProfile[key] || "").trim() && String(originalProfile[key] || "").trim()) mergedProfile[key] = originalProfile[key];
+   }
+   next.personalityProfile = mergedProfile;
+   const originalPrompts = Array.isArray(character?.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
+     : Array.isArray(character?.phoneSettings?.notices) ? character.phoneSettings.notices : [];
+   const draftPrompts = Array.isArray(next.phoneSettings?.noticePrompts) ? next.phoneSettings.noticePrompts : [];
+   if (!draftPrompts.length && originalPrompts.length) next.phoneSettings = character.phoneSettings;
+   next.baseFingerprint = fingerprint;
+   return { stale: false, draft: next, fingerprint };
+ };
  global.PoyozzCityMap = Object.freeze({
  normalizeWorldviewTags,
  readWorldviewTags,
  renderWorldviewField,
+ editorCharacterFingerprint,
+ reconcileEditorDraft,
  destroy: destroyActiveMap,
  refreshScenes() {
  return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
