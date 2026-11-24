@@ -341,7 +341,9 @@ assert.match(worldviewTagsMigration, /ADD COLUMN IF NOT EXISTS worldview_tags te
 assert.match(worldviewTagsMigration, /encounter_schedule_source_payload/);
 assert.match(worldviewTagsMigration, /worldview_tags/);
 assert.match(worldviewTagsMigration, /UPDATE OF[\s\S]*worldview_tags/);
-assert.match(worldviewTagsMigration, /enqueue_encounter_schedule_generation_internal/);
+assert.match(worldviewTagsMigration, /OR OLD\.worldview_tags IS DISTINCT FROM NEW\.worldview_tags/);
+assert.doesNotMatch(worldviewTagsMigration, /DO \$requeue\$|enqueue_encounter_schedule_generation_internal/,
+  "Adding worldview metadata must not requeue existing characters or incur AI generation costs");
 assert.match(generator, /worldviewTags\.length/);
 assert.match(generator, /Unknown legacy characters are no longer blocked/);
 assert.match(worker, /postPublishReviewCharacterIds/);
