@@ -9718,7 +9718,6 @@ async function renderPhoneModal() {
   // Author-configured phone fields are the primary rows for both single and group phones.
   // Current AI snapshots match by field_index; unmatched states and historical events follow.
 
-  // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const groupMemorySummaries=isGroup?await loadGroupMemorySummaries(group.id,true):[];
   const diaryList=isGroup?[]:(session.memories||[]);
   const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
