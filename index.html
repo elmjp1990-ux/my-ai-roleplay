@@ -1172,6 +1172,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./signed-url-manager.js"></script>
 <script src="./core-utils.js"></script>
 <script src="./city-map.js"></script>
+<script src="./character-editor-cloud.js"></script>
 <script src="./encounter-history.js"></script>
 <script src="./followed-authors.js"></script>
 <script src="./author-profile.js"></script>
@@ -6321,8 +6322,8 @@ function clearEditorDraft() {
   try { localStorage.removeItem(key); } catch (_) {}
   try { sessionStorage.removeItem(key); } catch (_) {}
 }
-const editorCloudRefreshController=window.PoyozzCityMap.createEditorCloudRefreshController({
-  refresh:characterId=>window.PoyozzCityMap.refreshOwnedCharacterForEditor({
+const editorCloudRefreshController=window.PoyozzCharacterEditorCloud.createEditorCloudRefreshController({
+  refresh:characterId=>window.PoyozzCharacterEditorCloud.refreshOwnedCharacterForEditor({
     characterId,client:window.mySupabase,currentUser,getVerifiedAuthUser,state,
     normalizePersonalityProfile,normalizeCharacterTagsForRead,persist
   }),
@@ -6383,7 +6384,7 @@ function renderEditor() {
   if(route.id){
     const cloudState=editorCloudRefreshController.getState();
     const cloudMarkup=cloudState.characterId===route.id
-      ?window.PoyozzCityMap.renderEditorCloudStatus(cloudState,e):'';
+      ?window.PoyozzCharacterEditorCloud.renderEditorCloudStatus(cloudState,e):'';
     if(cloudMarkup){$('view').innerHTML=cloudMarkup;return;}
   }
   let savedDraft = readEditorDraft();
