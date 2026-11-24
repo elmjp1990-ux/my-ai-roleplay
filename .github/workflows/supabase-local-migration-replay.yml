@@ -638,7 +638,7 @@ jobs:
               'public.encounter_schedule_source_payload(uuid)'::regprocedure
             );
             IF pg_catalog.strpos(v_source_definition, 'worldview_tags') = 0
-               OR pg_catalog.strpos(v_source_definition, 'v4-worldview-tags') = 0 THEN
+               OR pg_catalog.strpos(v_source_definition, 'v9-worldview-tags') = 0 THEN
               RAISE EXCEPTION 'schedule source payload does not include worldview tags/version';
             END IF;
             SELECT pg_catalog.pg_get_triggerdef(t.oid)
