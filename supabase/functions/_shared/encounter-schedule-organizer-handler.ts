@@ -621,15 +621,16 @@ export async function handleEncounterScheduleOrganizer(
           : Promise.resolve({ data: [], error: null }),
       ]);
       if (jobsError) return json({ error: "schedule_repair_job_states_unavailable" }, 503);
-      const repairableCharacterIds = new Set((jobs || [])
-        .filter((job: any) => job.status === "failed")
-        .map((job: any) => job.character_id));
+      const repairableJobByCharacter = new Map((jobs || [])
+        .filter((job: any) => ["failed", "needs_reconciliation"].includes(job.status))
+        .map((job: any) => [job.character_id, job]));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
       return json({
         status: "available",
-        outputs: (outputs || []).filter((item: any) => repairableCharacterIds.has(item.character_id)).map((item: any) => ({
+        outputs: (outputs || []).filter((item: any) => repairableJobByCharacter.has(item.character_id)).map((item: any) => ({
           ...item,
           character_name: names.get(item.character_id) || "角色",
+          job_status: repairableJobByCharacter.get(item.character_id)?.status || "failed",
           raw_response_text: item.raw_response_text || item.raw_response_body || "",
           latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
           latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
