@@ -51,7 +51,7 @@
  render(dependencies) {
  destroyActiveMap();
  const {
- $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
+ ICON, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
  persist, hydratePublicCharacterIllustrations, characterVideoObserver,
  releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
  setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
@@ -122,8 +122,12 @@
           <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
         </aside>
         <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
-        <div class="city-map-bottom">
-          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
+        <div class="city-map-bottom" aria-label="主要導覽">
+          <button type="button" class="nav-btn active" data-action="nav" data-page="citymap" aria-current="page">${ICON.home}<span class="nav-label">探索</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="create">${ICON.create}<span class="nav-label">創建</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="chat">${ICON.chat}<span class="nav-label">聊天</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="shop">${ICON.shop}<span class="nav-label">商店</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="profile">${ICON.profile}<span class="nav-label">我的</span></button>
         </div>
       </div>
       <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>
