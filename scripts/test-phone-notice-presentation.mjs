@@ -124,7 +124,6 @@ assert.ok(!chatEntriesBlock.includes('last?.at'), 'Chat list must not reference 
 
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
-const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const editorStart = cityMap.indexOf('const normalizePhoneNoticeRows');
 const editorEnd = cityMap.indexOf('const editorCharacterFingerprint', editorStart);
 assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Shared phone normalization helpers must exist in the extracted city-map module');
