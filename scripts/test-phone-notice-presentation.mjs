@@ -141,6 +141,16 @@ assert.match(html, /scheduleField\.dataset\.scheduleHydrated !== 'true'/,
   'Saving must wait for schedule hydration instead of deleting an unread existing value');
 assert.match(html, /verifiedPrivateInfo/,
   'Private personality and private-info fields must be read back after save');
+assert.match(html, /async function refreshOwnedCharacterForEditor\(characterId\)/,
+  'Opening an existing role must fetch the authoritative cloud record directly before rendering editable fields');
+assert.match(html, /character_private_info'[\s\S]*?\.eq\('character_id',characterId\)\.eq\('author_id',uid\)/,
+  'Editor hydration must read private personality and private notes using the verified owner identity');
+assert.match(html, /character_stories'[\s\S]*?\.eq\('character_id',characterId\)[\s\S]*?\.limit\(1\)\.maybeSingle\(\)/,
+  'Editor hydration must fetch the latest saved opening message directly for the selected character');
+assert.match(html, /正在讀取角色雲端設定/,
+  'Editor must not show empty fields while the authoritative cloud settings are still loading');
+assert.match(html, /角色設定暫時無法載入/,
+  'A cloud hydration failure must be explicit and must not silently present blank settings as valid data');
 assert.match(html, /expectedPhonePrompts/,
   'Phone settings must be verified against the saved database row');
 
