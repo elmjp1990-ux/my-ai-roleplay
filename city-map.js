@@ -46,7 +46,7 @@
  const renderWorldviewField = character => {
    const selected = new Set(normalizeWorldviewTags(character?.worldviewTags));
    return `<section class="memory-item stack" style="gap:8px">
-     <strong>這個角色的世界觀分類：</strong>
+     <strong>這個角色的世界觀分類</strong>
      <small>可複選，若種族非人類，建議勾選奇幻搭配現代或古代世界觀分類</small>
      <div style="display:flex;flex-direction:column;gap:9px">
        <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="modern" ${selected.has("modern") ? "checked" : ""}> 現代</label>
