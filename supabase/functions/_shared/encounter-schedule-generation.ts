@@ -301,6 +301,7 @@ export type EncounterWorldviewClassification = {
   confidence: "high" | "low";
 };
 
+// Author tags route modern/ancient/fantasy; unknown legacy roles generate before soft review.
 export function classifyEncounterWorldview(source: EncounterScheduleSource): EncounterWorldviewClassification {
   const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
   const derivedProfile = isRecord(source.derived_character_profile) ? source.derived_character_profile : {};
