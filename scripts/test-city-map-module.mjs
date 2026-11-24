@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
@@ -280,7 +281,28 @@ assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)
   'Null or empty schedule profile fields must fall back to the cached character profile.');
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
-assert.match(cityMap, /const isSleepingSchedule=.*睡夢.*淺眠/);
+const sleepingHelperSource = cityMap.slice(
+  cityMap.indexOf('const isSleepingSchedule='),
+  cityMap.indexOf('const isCurrentCityCharacterEligible='),
+).trim();
+const isSleepingSchedule = vm.runInNewContext(
+  `(()=>{${sleepingHelperSource};return isSleepingSchedule})()`,
+);
+assert.equal(
+  isSleepingSchedule('補眠', '手機放在茶几上保持待命狀態，隨時準備接聽電話'),
+  false,
+  'A resting character who is explicitly on call must remain available for an encounter.',
+);
+assert.equal(
+  isSleepingSchedule('補眠', '手機靜音，請勿打擾'),
+  true,
+  'Rest without an explicit availability signal must remain unavailable.',
+);
+assert.equal(
+  isSleepingSchedule('深層睡眠', '手機保持待命'),
+  true,
+  'An explicit deep-sleep state must remain unavailable.',
+);
 assert.match(fixedSceneMigration, /marker_x\s*=\s*EXCLUDED\.marker_x/);
 assert.match(fixedSceneMigration, /marker_y\s*=\s*EXCLUDED\.marker_y/);
 assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneKey\)/,
