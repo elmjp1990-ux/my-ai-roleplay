@@ -10071,6 +10071,10 @@ async function loadEncounterScheduleRepairOutputs(){
     container.innerHTML=outputs.map(item=>{
       const outputId=e(item.id||'');
       const raw=e(item.raw_response_text||'');
+      const hasSavedRevision=typeof item.latest_revision_text==='string'&&item.latest_revision_text.length>0;
+      const editorText=e(hasSavedRevision?item.latest_revision_text:item.raw_response_text||'');
+      const revisionStatus=String(item.latest_revision_status||'');
+      const revisionLabel=revisionStatus==='published'?'最近版本已發布':revisionStatus==='draft'?'已保存草稿，尚未發布':revisionStatus==='invalid'?'已保存上次修改（尚未通過驗證）':revisionStatus==='publish_failed'?'已保存上次修改（發布失敗）':hasSavedRevision?'已載入上次保存的修改':'目前顯示原始 AI 回覆';
       const errors=Array.isArray(item.validation_errors)?item.validation_errors.join('、'):'';
       const finish=e(item.finish_reason||'未提供');
       const model=e(item.response_model||item.requested_model||'未知模型');
@@ -10081,8 +10085,10 @@ async function loadEncounterScheduleRepairOutputs(){
         '<strong>'+e(item.character_name||'角色')+' · '+status+'</strong>'+
         '<p class="small muted">'+model+'｜finish_reason：'+finish+'｜HTTP '+Number(item.http_status||0)+'｜'+e(created)+truncation+'</p>'+
         (errors?'<p class="small muted">驗證問題：'+e(errors)+'</p>':'')+
-        '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+raw+'</textarea>'+
-        '<div class="row wrap"><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正並發布（不呼叫 AI）</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">重新驗證並發布這份修正版</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
+        '<p class="small muted" data-encounter-repair-draft-status="'+outputId+'">'+e(revisionLabel)+'</p>'+
+        '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+editorText+'</textarea>'+
+        '<p class="small muted">先「儲存修改」就會保存草稿；重新登入後會載入最近保存的版本。發布前仍會重新驗證，不會呼叫 AI。</p>'+
+        '<div class="row wrap"><button type="button" data-action="save-encounter-schedule-repair-draft" data-output-id="'+outputId+'">儲存修改（不發布）</button><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正後發布</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">驗證目前文字並發布</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
       '</article>';
     }).join('');
   }catch(error){
@@ -10412,6 +10418,28 @@ document.addEventListener('click',async event=>{
     await loadEncounterScheduleRepairOutputs();
     return;
   }
+  const saveDraftButton=event.target.closest('[data-action="save-encounter-schedule-repair-draft"]');
+  if(saveDraftButton){
+    event.preventDefault();
+    const outputId=saveDraftButton.dataset.outputId||'';
+    const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
+    if(!textarea||textarea.value.trim().length<2)return toast('請先輸入要保存的完整行程內容。');
+    saveDraftButton.disabled=true;
+    try{
+      const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
+        body:{mode:'repair_draft',output_id:outputId,corrected_response:textarea.value}
+      });
+      if(error)throw error;
+      if(data?.status!=='draft_saved'||data?.ai_called!==false||data?.published!==false)throw new Error('repair_draft_save_result_invalid');
+      const status=document.querySelector('[data-encounter-repair-draft-status="'+outputId+'"]');
+      if(status)status.textContent='已保存草稿（尚未發布）'+(data.saved_at?' · '+new Date(data.saved_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'');
+      toast('修改已保存。重新登入後會載入這份草稿；目前尚未發布，也沒有呼叫 AI。');
+    }catch(error){
+      toast('草稿保存失敗；目前文字仍留在畫面，請勿關閉頁面。');
+      console.warn('Encounter schedule repair draft save failed:',error?.message||error);
+    }finally{saveDraftButton.disabled=false;}
+    return;
+  }
   const autoRepairButton=event.target.closest('[data-action="auto-repair-encounter-schedule-output"]');
   if(autoRepairButton){
     event.preventDefault();
@@ -10421,7 +10449,7 @@ document.addEventListener('click',async event=>{
     let corrected;
     try{corrected=autoCorrectEncounterScheduleOutput(textarea.value);}
     catch(error){return toast(error&&error.message?error.message:'無法解析原始行程。');}
-    if(!window.confirm('將依 POYOZZ 空間規則修正室內／戶外／車內判斷、地點與超長描述，保留時段、選項與權重，並立即重新驗證及發布？不會呼叫 AI，原始回覆會完整保留。'))return;
+    if(!window.confirm('將依 POYOZZ 空間規則自動修正室內／戶外／車內判斷、地點與超長描述，保留時段、選項與權重，然後立即驗證並發布？不會呼叫 AI。'))return;
     autoRepairButton.disabled=true;
     textarea.value=corrected.text;
     try{
@@ -10470,7 +10498,7 @@ document.addEventListener('click',async event=>{
   const outputId=repairButton.dataset.outputId||'';
   const textarea=document.querySelector('[data-encounter-repair-output="'+outputId+'"]');
   if(!textarea||!textarea.value.trim())return toast('請先填入完整的 JSON 修正版。');
-  if(!window.confirm('將以這份內容重新驗證並嘗試發布行程？不會呼叫 AI，也不會覆蓋原始回覆。'))return;
+  if(!window.confirm('將直接驗證文字框目前的內容；不會自動改字。通過後立即發布，不會呼叫 AI，原始 AI 回覆仍會保留。'))return;
   repairButton.disabled=true;
   try{
     const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{
