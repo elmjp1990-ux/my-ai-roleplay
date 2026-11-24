@@ -18,6 +18,8 @@ const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/2026111807
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const rawOutputSoftHideMigration = fs.readFileSync("supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql", "utf8");
 const rawOutputSoftHideReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-soft-hide.sql", "utf8");
+const scheduleRepairDraftMigration = fs.readFileSync("supabase/migrations/20261124090000_encounter_schedule_repair_drafts.sql", "utf8");
+const scheduleRepairDraftReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-repair-drafts.sql", "utf8");
 const providerAdapter = fs.readFileSync("supabase/functions/_shared/openrouter-chat-completions.ts", "utf8");
 const replayWorkflow = fs.readFileSync(".github/workflows/supabase-local-migration-replay.yml", "utf8");
 const replaySchedule = fs.readFileSync("supabase/drafts/replay-encounter-schedule-pipeline.sql", "utf8");
@@ -32,7 +34,25 @@ assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
 assert.match(worker, /recordRawGenerationOutput/);
 assert.match(worker, /handleScheduleRepair/);
+const repairDraftHandler = worker.slice(
+  worker.indexOf("async function handleScheduleRepairDraft"),
+  worker.indexOf("async function handleScheduleRepair(", worker.indexOf("async function handleScheduleRepairDraft"))
+);
+assert.ok(repairDraftHandler.length > 0, "Persistent repair draft handler must exist");
+assert.match(repairDraftHandler, /status: "draft"/);
+assert.match(repairDraftHandler, /ai_called: false/);
+assert.doesNotMatch(repairDraftHandler, /requestProvider|claim_encounter_schedule_repair|publish_encounter_schedule_batch/,
+  "Saving a repair draft must never call AI or publish schedules");
+assert.match(replayWorkflow, /20261124090000_encounter_schedule_repair_drafts\.sql/);
+assert.match(replayWorkflow, /replay-encounter-schedule-repair-drafts\.sql/);
 assert.match(worker, /mode === "repair_list"/);
+assert.match(worker, /mode === "repair_draft"/);
+assert.match(worker, /handleScheduleRepairDraft/);
+assert.match(worker, /status: "draft"/);
+assert.match(worker, /latest_revision_text/);
+assert.match(scheduleRepairDraftMigration, /\x27draft\x27/);
+assert.match(scheduleRepairDraftMigration, /encounter_schedule_generation_output_revisions_status_check/);
+assert.match(scheduleRepairDraftReplay, /\x27draft\x27/);
 assert.match(worker, /claim_encounter_schedule_repair/);
 assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
 assert.match(worker, /originalBatch\.is_manual !== true/);
@@ -270,6 +290,11 @@ assert.match(html, /functions\.invoke\('encounter-schedule-organizer',\{body:\{m
 assert.match(html, /fetch\('\/api\/encounter-schedule-organizer'/);
 assert.match(html, /loadEncounterScheduleRepairOutputs/);
 assert.match(html, /mode:'repair_list'/);
+assert.match(html, /mode:\x27repair_draft\x27/);
+assert.match(html, /儲存修改（不發布）/);
+assert.match(html, /latest_revision_text/);
+assert.match(html, /驗證目前文字並發布/);
+assert.match(html, /自動修正後發布/);
 assert.match(html, /mode:'repair'/);
 assert.match(html, /repair-encounter-schedule-output/);
 assert.match(html, /不會再次呼叫 AI/);
