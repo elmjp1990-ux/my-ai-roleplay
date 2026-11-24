@@ -153,6 +153,24 @@
   persist();
   return refreshed;
 }
+ const createEditorCloudRefreshController = ({refresh,isCurrent,onReady,onError}) => {
+   let state={characterId:null,status:'idle',error:null,promise:null};
+   const getState=()=>state;
+   const start=characterId=>{
+     if(!characterId||state.status==='loading'&&state.characterId===characterId)return;
+     state={characterId,status:'loading',error:null,promise:null};
+     const promise=Promise.resolve().then(()=>refresh(characterId));
+     state.promise=promise;
+     promise.then(value=>{if(isCurrent(characterId)){state={characterId,status:'ready',error:null,promise:null};onReady(value);}})
+       .catch(error=>{if(isCurrent(characterId)){state={characterId,status:'error',error,promise:null};onError(error);}});
+   };
+   return {getState,start};
+ };
+ const renderEditorCloudStatus = (state,escapeHTML) => {
+   if(state.status==='loading')return '<div class="panel form-width"><h2>正在讀取角色雲端設定…</h2><p class="muted">請稍候片刻。</p></div>';
+   if(state.status==='error')return '<div class="panel form-width"><h2>角色設定暫時無法載入</h2><p class="muted">'+escapeHTML(state.error?.message||'雲端資料讀取失敗')+'</p><button type="button" class="primary" data-action="retry-editor-cloud">重新讀取角色設定</button></div>';
+   return '';
+ };
  global.PoyozzCityMap = Object.freeze({
  normalizeWorldviewTags,
  readWorldviewTags,
@@ -160,6 +178,8 @@
  editorCharacterFingerprint,
  reconcileEditorDraft,
  refreshOwnedCharacterForEditor,
+ createEditorCloudRefreshController,
+ renderEditorCloudStatus,
  normalizePhoneNoticeRows,
  readPhoneNoticeRows,
  destroy: destroyActiveMap,
