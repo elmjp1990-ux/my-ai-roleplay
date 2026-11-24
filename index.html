@@ -6231,24 +6231,6 @@ function readEditorDraft() {
   }
   return null;
 }
-function normalizePhoneNoticeRows(value) {
-  const source = Array.isArray(value) ? value : [];
-  return source.slice(0,8).map(item => {
-    const raw = String(item || '');
-    const separator = raw.indexOf('|');
-    return separator < 0
-      ? { display:raw.trim(), instruction:'' }
-      : { display:raw.slice(0,separator).trim(), instruction:raw.slice(separator+1).trim() };
-  });
-}
-function readPhoneNoticeRows(form) {
-  const values = new FormData(form);
-  return Array.from({length:8}, (_,index) => {
-    const display = String(values.get('phoneDisplay'+index) || '').trim().slice(0,80);
-    const instruction = String(values.get('phoneInstruction'+index) || '').trim().slice(0,150);
-    return display || instruction ? display + ' | ' + instruction : '';
-  }).filter(Boolean);
-}
 function renderPhoneSettingsFields(character, savedDraft) {
   const draftPrompts = savedDraft?.phoneSettings?.noticePrompts;
   const legacyDraftPrompts = String(savedDraft?.phoneNotices || '').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
@@ -6256,7 +6238,7 @@ function renderPhoneSettingsFields(character, savedDraft) {
     : legacyDraftPrompts.length ? legacyDraftPrompts
     : (Array.isArray(character.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
       : Array.isArray(character.phoneSettings?.notices) ? character.phoneSettings.notices : []);
-  const rows = normalizePhoneNoticeRows(source);
+  const rows = window.PoyozzCityMap.normalizePhoneNoticeRows(source);
   const visibleRows = rows.length ? rows : [{display:'',instruction:''}];
   return '<div id="phoneSettingsEditor" class="stack" style="gap:10px">' +
     '<div id="phoneSettingsRows" class="stack" style="gap:10px">' +
@@ -6306,7 +6288,7 @@ function saveEditorDraft() {
       boundaries:'', relationshipPacing:''
     }),
     encounterScheduleDescription:String(values.get('encounterScheduleDescription') || ''),
-    phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
+    phoneSettings:{noticePrompts:window.PoyozzCityMap.readPhoneNoticeRows(form)},
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     isNSFW:values.get('isNSFW') === 'on',
@@ -6315,7 +6297,7 @@ function saveEditorDraft() {
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
-    baseFingerprint:draftCharacter?.__editorBaseFingerprint || window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)),
+    baseFingerprint:route.id ? window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)) : '',
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -6341,7 +6323,6 @@ function clearEditorDraft() {
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
-  if(draftCharacter)draftCharacter.__editorBaseFingerprint=window.PoyozzCityMap.editorCharacterFingerprint(c);
   draftTags = normalizeCharacterTagsForRead(c?.tags || []);
   draftImage = c?.image || '';
   draftIllustrations = [];
@@ -6406,7 +6387,6 @@ function renderEditor() {
   }
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
-    draftCharacter.__editorBaseFingerprint=window.PoyozzCityMap.editorCharacterFingerprint(original);
     if (!savedDraft) {
       draftTags = normalizeCharacterTagsForRead(original.tags || []);
       draftImage = original.image || '';
@@ -12956,7 +12936,7 @@ document.addEventListener('submit',async event => {
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
             boundaries:'', relationshipPacing:''
           }),
-          phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
+          phoneSettings:{noticePrompts:window.PoyozzCityMap.readPhoneNoticeRows(form)},
           visibility:String(f.get('visibility')),image:draftImage,
           avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
