@@ -6340,11 +6340,8 @@ function startEditor(c = null) {
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
-  editorCloudRefresh=c?.id
-    ?{characterId:c.id,status:'loading',error:null,promise:null}
-    :{characterId:null,status:'idle',error:null,promise:null};
-  visit('editor',c?.id);
   if(c?.id)editorCloudRefreshController.start(c.id);
+  visit('editor',c?.id);
 }
 async function hydrateCharacterIllustrationsIntoEditor(characterId) {
   const client=window.mySupabase;
@@ -12149,7 +12146,7 @@ document.addEventListener('click',async event => {
         if (owned(c)) startEditor(c);
         break;
       }
-      case 'retry-editor-cloud': editorCloudRefreshController.start(route.id); break;
+      case 'retry-editor-cloud': editorCloudRefreshController.start(route.id);render();break;
       case 'visibility': {
         const c = state.characters.find(c => c.id === key);
         if (!owned(c)) break;
