@@ -81,6 +81,7 @@ const runtimeFiles = [
   'signed-url-manager.js',
   'core-utils.js',
   'city-map.js',
+  'character-editor-cloud.js',
   'encounter-history.js',
   'followed-authors.js',
   'list-pagination.js',
