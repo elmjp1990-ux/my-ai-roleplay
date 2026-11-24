@@ -1787,7 +1787,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       }
       // 登入階段只讀取未刪除的雲端角色；不會把本機快照自動寫回 Supabase。
       const pageResult=await client.from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, worldview_tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id',user.id).is('deleted_at',null)
         .order('created_at',{ascending:false}).order('id',{ascending:false})
         .range(pager.offset,pager.offset+pageSize-1);
@@ -1890,6 +1890,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: normalizeCharacterTagsForRead(Array.isArray(row.tags) ? row.tags : (local.tags || [])),
+          worldviewTags: Array.isArray(row.worldview_tags) ? row.worldview_tags.filter(value=>['modern','ancient','fantasy'].includes(value)) : (local.worldviewTags || []),
           authorId: row.author_id,
           owner: true,
           chats: local.chats || '0',
@@ -2886,6 +2887,12 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
     character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
+    const allowedWorldviewTags = new Set(['modern','ancient','fantasy']);
+    const requestedWorldviewTags = Array.isArray(character.worldviewTags) ? character.worldviewTags : [];
+    if (requestedWorldviewTags.some(value => !allowedWorldviewTags.has(value))) {
+      throw new Error('世界觀分類資料無效，請重新勾選後儲存。');
+    }
+    character.worldviewTags = [...new Set(requestedWorldviewTags)];
 
     // 先用登入者專屬 RPC 取得生日，避免未成年作者勾選 NSFW 後才收到泛用的 RLS 寫入錯誤。
     // 資料庫 INSERT／UPDATE 年齡政策仍是最終安全防線。
@@ -2921,7 +2928,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     // 先讀取既有上架紀錄，避免 upsert 把首次公開時間或資格重設。
     const { data: existingCharacter, error: existingCharacterError } = await client
       .from('characters')
-      .select('name, intro, race, style, tags, phone_settings, visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
+      .select('name, intro, race, style, tags, worldview_tags, phone_settings, visibility, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, is_nsfw, deleted_at')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -2977,7 +2984,8 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,230))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
-      tags: Array.isArray(character.tags) ? character.tags : []
+      tags: Array.isArray(character.tags) ? character.tags : [],
+      worldview_tags: character.worldviewTags
     };
 
     const { error: characterError } = await client
@@ -3013,7 +3021,7 @@ if (characterError) {
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
+      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings, worldview_tags')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -3030,6 +3038,9 @@ if (characterError) {
     }
     if (savedCharacter.nsfw_workplace_warning !== (character.nsfwWorkplaceWarning === true)) {
       throw new Error('資料庫中的 NSFW 工作場所提醒未成功保存，請重試。');
+    }
+    if (JSON.stringify(savedCharacter.worldview_tags || []) !== JSON.stringify(row.worldview_tags || [])) {
+      throw new Error('角色世界觀分類回讀結果與送出內容不一致，請重新儲存。');
     }
     const expectedPhonePrompts = Array.isArray(row.phone_settings?.noticePrompts) ? row.phone_settings.noticePrompts : [];
     const savedPhonePrompts = Array.isArray(savedCharacter.phone_settings?.noticePrompts) ? savedCharacter.phone_settings.noticePrompts : [];
@@ -5168,7 +5179,7 @@ function chatNavUnreadBadge(){
 }
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
-    : route.page === 'citymap' ? 'home'
+    : route.page === 'home' ? 'citymap'
     : ['editor','ai'].includes(route.page) ? 'create'
     : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
@@ -6288,6 +6299,7 @@ function saveEditorDraft() {
     gender:String(values.get('gender') || 'ambiguous'),
     age:String(values.get('age') || ''),
     race:String(values.get('race') || ''),
+    worldviewTags:values.getAll('worldviewTags').map(value=>String(value)).filter(value=>['modern','ancient','fantasy'].includes(value)),
     intro:String(values.get('intro') || ''),
     opening:String(values.get('opening') || ''),
     privateInfo:String(values.get('privateInfo') || ''),
@@ -6304,6 +6316,7 @@ function saveEditorDraft() {
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     isNSFW:values.get('isNSFW') === 'on',
     tags:[...draftTags],
+    worldviewTags:values.getAll('worldviewTags').map(value=>String(value)).filter(value=>['modern','ancient','fantasy'].includes(value)),
     image:draftImage,
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
@@ -6420,6 +6433,15 @@ function renderEditor() {
           <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
+        <section class="memory-item stack" style="gap:8px">
+          <strong>這個角色的世界觀分類：</strong>
+          <small>可複選，若種族非人類，建議勾選奇幻搭配現代或古代世界觀分類</small>
+          <div style="display:flex;flex-direction:column;gap:9px">
+            <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="modern" ${Array.isArray(c.worldviewTags) && c.worldviewTags.includes('modern') ? 'checked' : ''}> 現代</label>
+            <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="ancient" ${Array.isArray(c.worldviewTags) && c.worldviewTags.includes('ancient') ? 'checked' : ''}> 古代</label>
+            <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="fantasy" ${Array.isArray(c.worldviewTags) && c.worldviewTags.includes('fantasy') ? 'checked' : ''}> 奇幻</label>
+          </div>
+        </section>
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
@@ -12929,7 +12951,9 @@ document.addEventListener('submit',async event => {
         const c={
           id:old?.id || id(),name,
           gender:String(f.get('gender')),age:String(f.get('age')).trim(),
-          race:String(f.get('race')).trim(),intro,opening,
+          race:String(f.get('race')).trim(),
+          worldviewTags:[...new Set(f.getAll('worldviewTags').map(value=>String(value)).filter(value=>['modern','ancient','fantasy'].includes(value)))],
+          intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
           encounterScheduleDescription:String(f.get('encounterScheduleDescription') || '').trim(),
           style:String(f.get('style')).trim(),
@@ -13904,6 +13928,7 @@ async function importCharacter(file) {
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
     age:String(data.age ?? '').trim().slice(0,25),
     race:String(data.race || '').slice(0,50),
+    worldviewTags:Array.isArray(data.worldviewTags)?data.worldviewTags.filter(value=>['modern','ancient','fantasy'].includes(value)):[],
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
     authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
     chats:'0',users:null,createdAt:Date.now()
@@ -14024,7 +14049,7 @@ function renderCityMapMVP() {
     return;
   }
   return renderCityMap({
-    $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
+    ICON, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
     setEncounterLifecycleState, createEncounterSession,
@@ -14381,5 +14406,26 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
 <script>
 document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const target=event.target?.closest?.('.encounter-dialogue-beat');if(!target||event.target?.closest?.('.encounter-dialogue-replay'))return;event.preventDefault();target.click();});
 </script>
+<style id="poyozz-city-map-shared-primary-nav">
+body.city-map-mode .city-map-bottom .nav-btn{
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  gap:4px!important;min-width:0!important;padding:6px 1px!important;font-size:10px!important;line-height:1.2!important;
+  text-align:center!important;white-space:nowrap!important;background:transparent!important;border:1px solid transparent!important;
+  border-radius:10px!important;color:rgba(255,255,255,.88)!important;text-shadow:0 1px 8px rgba(5,10,24,.55)!important;
+  box-shadow:none!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn svg{width:20px!important;height:20px!important;filter:drop-shadow(0 1px 5px rgba(5,10,24,.42))}
+body.city-map-mode .city-map-bottom .nav-btn .nav-label{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:clip!important}
+body.city-map-mode .city-map-bottom .nav-btn.active,
+body.city-map-mode .city-map-bottom .nav-btn[aria-current="page"]{
+  background:linear-gradient(135deg,rgba(183,157,255,.24),rgba(255,178,210,.17))!important;
+  border-color:rgba(225,210,255,.3)!important;color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn:hover,
+body.city-map-mode .city-map-bottom .nav-btn:focus-visible{
+  background:rgba(255,255,255,.12)!important;border-color:rgba(255,255,255,.18)!important;color:#fff!important;
+}
+</style>
 </body>
 </html>
