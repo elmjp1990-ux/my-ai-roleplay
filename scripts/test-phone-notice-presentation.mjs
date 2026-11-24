@@ -153,6 +153,8 @@ assert.match(cityMap, /角色設定暫時無法載入/,
   'A cloud hydration failure must be explicit and must not silently present blank settings as valid data');
 assert.match(cityMap, /createEditorCloudRefreshController/,
   'Editor cloud hydration must reject stale async responses after navigation');
+assert.match(cityMap, /state\.requestId===requestId/,
+  'Only the latest editor hydration request may replace the selected role data');
 assert.match(html, /expectedPhonePrompts/,
   'Phone settings must be verified against the saved database row');
 
