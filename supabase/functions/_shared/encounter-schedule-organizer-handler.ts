@@ -621,7 +621,7 @@ export async function handleEncounterScheduleOrganizer(
           : Promise.resolve({ data: [], error: null }),
       ]);
       if (jobsError) return json({ error: "schedule_repair_job_states_unavailable" }, 503);
-      const repairableJobByCharacter = new Map((jobs || [])
+      const repairableJobByCharacter = new Map<string, any>((jobs || [])
         .filter((job: any) => ["failed", "needs_reconciliation"].includes(job.status))
         .map((job: any) => [job.character_id, job]));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
