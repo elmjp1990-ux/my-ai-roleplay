@@ -10074,7 +10074,7 @@ async function loadEncounterScheduleRepairOutputs(){
       const editorText=e(hasSavedRevision?item.latest_revision_text:item.raw_response_text||'');
       const revisionStatus=String(item.latest_revision_status||'');
       const needsReconciliation=item.job_status==='needs_reconciliation';
-      const revisionLabel=needsReconciliation?'發布結果待核對；已保存內容仍可編輯，但請勿重試發布':revisionStatus==='published'?'最近版本已發布':revisionStatus==='draft'?'已保存草稿，尚未發布':revisionStatus==='invalid'?'已保存上次修改（尚未通過驗證）':revisionStatus==='publish_failed'?'已保存上次修改（發布失敗）':hasSavedRevision?'已載入上次保存的修改':'目前顯示原始 AI 回覆';
+      const revisionLabel=needsReconciliation?'上次發布結果待核對；重新驗證後可再次嘗試發布':revisionStatus==='published'?'最近版本已發布':revisionStatus==='draft'?'已保存草稿，尚未發布':revisionStatus==='invalid'?'已保存上次修改（尚未通過驗證）':revisionStatus==='publish_failed'?'已保存上次修改（發布失敗）':hasSavedRevision?'已載入上次保存的修改':'目前顯示原始 AI 回覆';
       const errors=Array.isArray(item.validation_errors)?item.validation_errors.join('、'):'';
       const finish=e(item.finish_reason||'未提供');
       const model=e(item.response_model||item.requested_model||'未知模型');
@@ -10088,7 +10088,7 @@ async function loadEncounterScheduleRepairOutputs(){
         '<p class="small muted" data-encounter-repair-draft-status="'+outputId+'">'+e(revisionLabel)+'</p>'+
         '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+editorText+'</textarea>'+
         '<p class="small muted">先「儲存修改」就會保存草稿；重新登入後會載入最近保存的版本。發布前仍會重新驗證，不會呼叫 AI。</p>'+
-        '<div class="row wrap"><button type="button" data-action="save-encounter-schedule-repair-draft" data-output-id="'+outputId+'">儲存修改（不發布）</button><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation||needsReconciliation?'disabled title="'+(needsReconciliation?'發布結果待核對，暫停發布操作':'原始回覆不完整，不能自動修正')+'"':'')+'>自動修正後發布</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(needsReconciliation?'disabled title="發布結果待核對，暫停發布操作"':'')+'>驗證目前文字並發布</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
+        '<div class="row wrap"><button type="button" data-action="save-encounter-schedule-repair-draft" data-output-id="'+outputId+'">儲存修改（不發布）</button><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正後發布</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'" '++'>驗證目前文字並發布</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
       '</article>';
     }).join('');
   }catch(error){
