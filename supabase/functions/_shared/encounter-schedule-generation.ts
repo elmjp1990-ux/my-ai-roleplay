@@ -268,7 +268,9 @@ export function normalizeEncounterSceneKey(
   return null;
 }
 
-const SLEEPING_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|睡夢|睡得很沉|淺眠|深層睡眠|入睡|睡去|午睡|補眠|就寢/;
+const DEEP_SLEEP_SCHEDULE_PATTERN = /熟睡|沉睡|酣睡|安睡|睡得很沉|深層睡眠/;
+const SLEEPING_SCHEDULE_PATTERN = /睡著|睡着|睡覺|睡眠|睡夢|淺眠|入睡|睡去|午睡|補眠|就寢/;
+const EXPLICIT_ON_CALL_PATTERN = /待命|隨時.{0,8}(接聽|接電話|聯絡|回應)|保持.{0,8}(待命|開機)|手機.{0,12}(接聽|待命)|可.{0,4}(接聽|聯絡)|接聽電話/;
 
 export function resolveEncounterScheduleAvailability(
   activity: unknown,
@@ -276,6 +278,10 @@ export function resolveEncounterScheduleAvailability(
 ): "available" | "sleeping" {
   const context = [text(activity), text(sceneDescription)].join(" ").normalize("NFKC")
     .replace(/準備(?:要)?睡覺/g, "");
+  // Explicit deep sleep always blocks encounters. Generic rest wording such as
+  // 補眠 is overridden by a clear on-call/standby instruction, matching city-map UI.
+  if (DEEP_SLEEP_SCHEDULE_PATTERN.test(context)) return "sleeping";
+  if (EXPLICIT_ON_CALL_PATTERN.test(context)) return "available";
   return SLEEPING_SCHEDULE_PATTERN.test(context) ? "sleeping" : "available";
 }
 
