@@ -10088,7 +10088,7 @@ async function loadEncounterScheduleRepairOutputs(){
         '<p class="small muted" data-encounter-repair-draft-status="'+outputId+'">'+e(revisionLabel)+'</p>'+
         '<textarea rows="12" maxlength="500000" data-encounter-repair-output="'+outputId+'" spellcheck="false" style="width:100%;font-family:monospace">'+editorText+'</textarea>'+
         '<p class="small muted">先「儲存修改」就會保存草稿；重新登入後會載入最近保存的版本。發布前仍會重新驗證，不會呼叫 AI。</p>'+
-        '<div class="row wrap"><button type="button" data-action="save-encounter-schedule-repair-draft" data-output-id="'+outputId+'">儲存修改（不發布）</button><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正後發布</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'" '++'>驗證目前文字並發布</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
+        '<div class="row wrap"><button type="button" data-action="save-encounter-schedule-repair-draft" data-output-id="'+outputId+'">儲存修改（不發布）</button><button type="button" data-action="auto-repair-encounter-schedule-output" data-output-id="'+outputId+'" '+(truncation?'disabled title="原始回覆不完整，不能自動修正"':'')+'>自動修正後發布</button><button type="button" data-action="repair-encounter-schedule-output" data-output-id="'+outputId+'">驗證目前文字並發布</button><button type="button" class="ghost" data-action="hide-encounter-schedule-output" data-output-id="'+outputId+'">從修復清單隱藏</button></div>'+
       '</article>';
     }).join('');
   }catch(error){
