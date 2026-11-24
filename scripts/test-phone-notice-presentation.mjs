@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
+const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const groupTurnSource = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
