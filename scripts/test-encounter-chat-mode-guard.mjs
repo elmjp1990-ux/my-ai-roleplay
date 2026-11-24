@@ -479,6 +479,16 @@ assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
 
 const encounterPresentation = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
+const splitBeatsSource = encounterPresentation.slice(
+  encounterPresentation.indexOf("const splitEncounterBeats="),
+  encounterPresentation.indexOf("const encounterBeatMarkup="),
+).trim();
+const splitEncounterBeats = vm.runInNewContext(`(()=>{${splitBeatsSource};return splitEncounterBeats})()`);
+assert.deepEqual(
+  Array.from(splitEncounterBeats("*咬著半片吐司抬頭，瞇眼看你一眼* 門沒鎖，自己進來的？")),
+  ["*咬著半片吐司抬頭，瞇眼看你一眼*", "門沒鎖，自己進來的？"],
+  "Encounter narration must appear as its own beat before the character's spoken dialogue",
+);
 assert.match(encounterHistory, /loadCloudHistory/);
 assert.match(encounterHistory, /const N=10/);
 assert.match(encounterHistory, /range\(offset,offset\+N-1\)/);
@@ -530,6 +540,10 @@ assert.match(encounterOutputParser, /\.filter\(Boolean\)\.slice\(0, 3\)/);
 assert.doesNotMatch(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
+assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*font-size:10px/);
+assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*padding:4px 9px/);
+assert.match(frontend, /background:rgba\(38,35,46,\.94\)/);
+assert.match(frontend, /body\.day \.encounter-memory-card,body\.day \.encounter-memory-message/);
 assert.match(encounterSceneCss, /encounter-dialogue-text em/);
 assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
