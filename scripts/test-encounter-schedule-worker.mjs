@@ -308,7 +308,7 @@ assert.match(html, /mode:\x27repair_draft\x27/);
 assert.match(html, /儲存修改（不發布）/);
 assert.match(html, /latest_revision_text/);
 assert.match(html, /上次發布結果待核對；重新驗證後可再次嘗試發布/);
-assert.match(html, /needsReconciliation\?'disabled title="發布結果待核對，暫停發布操作"'/);
+assert.doesNotMatch(html, /needsReconciliation\?'disabled title="發布結果待核對，暫停發布操作"'/);
 assert.match(html, /驗證目前文字並發布/);
 assert.match(html, /自動修正後發布/);
 assert.match(html, /mode:'repair'/);
