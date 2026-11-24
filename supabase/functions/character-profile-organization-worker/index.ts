@@ -56,6 +56,7 @@ type ProfileUsageMetadata = {
   responseBodyLength?: number | null;
   responseParsed?: boolean | null;
   providerAttempts?: Array<Record<string, unknown>>;
+  requestTrace?: Array<Record<string, unknown>>;
 };
 
 type GeneratedProfile = ProfileUsageMetadata & {
@@ -144,14 +145,23 @@ async function completeProfileWithRetry(
 async function generateProfile(
   item: WorkItem,
   apiKey: string,
+  onTrace?: (trace: Array<Record<string, unknown>>) => Promise<void>,
 ): Promise<GeneratedProfile> {
   const messages = buildCharacterProfileMessages(item.source_payload);
   const providerAttempts: Array<Record<string, unknown>> = [];
+  const requestTrace: Array<Record<string, unknown>> = [];
+  const trace = async (stage: string, provider: string, details: Record<string, unknown> = {}) => {
+    requestTrace.push({ stage, provider, at: new Date().toISOString(), ...details });
+    if (requestTrace.length > 20) requestTrace.shift();
+    await onTrace?.(requestTrace);
+  };
   for (const provider of APPROVED_OPENROUTER_PROVIDERS) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       let response: Response;
+      const requestStartedAt = Date.now();
+      await trace("request_dispatched", provider);
       try {
         response = await fetch(OPENROUTER_URL, {
           method: "POST",
@@ -178,13 +188,25 @@ async function generateProfile(
         const code = error instanceof Error && error.name === "AbortError"
           ? "provider_request_timeout"
           : "provider_outcome_unknown";
+        await trace("fetch_failed", provider, {
+          error_name: error instanceof Error ? error.name.slice(0, 80) : "unknown",
+          elapsed_ms: Date.now() - requestStartedAt,
+        });
         throw new ProfileGenerationError(code, {
           model: CHARACTER_PROFILE_MODEL,
           provider,
           requestId: null,
           usage: {},
+          requestTrace,
         });
       }
+
+      await trace("response_received", provider, {
+        http_status: response.status,
+        request_id: response.headers.get("x-request-id"),
+        content_type: response.headers.get("content-type"),
+        elapsed_ms: Date.now() - requestStartedAt,
+      });
 
       // A rate-limit response is an explicit non-generation failure and may
       // safely use the next approved provider once. Generic 5xx responses are
@@ -202,6 +224,8 @@ async function generateProfile(
             provider,
             requestId: response.headers.get("x-request-id"),
             usage: {},
+            httpStatus: response.status,
+            requestTrace,
           });
         }
         throw new ProfileGenerationError("openrouter_http_" + response.status, {
@@ -209,6 +233,8 @@ async function generateProfile(
           provider,
           requestId: response.headers.get("x-request-id"),
           usage: {},
+          httpStatus: response.status,
+          requestTrace,
         });
       }
 
@@ -216,7 +242,9 @@ async function generateProfile(
       let responseText: string;
       try {
         responseText = await readBoundedResponseText(response);
+        await trace("body_received", provider, { body_length: responseText.length });
         result = JSON.parse(responseText);
+        await trace("response_parsed", provider);
       } catch (error) {
         if (error instanceof Error && error.message === "provider_response_too_large") {
           throw new ProfileGenerationError("provider_response_too_large", {
@@ -231,6 +259,9 @@ async function generateProfile(
           provider,
           requestId: response.headers.get("x-request-id"),
           usage: {},
+          httpStatus: response.status,
+          responseContentType: response.headers.get("content-type") || "",
+          requestTrace,
         });
       }
 
@@ -267,6 +298,7 @@ async function generateProfile(
           responseContentType: response.headers.get("content-type") || "",
           responseBodyLength: responseText.length,
           responseParsed: true,
+          requestTrace,
         });
       }
 
@@ -292,6 +324,7 @@ async function generateProfile(
         responseBodyLength: responseText.length,
         responseParsed: true,
         providerAttempts,
+        requestTrace,
       };
       if (typeof content !== "string" || !content.trim()) {
         throw new ProfileGenerationError("model_content_missing", metadata);
@@ -533,19 +566,29 @@ export default {
         const sourceValidation = validateCharacterProfileSourcePayload(item.source_payload);
         if (!sourceValidation.ok) throw new Error(sourceValidation.errors[0] || "source_payload_invalid");
         if (isManualUser) manualAiCallStarted = true;
-        const generated = await generateProfile(item, apiKey);
-        generatedMetadata = generated;
-        // A valid provider response is only "received" until the derived Profile
-        // has actually been committed. Persistence failures must not look successful.
+        // Persist a checkpoint before contacting the provider. If the worker is
+        // interrupted mid-request, the diagnostic still shows that generation began.
         diagnosticId = await recordAiGenerationDiagnostic(supabase, {
           generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
-          sourceRef: item.source_hash, model: generated.model, provider: generated.provider,
-          requestId: generated.requestId, httpStatus: generated.httpStatus, finishReason: generated.finishReason,
+          sourceRef: item.source_hash, model: CHARACTER_PROFILE_MODEL, provider: null,
+          status: "received",
+          metadata: { request_stage: "request_prepared", persistence_status: "not_started" },
+        });
+        const generated = await generateProfile(item, apiKey, async (requestTrace) => {
+          await updateAiGenerationDiagnostic(supabase, diagnosticId, {
+            metadata: { request_stage: requestTrace[requestTrace.length - 1]?.stage || "unknown", request_trace: requestTrace },
+          });
+        });
+        generatedMetadata = generated;
+        // Keep one diagnostic row from request start through persistence completion.
+        await updateAiGenerationDiagnostic(supabase, diagnosticId, {
+          model: generated.model, provider: generated.provider, requestId: generated.requestId,
+          httpStatus: generated.httpStatus, finishReason: generated.finishReason,
           responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
           rawResponseBody: generated.rawResponseBody, responseParsed: generated.responseParsed,
           rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
-          refusalText: generated.refusalText, usage: generated.usage, status: "received",
-          metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [] },
+          refusalText: generated.refusalText, usage: generated.usage,
+          metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [], request_trace: generated.requestTrace || [] },
         });
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
@@ -581,9 +624,23 @@ export default {
           failureStage,
           failureCode: code,
           validationErrors,
+          model: failedMetadata?.model || CHARACTER_PROFILE_MODEL,
+          provider: failedMetadata?.provider || null,
+          requestId: failedMetadata?.requestId || null,
+          httpStatus: failedMetadata?.httpStatus ?? null,
+          finishReason: failedMetadata?.finishReason || null,
+          responseContentType: failedMetadata?.responseContentType || null,
+          responseBodyLength: failedMetadata?.responseBodyLength ?? null,
+          responseParsed: failedMetadata?.responseParsed ?? null,
+          rawResponseBody: failedMetadata?.rawResponseBody || null,
+          rawOutputText: failedMetadata?.rawOutputText || null,
+          refusalText: failedMetadata?.refusalText || null,
+          usage: failedMetadata?.usage || {},
           metadata: {
             ai_call_started: manualAiCallStarted,
             persistence_failed_after_generation: !!generatedMetadata,
+            provider_attempts: failedMetadata?.providerAttempts || [],
+            request_trace: failedMetadata?.requestTrace || [],
           },
         };
         if (diagnosticId) {
