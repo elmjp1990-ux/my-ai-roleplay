@@ -261,6 +261,9 @@ async function generateProfile(
           usage: {},
           httpStatus: response.status,
           responseContentType: response.headers.get("content-type") || "",
+          responseBodyLength: responseText.length,
+          responseParsed: false,
+          rawResponseBody: responseText || null,
           requestTrace,
         });
       }
