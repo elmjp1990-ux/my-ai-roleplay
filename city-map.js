@@ -40,7 +40,78 @@
  cleanup();
  };
 
+ const WORLDVIEW_TAG_VALUES = new Set(["modern", "ancient", "fantasy"]);
+ const normalizeWorldviewTags = values => [...new Set((Array.isArray(values) ? values : []).filter(value => WORLDVIEW_TAG_VALUES.has(value)))];
+ const readWorldviewTags = formData => normalizeWorldviewTags(formData.getAll("worldviewTags"));
+ const renderWorldviewField = character => {
+   const selected = new Set(normalizeWorldviewTags(character?.worldviewTags));
+   return `<section class="memory-item stack" style="gap:8px">
+     <strong>這個角色的世界觀分類</strong>
+     <small>可複選，若種族非人類，建議勾選奇幻搭配現代或古代世界觀分類</small>
+     <div style="display:flex;flex-direction:column;gap:9px">
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="modern" ${selected.has("modern") ? "checked" : ""}> 現代</label>
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="ancient" ${selected.has("ancient") ? "checked" : ""}> 古代</label>
+       <label style="display:flex;align-items:center;gap:9px"><input type="checkbox" name="worldviewTags" value="fantasy" ${selected.has("fantasy") ? "checked" : ""}> 奇幻</label>
+     </div>
+   </section>`;
+ };
+ const normalizePhoneNoticeRows = value => (Array.isArray(value) ? value : []).slice(0,8).map(item => {
+   const raw = String(item || "");
+   const separator = raw.indexOf("|");
+   return separator < 0 ? { display: raw.trim(), instruction: "" }
+     : { display: raw.slice(0, separator).trim(), instruction: raw.slice(separator + 1).trim() };
+ });
+ const readPhoneNoticeRows = form => {
+   const values = new FormData(form);
+   return Array.from({ length: 8 }, (_, index) => {
+     const display = String(values.get("phoneDisplay" + index) || "").trim().slice(0, 80);
+     const instruction = String(values.get("phoneInstruction" + index) || "").trim().slice(0, 150);
+     return display || instruction ? display + " | " + instruction : "";
+   }).filter(Boolean);
+ };
+ const editorCharacterFingerprint = character => {
+   const c = character || {};
+   const profile = c.personalityProfile || {};
+   const phone = c.phoneSettings || {};
+   const source = JSON.stringify([
+     String(c.name || ""), String(c.intro || ""), String(c.opening || ""),
+     String(c.privateInfo || ""), String(c.style || ""),
+     ["coreTraits", "values", "speechStyle", "behaviorRules", "boundaries", "relationshipPacing", "likes", "dislikes", "primaryIllustrationName"].map(key => String(profile[key] || "")),
+     (Array.isArray(phone.noticePrompts) ? phone.noticePrompts : Array.isArray(phone.notices) ? phone.notices : []).map(value => String(value))
+   ]);
+   let hash = 2166136261;
+   for (let index = 0; index < source.length; index++) hash = Math.imul(hash ^ source.charCodeAt(index), 16777619);
+   return (hash >>> 0).toString(16);
+ };
+ const reconcileEditorDraft = (character, draft) => {
+   const fingerprint = editorCharacterFingerprint(character);
+   if (draft.baseFingerprint) return { stale: draft.baseFingerprint !== fingerprint, draft, fingerprint };
+   const next = { ...draft };
+   for (const key of ["intro", "opening", "privateInfo", "style"]) {
+     if (!String(next[key] || "").trim() && String(character?.[key] || "").trim()) next[key] = character[key];
+   }
+   const originalProfile = character?.personalityProfile || {};
+   const draftProfile = next.personalityProfile || {};
+   const mergedProfile = { ...originalProfile, ...draftProfile };
+   for (const key of ["coreTraits", "values", "speechStyle", "behaviorRules", "boundaries", "relationshipPacing", "likes", "dislikes", "primaryIllustrationName"]) {
+     if (!String(draftProfile[key] || "").trim() && String(originalProfile[key] || "").trim()) mergedProfile[key] = originalProfile[key];
+   }
+   next.personalityProfile = mergedProfile;
+   const originalPrompts = Array.isArray(character?.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
+     : Array.isArray(character?.phoneSettings?.notices) ? character.phoneSettings.notices : [];
+   const draftPrompts = Array.isArray(next.phoneSettings?.noticePrompts) ? next.phoneSettings.noticePrompts : [];
+   if (!draftPrompts.length && originalPrompts.length) next.phoneSettings = character.phoneSettings;
+   next.baseFingerprint = fingerprint;
+   return { stale: false, draft: next, fingerprint };
+ };
  global.PoyozzCityMap = Object.freeze({
+ normalizeWorldviewTags,
+ readWorldviewTags,
+ renderWorldviewField,
+ editorCharacterFingerprint,
+ reconcileEditorDraft,
+ normalizePhoneNoticeRows,
+ readPhoneNoticeRows,
  destroy: destroyActiveMap,
  refreshScenes() {
  return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
@@ -51,7 +122,7 @@
  render(dependencies) {
  destroyActiveMap();
  const {
- $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
+ ICON, chatNavUnreadBadge, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
  persist, hydratePublicCharacterIllustrations, characterVideoObserver,
  releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
  setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
@@ -89,6 +160,27 @@
  document.body.classList.add('city-map-mode');
  const view=$('view');
   view.innerHTML=`
+    <style id="poyozz-city-map-shared-primary-nav">
+body.city-map-mode .city-map-bottom .nav-btn{
+  display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+  gap:4px!important;min-width:0!important;padding:6px 1px!important;font-size:10px!important;line-height:1.2!important;
+  text-align:center!important;white-space:nowrap!important;background:transparent!important;border:1px solid transparent!important;
+  border-radius:10px!important;color:rgba(255,255,255,.88)!important;text-shadow:0 1px 8px rgba(5,10,24,.55)!important;
+  box-shadow:none!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn svg{width:20px!important;height:20px!important;filter:drop-shadow(0 1px 5px rgba(5,10,24,.42))}
+body.city-map-mode .city-map-bottom .nav-btn .nav-label{display:block!important;max-width:100%!important;overflow:hidden!important;text-overflow:clip!important}
+body.city-map-mode .city-map-bottom .nav-btn.active,
+body.city-map-mode .city-map-bottom .nav-btn[aria-current="page"]{
+  background:linear-gradient(135deg,rgba(183,157,255,.24),rgba(255,178,210,.17))!important;
+  border-color:rgba(225,210,255,.3)!important;color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+}
+body.city-map-mode .city-map-bottom .nav-btn:hover,
+body.city-map-mode .city-map-bottom .nav-btn:focus-visible{
+  background:rgba(255,255,255,.12)!important;border-color:rgba(255,255,255,.18)!important;color:#fff!important;
+}
+</style>
     <section class="city-map-stage" id="cityMapStage" aria-label="POYOZZ 城市地圖">
       <div class="city-map-world" id="cityMapWorld" aria-label="可拖曳地圖">
         <div class="city-map-river"></div>
@@ -122,8 +214,12 @@
           <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
         </aside>
         <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
-        <div class="city-map-bottom">
-          <button data-action="city-traditional">✧<br>探索</button><button data-action="nav" data-page="create">✎<br>創建</button><button data-action="nav" data-page="chat">☏<br>聊天</button><button data-action="nav" data-page="shop">◇<br>商店</button><button data-action="nav" data-page="profile">♡<br>我的</button>
+        <div class="city-map-bottom" aria-label="主要導覽">
+          <button type="button" class="nav-btn active" data-action="nav" data-page="citymap" aria-current="page">${ICON.home}<span class="nav-label">探索</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="create">${ICON.create}<span class="nav-label">創建</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="chat"><span class="nav-icon-wrap">${ICON.chat}${chatNavUnreadBadge()}</span><span class="nav-label">聊天</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="shop">${ICON.shop}<span class="nav-label">商店</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="profile">${ICON.profile}<span class="nav-label">我的</span></button>
         </div>
       </div>
       <div class="city-map-empty">拖曳探索 · 雙指縮放 · 雙擊空白處沉浸</div>

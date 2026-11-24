@@ -51,7 +51,7 @@ const SCENE_ALIASES: Record<string, string> = {
   二手樂器行: "shopping-street", 樂器行: "shopping-street", 樂器店: "shopping-street",
   花店: "shopping-street", 路邊攤: "shopping-street", 小吃攤: "shopping-street", 小吃店: "shopping-street",
   百貨: "department-store", 百貨公司: "department-store", department: "department-store", restaurant: "department-store", 餐廳: "department-store", 餐館: "department-store",
-  大學: "university", 學校: "university", 校園: "university", university: "university",
+  大學: "university", 學校: "university", 校園: "university", 校舍: "university", 教學大樓: "university", 校園建築: "university", 店面: "shopping-street", university: "university",
   醫院: "hospital", 中央醫院: "hospital", 診所: "hospital",
   便利商店: "convenience-store", 超商: "convenience-store", convenience: "convenience-store",
   江邊堤防: "waterfront", 河堤: "waterfront", 河岸: "waterfront", 水岸港區: "waterfront", 海港: "waterfront",
@@ -155,6 +155,11 @@ export function classifyEncounterActivitySpace(
   // Product rule: smoking on the character's apartment balcony is treated as
   // part of the apartment's indoor scene, not as a weather-exposed activity.
   if (/陽台/.test(activity) && /抽菸|吸菸|抽煙/.test(activity)) return "indoor";
+
+  const clearlyIndoorConstruction = /室內施工|室內裝修|室內翻修|店內施工|教室施工|辦公室施工|房間內施工|客廳施工|廚房施工|浴室施工|水電管線|木作施工|室內油漆|地板施工|天花板施工/.test(activity);
+  if (clearlyIndoorConstruction) return "indoor";
+  const clearlyOutdoorConstruction = /道路施工|路面施工|公園步道施工|戶外施工|外牆施工|外牆修繕|外牆翻修|屋頂施工|屋頂防水|廣場施工|停車場施工|道路修繕|道路整修|步道整修/.test(activity);
+  if (clearlyOutdoorConstruction) return "outdoor";
 
   const clearlyIndoor = /室內|家中|家裡|公寓裡|客戶家|客戶住處|修理電燈|組裝書架|搬家打包|除蟲|清理雜物|包廂|晚宴|家庭聚餐|吃午餐|吃早餐|吃晚餐|用餐|超商內|貨架前|店內|結帳|選購飲料|挑選飲料|購物/.test(activity);
   if (clearlyIndoor) return "indoor";
@@ -296,10 +301,15 @@ export type EncounterWorldviewClassification = {
   confidence: "high" | "low";
 };
 
+// Author tags route modern/ancient/fantasy; unknown legacy roles generate before soft review.
 export function classifyEncounterWorldview(source: EncounterScheduleSource): EncounterWorldviewClassification {
   const profile = isRecord(source.personality_profile) ? source.personality_profile : {};
   const derivedProfile = isRecord(source.derived_character_profile) ? source.derived_character_profile : {};
   const derivedLifeContext = isRecord(source.derived_life_context) ? source.derived_life_context : {};
+  const worldviewTags = Array.isArray(source.worldview_tags)
+    ? [...new Set(source.worldview_tags.filter((value): value is string =>
+      typeof value === "string" && ["modern", "ancient", "fantasy"].includes(value)))]
+    : [];
   const context = [
     text(source.world_era), text(source.setting_era), text(source.intro),
     text(source.title), text(source.occupation), text(source.race), text(source.style),
@@ -307,16 +317,38 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
     text(source.schedule_description), text(source.private_info),
     JSON.stringify(profile), JSON.stringify(derivedProfile), JSON.stringify(derivedLifeContext),
   ].join(" ");
-  const modern = source.modern_setting_compatible === true || source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
   const cultivation = CULTIVATION_PATTERN.test(context);
   const historical = HISTORICAL_PATTERN.test(context);
   const scienceFiction = SCI_FI_PATTERN.test(context);
   const apocalypse = APOCALYPSE_PATTERN.test(context);
   const fantasy = FANTASY_PATTERN.test(context);
   const alternate = ALTERNATE_PATTERN.test(context);
+  const supernatural = SUPERNATURAL_SPECIES_PATTERN.test(context);
 
-  // Explicit contemporary context wins for modern supernatural species, but
-  // explicit historical/cultivation eras remain excluded unless time travel is stated.
+  // Explicit author-selected tags take precedence over inference. Modern wins
+  // for cross-era characters so they can receive coherent schedules on this map.
+  if (worldviewTags.length) {
+    if (worldviewTags.includes("modern")) {
+      return {
+        category: worldviewTags.includes("fantasy") || supernatural ? "modern_fantasy" : "modern",
+        modern_map_compatible: true,
+        confidence: "high",
+      };
+    }
+    if (worldviewTags.includes("ancient")) {
+      return {
+        category: cultivation ? "cultivation" : "historical",
+        modern_map_compatible: false,
+        confidence: "high",
+      };
+    }
+    if (worldviewTags.includes("fantasy")) {
+      return { category: "fantasy", modern_map_compatible: false, confidence: "high" };
+    }
+  }
+
+  const modern = source.modern_setting_compatible === true ||
+    source.time_travel_explicit === true || MODERN_SETTING_PATTERN.test(context);
   if (source.time_travel_explicit === true) {
     return { category: "modern_fantasy", modern_map_compatible: true, confidence: "high" };
   }
@@ -324,19 +356,17 @@ export function classifyEncounterWorldview(source: EncounterScheduleSource): Enc
   if (historical) return { category: "historical", modern_map_compatible: false, confidence: "high" };
   if (scienceFiction) return { category: "science_fiction", modern_map_compatible: false, confidence: "high" };
   if (apocalypse) return { category: "post_apocalyptic", modern_map_compatible: false, confidence: "high" };
-  if (modern) return {
-    category: (fantasy || SUPERNATURAL_SPECIES_PATTERN.test(context)) ? "modern_fantasy" : "modern",
-    modern_map_compatible: true,
-    confidence: "high",
-  };
-  // "異世界" is an alternate-world signal, not sufficient evidence of
-  // conventional fantasy by itself; explicit magic/fantasy signals still win
-  // only when no alternate-world marker is present.
+  if (modern) {
+    return {
+      category: (fantasy || supernatural) ? "modern_fantasy" : "modern",
+      modern_map_compatible: true,
+      confidence: "high",
+    };
+  }
   if (alternate) return { category: "alternate_world", modern_map_compatible: false, confidence: "high" };
   if (fantasy) return { category: "fantasy", modern_map_compatible: false, confidence: "high" };
   return { category: "unknown", modern_map_compatible: false, confidence: "low" };
 }
-
 export type EncounterWorldviewScheduleDisposition = "generate" | "not_applicable" | "needs_review";
 
 export function getEncounterWorldviewScheduleDisposition(
@@ -344,8 +374,11 @@ export function getEncounterWorldviewScheduleDisposition(
   manualDecision: unknown = null,
 ): EncounterWorldviewScheduleDisposition {
   if (manualDecision === "modern_map_compatible") return "generate";
+  if (manualDecision === "not_applicable") return "not_applicable";
   if (classification.modern_map_compatible) return "generate";
-  return classification.category === "unknown" ? "needs_review" : "not_applicable";
+  // Unknown legacy characters are no longer blocked by a manual-review gate.
+  // Their natural-language locations still pass through the existing scene resolver.
+  return classification.category === "unknown" ? "generate" : "not_applicable";
 }
 
 export function isEncounterModernMapCompatible(source: EncounterScheduleSource): boolean {
@@ -534,6 +567,9 @@ export function buildEncounterScheduleBatchMessages(
       age: text(source.age),
       tags: Array.isArray(source.tags)        ? source.tags.filter((value): value is string => typeof value === "string").map((value) => value.trim()).filter(Boolean).slice(0, 30)
         : [],
+      worldview_tags: Array.isArray(source.worldview_tags)
+        ? source.worldview_tags.filter((value): value is string => typeof value === "string" && ["modern", "ancient", "fantasy"].includes(value))
+        : [],
       occupation,
       author_character_profile: characterProfile,
       character_ai_profile: isRecord(source.derived_character_profile) ? source.derived_character_profile : null,
@@ -563,17 +599,17 @@ export function buildEncounterScheduleBatchMessages(
   void sceneCatalog;
   const system = [
     "你是 POYOZZ 的角色行程規劃器。一次為佇列提供的所有公開角色整理可驗證的城市地圖行程；不得自行省略任何角色。",
-    "系統已先完成世界觀分類；本次送入的角色都已由系統判定為現代地圖相容。你不得重新判斷時代、世界觀或地圖資格，也不得輸出 no_matching_location。吸血鬼、狼人、精靈等種族不代表古代；依輸入角色的現代背景推演其日常。必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。",
+    "系統已先完成世界觀分類；本次送入的角色都已允許進行現代地圖行程生成。worldview_tags 是作者明確勾選的世界觀分類：現代可使用現代城市生活；古代且未勾選現代者不會送入本次生成；奇幻代表題材而非年代，現代＋奇幻可安排現代城市中的吸血鬼、狼人、精靈等角色。舊角色 worldview_tags 為空時，依角色原始設定與生活脈絡判斷，不要自行捏造時代或身份；若沒有明確古代背景，優先安排不扭曲人設且能合理對應現有城市的日常。你不得重新判斷作者明確標註的世界觀或地圖資格，也不得輸出 no_matching_location。必須讀取角色名稱、稱號、職業、身分、世界觀、種族、性格、興趣、標籤、作者行程說明及 existing_author_schedules。existing_author_schedules 是作者已保存的固定時段與地點，必須原樣保留並視為最高優先限制，不得改寫或覆蓋；AI 只負責推演其餘時段。作者固定行程僅作為規劃限制。若 author_schedule_brief 為空，依角色卡設定推演合理日常；若作者只提供部分時段，保留明確時段與限制，只補足其他時段，不得覆蓋作者設定。只使用輸入角色的設定與作者提供的行程方向，不可替角色創造與背景衝突的現代身分。",
     "若輸入包含 character_ai_profile，必須讀取先前角色資料整理 AI 已保存的身份背景、核心個性、內在動機、情緒反應、關係互動、行為主動性、知識界線、說話風格與角色一致性規則，作為推演日常活動、工作內容及社交場景的主要參考；author_character_profile 是作者原始設定，若與整理結果有差異，以作者明示內容為準。unknowns 與 source_conflicts 代表尚未確認，不可自行補造，也不可將 AI 推論寫成作者明示。公開 activity 不得揭露私密資訊。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
     "若輸入包含 character_life_context，必須將其視為先前由角色原始設定整理並保存的生活環境參考；優先讀取有來源支持的工作環境、住所、日常作息、興趣、社交圈、常去場所與生活限制。status=not_provided 或空 items 代表未知，不可自行補造；ai_inference 必須視為推論而非作者明示。若此欄位不存在或為 null，才退回原始角色卡與作者私密設定推演。不得為取得生活環境而在行程生成階段再次呼叫分析 AI。",
-    "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 20 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
+    "不得向模型提供任何地圖地點建議、場景名稱範例或地點白名單，也不得提供地圖場景 ID、座標或內部場景分類。必須只依角色職業、經濟能力、個性、興趣、作息、生活圈與背景，自行推演合理地點；不可為了配合地圖而改寫角色生活或硬塞地點。每個選項只寫一個明確地點，地點名稱最多 20 個字（空格不計），允許括號等辨識名稱，例如「歸途（酒吧）」，不得用「或」、斜線、頓號等串接多個地點。工作活動必須使用實際工作場所，居家活動才使用住所；例如顧言在代辦所辦公，地點應為「代辦所」，不可因住所是公寓就把工作地點寫成公寓。施工、裝修、修繕是既有場所中的動態活動，不是獨立場景；location 必須寫實際施工的建物或場所，不可寫「工地」或創造新的地圖地點。依角色職業、案場與活動內容選擇合理的既有場所；activity 描述施工、監工、驗收等行為。不得輸出 location_key、場景 ID、座標或任何系統場景分類。地點是否能對應地圖由系統自行判斷，無法媒合時仍保留原地點與行程。",
     "airport 是特殊地點：只有角色本身職業／設定與航空機場有明確關聯，或作者設定有具體搭機、接送、轉機、出入境行程時才能使用。不得把機場當一般休閒、辦公或隨機偶遇地點；沒有明確理由時不得使用機場，應依角色背景自行推導合理地點。",
     "行程以角色自身日常活動為準，AI 不得判斷玩家是否能相遇、地點是否適合公開相遇或地圖是否顯示。weekday 與 holiday 各自必須完整輸出 24 個逐小時時段，從 00:00–01:00 到 23:00–00:00，不能有空檔、重疊或合併時段。必須按小時逐一輸出，完整包含 00、01、02、03、04、05、06、07、08、09、10、11、12、13、14、15、16、17、18、19、20、21、22、23 共 24 格；不可因角色睡眠、休息、待命、沒有工作或某時段不重要而省略。完成草稿後，輸出前先自我檢查兩種 day_type 的時段清單：每種均為 24 格、每格恰好 1 小時、起訖連續且從 00:00 開始至隔日 00:00 結束，沒有缺漏、重複、重疊或跨時段合併；若檢查失敗，必須先修正完整 JSON 再輸出。每個時段必須提供 2–3 個選項，不得少於 2 個或多於 3 個；即使固定工作或睡眠，也必須提出至少兩種符合角色背景的合理活動或情境，不得用單一選項 100% 規避機率，也不可為湊數虛構不合理活動。每個選項只輸出 weight、location、activity、is_outdoor、rain_fallback_location、rain_fallback_activity 六個欄位。activity 與 rain_fallback_activity 各 8–30 個中文字，直接描述角色正在做的事；不需要 scene_description、招呼語或長篇敘事。若角色正在睡覺，activity 必須明確寫出熟睡、睡著、睡覺中等可辨識狀態。每個時段所有選項 weight 必須是 1–99 的整數且總和必須恰好 100；weight 是該時段整組地點與行為實際發生的相對機率，依角色日常發生可能性設定，不可全部固定相同權重。不同時段獨立抽取：各時段依權重獨立抽選，同一時段的地點與行為必須整組一起切換；相鄰時段仍須符合交通與作息邏輯。即使地點無法媒合地圖，也必須保留自然地點與行為描述，是否能相遇及是否顯示由系統判斷。",
     "weekday 與 holiday 是日曆情境，不等於角色的上班日與休假日。依台灣政府正式辦公日曆及補班日決定 day_type；AI 必須根據角色職業與作者設定，分別推演平日和假日的生活節奏，不可假設所有人週末休息。系統每天依角色、日期與時段獨立執行加權抽取，同一天同一時段結果固定，重新整理地圖不會重新抽籤；不同日期會使用不同抽取種子。機率只在同一角色、同一日期類型、同一個小時的 options 內比較，絕不可跨時段或跨平日／假日共用權重。",
     "行程只分 weekday 與 holiday；節日、國定假日與補班日由系統依台灣日曆映射到相應日期類型，不要另外生成 special_events，也不可自行推算角色生日。",
     "戶外時段必須提供合理的雨天替代地點與替代行為，雨天行為也限制 8–30 個中文字；優先選擇室內場所。室內時段通常可將 rain_fallback_location 與 rain_fallback_activity 設為 null，但若角色在雨天改變活動或選擇不出門，AI 也可提供合理備案。雨天備案不必強制對應現有地圖場景；無法媒合時保留自然地點描述並由系統留空場景 key。是否戶外及地點對應何種系統場景，由系統判斷。",
-    "is_outdoor 必須依活動實際發生的空間判斷，不能只看地點名稱；地點描述與活動空間是兩個獨立欄位。客戶家維修、搬家、清潔等工作發生在室內；餐廳／小吃店用餐、超商內購物或結帳都屬室內。POYOZZ 特別規則：角色在自己公寓陽台抽菸仍判定為室內，地點使用住所。計程車內送客屬車內活動，is_outdoor=false，地點可寫「街頭」，不可錯掛在餐廳，也不可建立或要求計程車場景；角色下車後在街頭道別或步行才判定為戶外。不得因地點對應到街道或商圈就把車內／店內活動標為戶外。",
+    "is_outdoor 必須依活動實際發生的空間判斷，不能只看地點名稱；地點描述與活動空間是兩個獨立欄位。室內裝修、店內／教室／辦公室施工、水電管線、木作與室內翻修屬室內；道路、路面、公園步道、廣場、外牆與屋頂施工才屬戶外。客戶家維修、搬家、清潔等工作發生在室內；餐廳／小吃店用餐、超商內購物或結帳都屬室內。POYOZZ 特別規則：角色在自己公寓陽台抽菸仍判定為室內，地點使用住所。計程車內送客屬車內活動，is_outdoor=false，地點可寫「街頭」，不可錯掛在餐廳，也不可建立或要求計程車場景；角色下車後在街頭道別或步行才判定為戶外。不得因地點對應到街道或商圈就把車內／店內活動標為戶外。",
 
     "作者行程說明只供內部規劃；activity 必須使用公開可見、簡短自然的描述，不得逐字複製整段說明或揭露私密情節。",
 

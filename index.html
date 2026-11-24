@@ -1172,6 +1172,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
 <script src="./signed-url-manager.js"></script>
 <script src="./core-utils.js"></script>
 <script src="./city-map.js"></script>
+<script src="./character-editor-cloud.js"></script>
 <script src="./encounter-history.js"></script>
 <script src="./followed-authors.js"></script>
 <script src="./author-profile.js"></script>
@@ -1787,7 +1788,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
       }
       // 登入階段只讀取未刪除的雲端角色；不會把本機快照自動寫回 Supabase。
       const pageResult=await client.from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
+        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, worldview_tags, phone_settings, nsfw_workplace_warning, created_at, first_published_at, latest_eligible, rights_confirmed, deleted_at, deletion_reason')
         .eq('author_id',user.id).is('deleted_at',null)
         .order('created_at',{ascending:false}).order('id',{ascending:false})
         .range(pager.offset,pager.offset+pageSize-1);
@@ -1890,6 +1891,7 @@ body.city-map-mode #mobileNav.mobile-nav .nav-btn:focus-visible{
           phoneSettings:row.phone_settings && typeof row.phone_settings==='object' ? row.phone_settings : (local.phoneSettings || {}),
           nsfwWorkplaceWarning:row.nsfw_workplace_warning === true,
           tags: normalizeCharacterTagsForRead(Array.isArray(row.tags) ? row.tags : (local.tags || [])),
+          worldviewTags: window.PoyozzCityMap.normalizeWorldviewTags(Array.isArray(row.worldview_tags) ? row.worldview_tags : local.worldviewTags),
           authorId: row.author_id,
           owner: true,
           chats: local.chats || '0',
@@ -2886,6 +2888,7 @@ async function saveSupabaseCharacter(character, expectedUserId) {
     const client = window.mySupabase;
     if (!client || !expectedUserId) throw new Error('請先使用 Google 帳號登入，再儲存角色。');
     character.tags = validateCharacterTags(Array.isArray(character.tags) ? character.tags : []);
+    character.worldviewTags = window.PoyozzCityMap.normalizeWorldviewTags(character.worldviewTags);
 
     // 先用登入者專屬 RPC 取得生日，避免未成年作者勾選 NSFW 後才收到泛用的 RLS 寫入錯誤。
     // 資料庫 INSERT／UPDATE 年齡政策仍是最終安全防線。
@@ -2977,7 +2980,8 @@ async function saveSupabaseCharacter(character, expectedUserId) {
       phone_settings:character.phoneSettings && typeof character.phoneSettings==='object' ? {noticePrompts:(Array.isArray(character.phoneSettings.noticePrompts)?character.phoneSettings.noticePrompts:Array.isArray(character.phoneSettings.notices)?character.phoneSettings.notices:[]).slice(0,8).map(x=>String(x).slice(0,230))} : {},
       nsfw_workplace_warning: character.nsfwWorkplaceWarning === true,
       is_nsfw: character.isNSFW === true,
-      tags: Array.isArray(character.tags) ? character.tags : []
+      tags: Array.isArray(character.tags) ? character.tags : [],
+      worldview_tags: character.worldviewTags
     };
 
     const { error: characterError } = await client
@@ -3013,7 +3017,7 @@ if (characterError) {
     // 重新讀取資料庫，避免 RLS／trigger／資料庫規則拒絕公開卻讓前端顯示成功。
     const { data: savedCharacter, error: verifyError } = await client
       .from('characters')
-      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings')
+      .select('visibility, age, first_published_at, latest_eligible, rights_confirmed, nsfw_workplace_warning, deleted_at, phone_settings, worldview_tags')
       .eq('id', character.id)
       .eq('author_id', expectedUserId)
       .maybeSingle();
@@ -3030,6 +3034,9 @@ if (characterError) {
     }
     if (savedCharacter.nsfw_workplace_warning !== (character.nsfwWorkplaceWarning === true)) {
       throw new Error('資料庫中的 NSFW 工作場所提醒未成功保存，請重試。');
+    }
+    if (JSON.stringify(savedCharacter.worldview_tags || []) !== JSON.stringify(row.worldview_tags || [])) {
+      throw new Error('角色世界觀分類回讀結果與送出內容不一致，請重新儲存。');
     }
     const expectedPhonePrompts = Array.isArray(row.phone_settings?.noticePrompts) ? row.phone_settings.noticePrompts : [];
     const savedPhonePrompts = Array.isArray(savedCharacter.phone_settings?.noticePrompts) ? savedCharacter.phone_settings.noticePrompts : [];
@@ -6225,24 +6232,6 @@ function readEditorDraft() {
   }
   return null;
 }
-function normalizePhoneNoticeRows(value) {
-  const source = Array.isArray(value) ? value : [];
-  return source.slice(0,8).map(item => {
-    const raw = String(item || '');
-    const separator = raw.indexOf('|');
-    return separator < 0
-      ? { display:raw.trim(), instruction:'' }
-      : { display:raw.slice(0,separator).trim(), instruction:raw.slice(separator+1).trim() };
-  });
-}
-function readPhoneNoticeRows(form) {
-  const values = new FormData(form);
-  return Array.from({length:8}, (_,index) => {
-    const display = String(values.get('phoneDisplay'+index) || '').trim().slice(0,80);
-    const instruction = String(values.get('phoneInstruction'+index) || '').trim().slice(0,150);
-    return display || instruction ? display + ' | ' + instruction : '';
-  }).filter(Boolean);
-}
 function renderPhoneSettingsFields(character, savedDraft) {
   const draftPrompts = savedDraft?.phoneSettings?.noticePrompts;
   const legacyDraftPrompts = String(savedDraft?.phoneNotices || '').split(/\r?\n/).map(value=>value.trim()).filter(Boolean);
@@ -6250,7 +6239,7 @@ function renderPhoneSettingsFields(character, savedDraft) {
     : legacyDraftPrompts.length ? legacyDraftPrompts
     : (Array.isArray(character.phoneSettings?.noticePrompts) ? character.phoneSettings.noticePrompts
       : Array.isArray(character.phoneSettings?.notices) ? character.phoneSettings.notices : []);
-  const rows = normalizePhoneNoticeRows(source);
+  const rows = window.PoyozzCityMap.normalizePhoneNoticeRows(source);
   const visibleRows = rows.length ? rows : [{display:'',instruction:''}];
   return '<div id="phoneSettingsEditor" class="stack" style="gap:10px">' +
     '<div id="phoneSettingsRows" class="stack" style="gap:10px">' +
@@ -6288,6 +6277,7 @@ function saveEditorDraft() {
     gender:String(values.get('gender') || 'ambiguous'),
     age:String(values.get('age') || ''),
     race:String(values.get('race') || ''),
+    worldviewTags:window.PoyozzCityMap.readWorldviewTags(values),
     intro:String(values.get('intro') || ''),
     opening:String(values.get('opening') || ''),
     privateInfo:String(values.get('privateInfo') || ''),
@@ -6299,7 +6289,7 @@ function saveEditorDraft() {
       boundaries:'', relationshipPacing:''
     }),
     encounterScheduleDescription:String(values.get('encounterScheduleDescription') || ''),
-    phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
+    phoneSettings:{noticePrompts:window.PoyozzCityMap.readPhoneNoticeRows(form)},
     visibility:String(values.get('visibility') || 'private'),
     rightsConfirmed:values.get('rightsConfirmed') === 'on',
     isNSFW:values.get('isNSFW') === 'on',
@@ -6308,6 +6298,7 @@ function saveEditorDraft() {
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
+    baseFingerprint:route.id ? window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter) : '',
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -6331,6 +6322,15 @@ function clearEditorDraft() {
   try { localStorage.removeItem(key); } catch (_) {}
   try { sessionStorage.removeItem(key); } catch (_) {}
 }
+const editorCloudRefreshController=window.PoyozzCharacterEditorCloud.createEditorCloudRefreshController({
+  refresh:characterId=>window.PoyozzCharacterEditorCloud.refreshOwnedCharacterForEditor({
+    characterId,client:window.mySupabase,currentUser,getVerifiedAuthUser,state,
+    normalizePersonalityProfile,normalizeCharacterTagsForRead,persist
+  }),
+  isCurrent:characterId=>route.page==='editor'&&route.id===characterId,
+  onReady:refreshed=>{draftCharacter=clone(refreshed);render();},
+  onError:error=>{console.error('角色編輯器雲端資料刷新失敗：',error);render();}
+});
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
   draftTags = normalizeCharacterTagsForRead(c?.tags || []);
@@ -6341,6 +6341,7 @@ function startEditor(c = null) {
   draftVideoFile = null;
   draftVideoPath = c?.avatarVideoPath || '';
   if(draftVideoPreviewUrl){URL.revokeObjectURL(draftVideoPreviewUrl);draftVideoPreviewUrl='';}
+  if(c?.id)editorCloudRefreshController.start(c.id);
   visit('editor',c?.id);
 }
 async function hydrateCharacterIllustrationsIntoEditor(characterId) {
@@ -6380,8 +6381,19 @@ function renderCharacterIllustrationGallery(items = []) {
 }
 
 function renderEditor() {
-  const savedDraft = readEditorDraft();
-  const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
+  if(route.id){
+    const cloudState=editorCloudRefreshController.getState();
+    const cloudMarkup=cloudState.characterId===route.id
+      ?window.PoyozzCharacterEditorCloud.renderEditorCloudStatus(cloudState,e):'';
+    if(cloudMarkup){$('view').innerHTML=cloudMarkup;return;}
+  }
+  let savedDraft = readEditorDraft();
+  const original = state.characters.find(c => c.id === route.id) || draftCharacter || {};
+  if(route.id && original.id===route.id)draftCharacter=clone(original);
+  if(route.id&&savedDraft){
+    const reconciled=window.PoyozzCityMap.reconcileEditorDraft(original,savedDraft);
+    if(reconciled.stale){clearEditorDraft();savedDraft=null;}else savedDraft=reconciled.draft;
+  }
   const c = savedDraft ? {...original, ...savedDraft} : original;
   const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
   if (savedDraft) {
@@ -6420,6 +6432,7 @@ function renderEditor() {
           <label class="field"><span>年齡</span><input name="age" type="text" maxlength="25" value="${e(c.age || '')}"></label>
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
+        ${window.PoyozzCityMap.renderWorldviewField(c)}
         <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
@@ -9706,7 +9719,6 @@ async function renderPhoneModal() {
   // Author-configured phone fields are the primary rows for both single and group phones.
   // Current AI snapshots match by field_index; unmatched states and historical events follow.
 
-  // Group sweet-diary excerpts are stored per group in localStorage, so use that same shared diary for every member phone's battery.
   const groupMemorySummaries=isGroup?await loadGroupMemorySummaries(group.id,true):[];
   const diaryList=isGroup?[]:(session.memories||[]);
   const usesCloudStoryMemory=!isGroup&&session.storyMode&&session.cloudOwned;
@@ -10073,7 +10085,8 @@ async function loadEncounterScheduleRepairOutputs(){
       const hasSavedRevision=typeof item.latest_revision_text==='string'&&item.latest_revision_text.length>0;
       const editorText=e(hasSavedRevision?item.latest_revision_text:item.raw_response_text||'');
       const revisionStatus=String(item.latest_revision_status||'');
-      const revisionLabel=revisionStatus==='published'?'最近版本已發布':revisionStatus==='draft'?'已保存草稿，尚未發布':revisionStatus==='invalid'?'已保存上次修改（尚未通過驗證）':revisionStatus==='publish_failed'?'已保存上次修改（發布失敗）':hasSavedRevision?'已載入上次保存的修改':'目前顯示原始 AI 回覆';
+      const needsReconciliation=item.job_status==='needs_reconciliation';
+      const revisionLabel=needsReconciliation?'上次發布結果待核對；重新驗證後可再次嘗試發布':revisionStatus==='published'?'最近版本已發布':revisionStatus==='draft'?'已保存草稿，尚未發布':revisionStatus==='invalid'?'已保存上次修改（尚未通過驗證）':revisionStatus==='publish_failed'?'已保存上次修改（發布失敗）':hasSavedRevision?'已載入上次保存的修改':'目前顯示原始 AI 回覆';
       const errors=Array.isArray(item.validation_errors)?item.validation_errors.join('、'):'';
       const finish=e(item.finish_reason||'未提供');
       const model=e(item.response_model||item.requested_model||'未知模型');
@@ -10262,7 +10275,7 @@ async function loadEncounterScheduleTestTools(){
         return '<article class="panel stack" style="padding:12px">'+
           '<strong>'+name+'｜待人工審核</strong>'+
           '<p class="small muted">原因：'+reason+'｜保留時間：'+e(updated)+'</p>'+
-          '<p class="small">系統無法可靠判定此角色的世界觀是否適用現代地圖，因此已暫停行程生成。請依角色設定明確分類；選擇現代地圖適用只會加入待生成佇列，不會立即呼叫 AI。選擇不適用則結束審核並保留既有行程與招呼池。</p>'+
+          '<p class="small">行程會先依角色設定自動生成並發布；低信心舊角色會列在此處供日後人工核對，核對不會阻擋行程先行出現。</p>'+
           '<div class="row wrap"><button type="button" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="modern_map_compatible">判定為現代地圖適用</button><button type="button" class="ghost" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="not_applicable">判定不適用（保留既有資料）</button></div>'+
         '</article>';
       }).join(''):'<p class="small muted">目前沒有待人工審核的未知世界觀角色。</p>';
@@ -11194,9 +11207,7 @@ document.addEventListener('toggle', event => {
   hint.textContent = panel.open ? (hint.dataset.expanded || '滑動或點選燈號可切換') : (hint.dataset.collapsed || '點擊可展開');
 }, true);
 
-/* UI-1024: robust horizontal swipe navigation for single/group suggested replies.
-   Touch devices use touch events (with vertical scrolling preserved); mouse uses pointer events.
-   Delegation keeps the behavior alive across chat rerenders. */
+/* Swipe single/group suggestions; preserve vertical scroll across rerenders. */
 (function installSuggestionSwipe(){
   let gesture = null;
   let suppressClickUntil = 0;
@@ -11261,9 +11272,7 @@ document.addEventListener('toggle', event => {
   }, true);
 })();
  
-/* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
-   This makes group navigation independent of nested list markup or another handler
-   stopping propagation. The normal bubble handler is skipped to prevent double-open. */
+/* Capture group-open clicks before delegated handlers; prevent double-open. */
 document.addEventListener('click', event => {
   const target = event.target instanceof Element
     ? event.target.closest('[data-action="group-open"]')
@@ -11357,9 +11366,7 @@ document.addEventListener('click',event=>{
   else void toggleChatSessionPin(id);
 },true);
 
-/* GROUP MESSAGE ACTION CAPTURE FIX
-   Handle group-message menu and delete clicks in capture phase so an ancestor
-   handler cannot swallow the click before the action reaches the delegated router. */
+/* Capture group-message menu/delete clicks before ancestor handlers. */
 document.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!target || target.disabled) return;
@@ -12133,6 +12140,7 @@ document.addEventListener('click',async event => {
         if (owned(c)) startEditor(c);
         break;
       }
+      case 'retry-editor-cloud': editorCloudRefreshController.start(route.id);render();break;
       case 'visibility': {
         const c = state.characters.find(c => c.id === key);
         if (!owned(c)) break;
@@ -12928,7 +12936,9 @@ document.addEventListener('submit',async event => {
         const c={
           id:old?.id || id(),name,
           gender:String(f.get('gender')),age:String(f.get('age')).trim(),
-          race:String(f.get('race')).trim(),intro,opening,
+          race:String(f.get('race')).trim(),
+          worldviewTags:window.PoyozzCityMap.readWorldviewTags(f),
+          intro,opening,
           privateInfo:String(f.get('privateInfo')).trim(),
           encounterScheduleDescription:String(f.get('encounterScheduleDescription') || '').trim(),
           style:String(f.get('style')).trim(),
@@ -12938,7 +12948,7 @@ document.addEventListener('submit',async event => {
             likes:f.get('personalityLikes'), dislikes:f.get('personalityDislikes'),
             boundaries:'', relationshipPacing:''
           }),
-          phoneSettings:{noticePrompts:readPhoneNoticeRows(form)},
+          phoneSettings:{noticePrompts:window.PoyozzCityMap.readPhoneNoticeRows(form)},
           visibility:String(f.get('visibility')),image:draftImage,
           avatarVideoPath:draftVideoPath || '',
           isNSFW:f.get('isNSFW') === 'on',
@@ -13903,6 +13913,7 @@ async function importCharacter(file) {
     gender:['male','female','ambiguous'].includes(data.gender) ? data.gender : 'ambiguous',
     age:String(data.age ?? '').trim().slice(0,25),
     race:String(data.race || '').slice(0,50),
+    worldviewTags:window.PoyozzCityMap.normalizeWorldviewTags(data.worldviewTags),
     privateInfo:String(data.privateInfo || ''),style:String(data.style || ''),
     authorId:user.uid,owner:true,visibility:'private',rightsConfirmed:false,
     chats:'0',users:null,createdAt:Date.now()
@@ -14023,7 +14034,7 @@ function renderCityMapMVP() {
     return;
   }
   return renderCityMap({
-    $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
+    ICON, chatNavUnreadBadge, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
     persist, hydratePublicCharacterIllustrations, characterVideoObserver,
     releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
     setEncounterLifecycleState, createEncounterSession,
@@ -14380,5 +14391,6 @@ body.conversation .chat-layout,body.group-chat-page .chat-layout{
 <script>
 document.addEventListener('keydown',event=>{if(event.key!=='Enter'&&event.key!==' ')return;const target=event.target?.closest?.('.encounter-dialogue-beat');if(!target||event.target?.closest?.('.encounter-dialogue-replay'))return;event.preventDefault();target.click();});
 </script>
+
 </body>
 </html>

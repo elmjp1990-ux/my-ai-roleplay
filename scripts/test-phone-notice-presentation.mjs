@@ -3,6 +3,8 @@ import fs from 'node:fs';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const uiStyles = fs.readFileSync('poyozz-ui.css', 'utf8');
+const cityMap = fs.readFileSync('city-map.js', 'utf8');
+const editorCloud = fs.readFileSync('character-editor-cloud.js', 'utf8');
 const phoneStateMigration = fs.readFileSync('supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql', 'utf8');
 const storyPrompt = fs.readFileSync('supabase/functions/chat-turn/index.ts', 'utf8');
 const groupTurnSource = fs.readFileSync('supabase/functions/group-chat-turn/index.ts', 'utf8');
@@ -124,11 +126,12 @@ assert.ok(!chatEntriesBlock.includes('last?.at'), 'Chat list must not reference 
 
 console.log('Phone notification UI hides creator prompts and renders generated notices only.');
 
-const editorStart = html.indexOf('function normalizePhoneNoticeRows');
-const editorEnd = html.indexOf('function saveEditorDraft()', editorStart);
-assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Structured author phone editor helpers must exist');
-const editorHelpers = html.slice(editorStart, editorEnd);
-assert.match(editorHelpers, /source\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
+const editorStart = cityMap.indexOf('const normalizePhoneNoticeRows');
+const editorEnd = cityMap.indexOf('const editorCharacterFingerprint', editorStart);
+assert.ok(editorStart >= 0 && editorEnd > editorStart, 'Shared phone normalization helpers must exist in the extracted city-map module');
+const editorHelpers = cityMap.slice(editorStart, editorEnd) +
+  html.slice(html.indexOf('function renderPhoneSettingsFields'), html.indexOf('function saveEditorDraft()'));
+assert.match(editorHelpers, /\.slice\(0,8\)/, 'Phone editor must align with the eight-field Story contract');
 assert.match(editorHelpers, /phoneDisplay/);
 assert.match(editorHelpers, /phoneInstruction/);
 assert.match(editorHelpers, /<span>名稱<\/span>/);
@@ -137,8 +140,23 @@ assert.match(html, /encounterScheduleDescription:String\(values\.get\('encounter
   'Editor draft must retain the schedule field');
 assert.match(html, /scheduleField\.dataset\.scheduleHydrated !== 'true'/,
   'Saving must wait for schedule hydration instead of deleting an unread existing value');
+assert.match(html, /character-editor-cloud\.js/,'The authoritative editor hydration module must be loaded before the app script');
 assert.match(html, /verifiedPrivateInfo/,
   'Private personality and private-info fields must be read back after save');
+assert.match(editorCloud, /const refreshOwnedCharacterForEditor = async/,
+  'Opening an existing role must fetch the authoritative cloud record directly before rendering editable fields');
+assert.match(editorCloud, /character_private_info'[\s\S]*?\.eq\('character_id',characterId\)\.eq\('author_id',uid\)/,
+  'Editor hydration must read private personality and private notes using the verified owner identity');
+assert.match(editorCloud, /character_stories'[\s\S]*?\.eq\('character_id',characterId\)[\s\S]*?\.limit\(1\)\.maybeSingle\(\)/,
+  'Editor hydration must fetch the latest saved opening message directly for the selected character');
+assert.match(editorCloud, /正在讀取角色雲端設定/,
+  'Editor must not show empty fields while the authoritative cloud settings are still loading');
+assert.match(editorCloud, /角色設定暫時無法載入/,
+  'A cloud hydration failure must be explicit and must not silently present blank settings as valid data');
+assert.match(editorCloud, /createEditorCloudRefreshController/,
+  'Editor cloud hydration must reject stale async responses after navigation');
+assert.match(editorCloud, /state\.requestId===requestId/,
+  'Only the latest editor hydration request may replace the selected role data');
 assert.match(html, /expectedPhonePrompts/,
   'Phone settings must be verified against the saved database row');
 

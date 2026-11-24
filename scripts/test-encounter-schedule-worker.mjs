@@ -17,6 +17,9 @@ const pendingPriorityMigration = fs.readFileSync("supabase/migrations/2026111807
 const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118074727_encounter_schedule_raw_output_repair.sql", "utf8");
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const rawOutputSoftHideMigration = fs.readFileSync("supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql", "utf8");
+const reconciliationRepairMigration = fs.readFileSync("supabase/migrations/20261124130000_allow_reconciliation_schedule_repair.sql", "utf8");
+const worldviewTagsMigration = fs.readFileSync("supabase/migrations/20261124160000_character_worldview_tags_and_construction_scene.sql", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 const rawOutputSoftHideReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-soft-hide.sql", "utf8");
 const scheduleRepairDraftMigration = fs.readFileSync("supabase/migrations/20261124090000_encounter_schedule_repair_drafts.sql", "utf8");
 const scheduleRepairDraftReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-repair-drafts.sql", "utf8");
@@ -50,6 +53,10 @@ assert.match(worker, /mode === "repair_draft"/);
 assert.match(worker, /handleScheduleRepairDraft/);
 assert.match(worker, /status: "draft"/);
 assert.match(worker, /latest_revision_text/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/,
+  "Repair list must keep uncertain publish jobs visible so saved drafts can be recovered");
+assert.match(worker, /job_status:/,
+  "Repair list must expose the job state so the UI can prevent unsafe republishing");
 assert.match(scheduleRepairDraftMigration, /\x27draft\x27/);
 assert.match(scheduleRepairDraftMigration, /encounter_schedule_generation_output_revisions_status_check/);
 assert.match(scheduleRepairDraftReplay, /\x27draft\x27/);
@@ -57,18 +64,27 @@ assert.match(worker, /claim_encounter_schedule_repair/);
 assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
 assert.match(worker, /originalBatch\.is_manual !== true/);
 assert.match(worker, /job\.source_hash !== output\.source_hash/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/);
+assert.match(reconciliationRepairMigration, /needs_reconciliation/);
+assert.match(reconciliationRepairMigration, /last_completed_source_hash/);
+assert.match(reconciliationRepairMigration, /character_schedules/);
 assert.doesNotMatch(worker, /\.delete\(\)\.lt\("expires_at"/, "Expired originals must never be hard-deleted by repair_list");
 assert.match(worker, /"dismissed"/);
 assert.match(worker, /"repair_hide"/);
 assert.match(worker, /removed_at/);
 assert.match(html, /hide-encounter-schedule-output/);
+assert.doesNotMatch(html, /needsReconciliation\s*\?\s*\x27disabled/);
+assert.match(html, /data-action="auto-repair-encounter-schedule-output"/);
+assert.match(html, /data-action="repair-encounter-schedule-output"/);
 assert.match(html, /原始 AI 回覆與所有修正版本仍會保留/);
 assert.match(rawOutputSoftHideMigration, /ADD COLUMN IF NOT EXISTS removed_at timestamptz/);
 assert.ok(rawOutputSoftHideMigration.includes("REVOKE DELETE ON TABLE public.encounter_schedule_generation_outputs FROM service_role"));
 assert.ok(rawOutputSoftHideMigration.includes("REVOKE DELETE ON TABLE public.encounter_schedule_generation_output_revisions FROM service_role"));
 assert.match(rawOutputSoftHideReplay, /encounter_schedule_output_physical_delete_still_granted/);
-assert.match(worker, /repairableCharacterIds/);
-assert.match(worker, /job\.status === "failed"/);
+assert.match(worker, /repairableJobByCharacter/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/);
+assert.match(worker, /!\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/,
+  "Publishing may resume from reconciliation only after the guarded DB claim");
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputIdByCharacter\.get\(item\.sourceId\)[\s\S]*?"completed"/);
 
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputId/);
@@ -293,6 +309,8 @@ assert.match(html, /mode:'repair_list'/);
 assert.match(html, /mode:\x27repair_draft\x27/);
 assert.match(html, /儲存修改（不發布）/);
 assert.match(html, /latest_revision_text/);
+assert.match(html, /上次發布結果待核對；重新驗證後可再次嘗試發布/);
+assert.doesNotMatch(html, /needsReconciliation\?'disabled title="發布結果待核對，暫停發布操作"'/);
 assert.match(html, /驗證目前文字並發布/);
 assert.match(html, /自動修正後發布/);
 assert.match(html, /mode:'repair'/);
@@ -318,5 +336,35 @@ assert.match(sleepingAvailabilityMigration, /JOIN public\.character_schedules AS
 assert.match(sleepingAvailabilityMigration, /UPDATE public\.character_schedules/);
 assert.match(sleepingAvailabilityMigration, /location_description/);
 assert.match(sleepingAvailabilityMigration, /poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18/);
+
+assert.match(worldviewTagsMigration, /ADD COLUMN IF NOT EXISTS worldview_tags text\[\]/);
+assert.match(worldviewTagsMigration, /encounter_schedule_source_payload/);
+assert.match(worldviewTagsMigration, /worldview_tags/);
+assert.match(worldviewTagsMigration, /UPDATE OF[\s\S]*worldview_tags/);
+assert.match(worldviewTagsMigration, /OR OLD\.worldview_tags IS DISTINCT FROM NEW\.worldview_tags/);
+assert.doesNotMatch(worldviewTagsMigration, /DO \$requeue\$|enqueue_encounter_schedule_generation_internal/,
+  "Adding worldview metadata must not requeue existing characters or incur AI generation costs");
+assert.match(generator, /worldviewTags\.length/);
+assert.match(generator, /Unknown legacy characters are no longer blocked/);
+assert.match(worker, /postPublishReviewCharacterIds/);
+assert.match(worker, /publishedScheduleCharacterIds/);
+assert.match(worker, /worldview_post_publish_review_recommended/);
+assert.match(generator, /施工、裝修、修繕是既有場所中的動態活動/);
+assert.match(generator, /clearlyIndoorConstruction/);
+assert.match(generator, /clearlyOutdoorConstruction/);
+assert.match(cityMap, /name="worldviewTags" value="modern"/);
+assert.match(cityMap, /name="worldviewTags" value="ancient"/);
+assert.match(cityMap, /name="worldviewTags" value="fantasy"/);
+assert.match(html, /PoyozzCityMap\.renderWorldviewField\(c\)/);
+assert.match(html, /worldview_tags: character\.worldviewTags/);
+assert.match(cityMap, /data-page="citymap"/);
+assert.match(cityMap, /\$\{ICON\.home\}/);
+assert.match(cityMap, /\$\{ICON\.create\}/);
+assert.match(cityMap, /\$\{ICON\.chat\}/);
+assert.match(cityMap, /chatNavUnreadBadge\(\)/);
+assert.match(html, /ICON, chatNavUnreadBadge/);
+assert.match(cityMap, /\$\{ICON\.shop\}/);
+assert.match(cityMap, /\$\{ICON\.profile\}/);
+assert.doesNotMatch(cityMap, /data-action="city-traditional">✧/);
 
 assert.match(sleepingAvailabilityMigration, /AS \$schedule\$[\s\S]*?\$schedule\$;/);

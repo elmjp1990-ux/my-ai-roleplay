@@ -217,7 +217,7 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
   const { data: job, error: jobError } = await admin.from("encounter_schedule_generation_jobs")
     .select("status,source_hash").eq("character_id", output.character_id).maybeSingle();
   if (jobError || !job) return json({ error: "schedule_repair_job_unavailable" }, 503);
-  if (job.status !== "failed") return json({ error: "schedule_repair_job_not_failed", job_status: job.status }, 409);
+  if (!["failed", "needs_reconciliation"].includes(job.status)) return json({ error: "schedule_repair_job_not_repairable", job_status: job.status }, 409);
   if (job.source_hash !== output.source_hash) return json({ error: "schedule_repair_source_changed" }, 409);
 
   const { data: source, error: sourceError } = await admin.rpc("encounter_schedule_source_payload", {
@@ -437,7 +437,9 @@ export async function handleEncounterScheduleOrganizer(
     const manualReviewJobs = (reviewResult.data || []).map((job: any) => ({
       character_id: job.character_id,
       character_name: reviewNames.get(job.character_id) || "角色",
-      reason: job.last_error_code || "worldview_manual_review_required",
+      reason: job.last_error_code === "worldview_post_publish_review_recommended"
+        ? "已先發布，待核對世界觀與場景"
+        : job.last_error_code || "worldview_manual_review_required",
       updated_at: job.updated_at || null,
     }));
     const reconciliationBatches = reconciliationBatchesResult.data || [];
@@ -621,15 +623,16 @@ export async function handleEncounterScheduleOrganizer(
           : Promise.resolve({ data: [], error: null }),
       ]);
       if (jobsError) return json({ error: "schedule_repair_job_states_unavailable" }, 503);
-      const repairableCharacterIds = new Set((jobs || [])
-        .filter((job: any) => job.status === "failed")
-        .map((job: any) => job.character_id));
+      const repairableJobByCharacter = new Map<string, any>((jobs || [])
+        .filter((job: any) => ["failed", "needs_reconciliation"].includes(job.status))
+        .map((job: any) => [job.character_id, job]));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
       return json({
         status: "available",
-        outputs: (outputs || []).filter((item: any) => repairableCharacterIds.has(item.character_id)).map((item: any) => ({
+        outputs: (outputs || []).filter((item: any) => repairableJobByCharacter.has(item.character_id)).map((item: any) => ({
           ...item,
           character_name: names.get(item.character_id) || "角色",
+          job_status: repairableJobByCharacter.get(item.character_id)?.status || "failed",
           raw_response_text: item.raw_response_text || item.raw_response_body || "",
           latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
           latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
@@ -845,22 +848,30 @@ export async function handleEncounterScheduleOrganizer(
   const providerResponses: Array<{ sourceId: string; providerResponse: Awaited<ReturnType<typeof requestOpenRouterChatCompletion>> }> = [];
   const failedCharacterIds = new Set<string>();
   const reviewRequiredCharacterIds = new Set<string>();
+  const postPublishReviewCharacterIds = new Set<string>();
+  const publishedScheduleCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
   const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
   const rawOutputIdByCharacter = new Map<string, string>();
   let retryableProviderFailure = false;
   let ambiguousProviderFailure = false;
 
-  // Worldview is classified locally before any provider call. Known non-modern
-  // roles are marked not applicable; unknown roles are held for manual review.
-  // Neither group is sent to AI, and review-required roles are not published as unplaced.
+  // Worldview is classified before provider calls. Explicitly ancient/fantasy-only
+  // roles are not forced onto the modern map; unknown legacy roles generate first
+  // and are queued for non-blocking human review after a successful publish.
   const generationSources = enrichedSources.filter((source) => {
     const classification = classifyEncounterWorldview(source);
     const disposition = getEncounterWorldviewScheduleDisposition(
       classification,
       source.worldview_review_decision,
     );
-    if (disposition === "generate") return true;
+    if (disposition === "generate") {
+      const hasExplicitWorldview = Array.isArray(source.worldview_tags) && source.worldview_tags.length > 0;
+      if (classification.confidence === "low" && !hasExplicitWorldview && !asText(source.worldview_review_decision)) {
+        postPublishReviewCharacterIds.add(source.character_id);
+      }
+      return true;
+    }
     if (disposition === "needs_review") {
       // Review-only roles are deliberately not represented as parser output.
       // They are moved to the durable needs_review queue state after any
@@ -1100,6 +1111,7 @@ export async function handleEncounterScheduleOrganizer(
       }
       if (job?.status === "completed") {
         committedCharacterIds.add(item.sourceId);
+        publishedScheduleCharacterIds.add(item.sourceId);
         await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
         publishedCharacterCount += 1;
       } else if (job?.status === "cancelled") {
@@ -1129,9 +1141,12 @@ export async function handleEncounterScheduleOrganizer(
       continue;
     }
     committedCharacterIds.add(item.sourceId);
+    const characterPublishedCount = Number(publishRow.published_character_count || 0);
+    const characterUnplacedCount = Number(publishRow.unplaced_character_count || 0);
+    if (characterPublishedCount + characterUnplacedCount > 0) publishedScheduleCharacterIds.add(item.sourceId);
     await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
-    publishedCharacterCount += Number(publishRow.published_character_count || 0);
-    unplacedCharacterCount += Number(publishRow.unplaced_character_count || 0);
+    publishedCharacterCount += characterPublishedCount;
+    unplacedCharacterCount += characterUnplacedCount;
     skippedCharacterCount += Number(publishRow.skipped_private_character_count || 0);
   }
 
@@ -1185,6 +1200,29 @@ export async function handleEncounterScheduleOrganizer(
         validationErrors.push(characterId + ":worldview_review_state_persist_failed");
       }
       console.warn("Encounter worldview review state update failed:", reviewUpdateError.message);
+    }
+  }
+
+  const postPublishReviewIds = [...postPublishReviewCharacterIds]
+    .filter((characterId) => publishedScheduleCharacterIds.has(characterId));
+  let postPublishReviewCount = 0;
+  if (postPublishReviewIds.length > 0) {
+    const reviewedAt = new Date().toISOString();
+    const { error: postPublishReviewError } = await admin
+      .from("encounter_schedule_generation_jobs")
+      .update({
+        status: "needs_review",
+        lease_token: null,
+        lease_expires_at: null,
+        last_error_code: "worldview_post_publish_review_recommended",
+        updated_at: reviewedAt,
+      })
+      .in("character_id", postPublishReviewIds)
+      .eq("status", "completed");
+    if (postPublishReviewError) {
+      console.warn("Encounter post-publish worldview review queue update failed:", postPublishReviewError.message);
+    } else {
+      postPublishReviewCount = postPublishReviewIds.length;
     }
   }
 
@@ -1251,7 +1289,7 @@ export async function handleEncounterScheduleOrganizer(
     published_character_count: publishedCharacterCount,
     unplaced_character_count: unplacedCharacterCount,
     skipped_private_character_count: skippedCharacterCount,
-    needs_review_character_count: reviewRequiredCharacterIds.size,
+    needs_review_character_count: reviewRequiredCharacterIds.size + postPublishReviewCount,
     failed_character_count: partial ? Math.max(remaining, failedCharacterIds.size) : 0,
     validation_errors: validationErrors.slice(0, 30),
     scene_publish_status: scenePublishStatus,
