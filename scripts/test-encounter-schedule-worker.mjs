@@ -50,6 +50,10 @@ assert.match(worker, /mode === "repair_draft"/);
 assert.match(worker, /handleScheduleRepairDraft/);
 assert.match(worker, /status: "draft"/);
 assert.match(worker, /latest_revision_text/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/,
+  "Repair list must keep uncertain publish jobs visible so saved drafts can be recovered");
+assert.match(worker, /job_status:/,
+  "Repair list must expose the job state so the UI can prevent unsafe republishing");
 assert.match(scheduleRepairDraftMigration, /\x27draft\x27/);
 assert.match(scheduleRepairDraftMigration, /encounter_schedule_generation_output_revisions_status_check/);
 assert.match(scheduleRepairDraftReplay, /\x27draft\x27/);
@@ -293,6 +297,8 @@ assert.match(html, /mode:'repair_list'/);
 assert.match(html, /mode:\x27repair_draft\x27/);
 assert.match(html, /儲存修改（不發布）/);
 assert.match(html, /latest_revision_text/);
+assert.match(html, /發布結果待核對；已保存內容仍可編輯，但請勿重試發布/);
+assert.match(html, /needsReconciliation\?'disabled title="發布結果待核對，暫停發布操作"'/);
 assert.match(html, /驗證目前文字並發布/);
 assert.match(html, /自動修正後發布/);
 assert.match(html, /mode:'repair'/);
