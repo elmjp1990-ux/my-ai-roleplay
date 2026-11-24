@@ -830,3 +830,17 @@ assert.match(avatarRecovery,/image\.replaceWith\(fallback\)/,
   "a failed role portrait must become a stable name fallback instead of remaining a dark broken image");
 assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset\.characterPrimaryIllustration/,
   "the generic low-opacity image handler must not dim failed character avatars");
+
+
+// PR #277 follow-up: historical Encounter diary details must paginate independently of the currently open chat.
+const encounterDetailPagerSource=between("async function loadEncounterMemoryDetailOlder()","async function openEncounterMemoryDetail(button)");
+assert.doesNotMatch(encounterDetailPagerSource,/currentSession\\(\\)\\?\\.id!==pager\\.sessionId/,
+  "opening an older Encounter diary must not disable its load-more path just because another chat is currently open");
+assert.match(encounterDetailPagerSource,/uid!==pager\\.uid/,
+  "historical Encounter pagination must remain bound to the owning account");
+assert.match(encounterDetailPagerSource,/chat_mode\\.eq\\.encounter,session_data->>encounterMode\\.eq\\.true/,
+  "legacy Encounter sessions must pass the same ownership check as current Encounter sessions");
+assert.match(appIndexSource,/encounterMemoryDialog==='true'[\\s\\S]*?modal\\.close\\(\\)/,
+  "closing an Encounter diary detail must close only the detail dialog, not navigate to Chat Features");
+assert.match(appIndexSource,/encounterDiaryDisplayText\\(entry\\.content/,
+  "the internal discovery sentinel must be rendered as player-facing text in diary details");
