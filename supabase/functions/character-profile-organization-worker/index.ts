@@ -581,7 +581,7 @@ export default {
         });
         generatedMetadata = generated;
         // Keep one diagnostic row from request start through persistence completion.
-        await updateAiGenerationDiagnostic(supabase, diagnosticId, {
+        const generatedDiagnostic = {
           model: generated.model, provider: generated.provider, requestId: generated.requestId,
           httpStatus: generated.httpStatus, finishReason: generated.finishReason,
           responseContentType: generated.responseContentType, responseBodyLength: generated.responseBodyLength,
@@ -589,7 +589,15 @@ export default {
           rawOutputText: generated.rawOutputText || JSON.stringify(generated.profile),
           refusalText: generated.refusalText, usage: generated.usage,
           metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [], request_trace: generated.requestTrace || [] },
-        });
+        };
+        if (diagnosticId) {
+          await updateAiGenerationDiagnostic(supabase, diagnosticId, generatedDiagnostic);
+        } else {
+          diagnosticId = await recordAiGenerationDiagnostic(supabase, {
+            generationType: "character_profile", userId: item.author_id, characterId: item.character_id,
+            sourceRef: item.source_hash, status: "received", ...generatedDiagnostic,
+          });
+        }
         await recordProfileUsage(supabase, item, generated, "generated");
         usageRecorded = true;
         // The provider has already completed and may have billed this request.
