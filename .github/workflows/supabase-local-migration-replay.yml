@@ -609,6 +609,53 @@ jobs:
           $expiry_cleanup$;
           SQL
 
+      - name: Apply and verify character worldview tags and construction schedule rules
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124160000_character_worldview_tags_and_construction_scene.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $worldview_contract$
+          DECLARE
+            v_source_definition text;
+            v_trigger_definition text;
+          BEGIN
+            IF NOT EXISTS (
+              SELECT 1 FROM information_schema.columns
+              WHERE table_schema = 'public' AND table_name = 'characters'
+                AND column_name = 'worldview_tags' AND data_type = 'ARRAY'
+            ) THEN
+              RAISE EXCEPTION 'characters.worldview_tags column missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_constraint
+              WHERE conrelid = 'public.characters'::regclass
+                AND conname = 'characters_worldview_tags_allowed'
+            ) THEN
+              RAISE EXCEPTION 'worldview tag constraint missing';
+            END IF;
+            v_source_definition := pg_catalog.pg_get_functiondef(
+              'public.encounter_schedule_source_payload(uuid)'::regprocedure
+            );
+            IF pg_catalog.strpos(v_source_definition, 'worldview_tags') = 0
+               OR pg_catalog.strpos(v_source_definition, 'v4-worldview-tags') = 0 THEN
+              RAISE EXCEPTION 'schedule source payload does not include worldview tags/version';
+            END IF;
+            SELECT pg_catalog.pg_get_triggerdef(t.oid)
+            INTO v_trigger_definition
+            FROM pg_catalog.pg_trigger t
+            WHERE t.tgrelid = 'public.characters'::regclass
+              AND t.tgname = 'characters_enqueue_encounter_schedule_ai'
+              AND NOT t.tgisinternal;
+            IF v_trigger_definition IS NULL
+               OR pg_catalog.strpos(v_trigger_definition, 'worldview_tags') = 0 THEN
+              RAISE EXCEPTION 'worldview tag change trigger missing';
+            END IF;
+          END
+          $worldview_contract$;
+          SQL
+          node scripts/test-encounter-schedule-worker.mjs
+
       - name: Upload Encounter SQL replay diagnostics
         if: always()
         uses: actions/upload-artifact@v4
