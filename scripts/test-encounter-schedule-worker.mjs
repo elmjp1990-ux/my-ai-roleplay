@@ -18,6 +18,8 @@ const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/2026111807
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const rawOutputSoftHideMigration = fs.readFileSync("supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql", "utf8");
 const reconciliationRepairMigration = fs.readFileSync("supabase/migrations/20261124130000_allow_reconciliation_schedule_repair.sql", "utf8");
+const worldviewTagsMigration = fs.readFileSync("supabase/migrations/20261124160000_character_worldview_tags_and_construction_scene.sql", "utf8");
+const cityMap = fs.readFileSync("city-map.js", "utf8");
 const rawOutputSoftHideReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-soft-hide.sql", "utf8");
 const scheduleRepairDraftMigration = fs.readFileSync("supabase/migrations/20261124090000_encounter_schedule_repair_drafts.sql", "utf8");
 const scheduleRepairDraftReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-repair-drafts.sql", "utf8");
@@ -334,5 +336,27 @@ assert.match(sleepingAvailabilityMigration, /JOIN public\.character_schedules AS
 assert.match(sleepingAvailabilityMigration, /UPDATE public\.character_schedules/);
 assert.match(sleepingAvailabilityMigration, /location_description/);
 assert.match(sleepingAvailabilityMigration, /poyozz-encounter-schedule-v7-home-mapping-sleep-availability-2026-11-18/);
+
+assert.match(worldviewTagsMigration, /ADD COLUMN IF NOT EXISTS worldview_tags text\[\]/);
+assert.match(worldviewTagsMigration, /encounter_schedule_source_payload/);
+assert.match(worldviewTagsMigration, /worldview_tags/);
+assert.match(worldviewTagsMigration, /UPDATE OF[\s\S]*worldview_tags/);
+assert.match(worldviewTagsMigration, /enqueue_encounter_schedule_generation_internal/);
+assert.match(generator, /worldviewTags\.length/);
+assert.match(generator, /Unknown legacy characters are no longer blocked/);
+assert.match(generator, /施工、裝修、修繕是既有場所中的動態活動/);
+assert.match(generator, /clearlyIndoorConstruction/);
+assert.match(generator, /clearlyOutdoorConstruction/);
+assert.match(html, /name="worldviewTags" value="modern"/);
+assert.match(html, /name="worldviewTags" value="ancient"/);
+assert.match(html, /name="worldviewTags" value="fantasy"/);
+assert.match(html, /worldview_tags: character\.worldviewTags/);
+assert.match(cityMap, /data-page="citymap"/);
+assert.match(cityMap, /\$\{ICON\.home\}/);
+assert.match(cityMap, /\$\{ICON\.create\}/);
+assert.match(cityMap, /\$\{ICON\.chat\}/);
+assert.match(cityMap, /\$\{ICON\.shop\}/);
+assert.match(cityMap, /\$\{ICON\.profile\}/);
+assert.doesNotMatch(cityMap, /data-action="city-traditional">✧/);
 
 assert.match(sleepingAvailabilityMigration, /AS \$schedule\$[\s\S]*?\$schedule\$;/);
