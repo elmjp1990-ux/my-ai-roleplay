@@ -217,7 +217,7 @@ async function handleScheduleRepair(admin: any, actorUserId: string, body: Recor
   const { data: job, error: jobError } = await admin.from("encounter_schedule_generation_jobs")
     .select("status,source_hash").eq("character_id", output.character_id).maybeSingle();
   if (jobError || !job) return json({ error: "schedule_repair_job_unavailable" }, 503);
-  if (job.status !== "failed") return json({ error: "schedule_repair_job_not_failed", job_status: job.status }, 409);
+  if (!["failed", "needs_reconciliation"].includes(job.status)) return json({ error: "schedule_repair_job_not_repairable", job_status: job.status }, 409);
   if (job.source_hash !== output.source_hash) return json({ error: "schedule_repair_source_changed" }, 409);
 
   const { data: source, error: sourceError } = await admin.rpc("encounter_schedule_source_payload", {
