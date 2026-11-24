@@ -6213,7 +6213,6 @@ function renderCreate() {
     });
   }
 }
-let editorDraftBaseFingerprint = '';
 function editorDraftKey() {
   const uid = currentUser()?.uid;
   if (!uid) return null;
@@ -6316,7 +6315,7 @@ function saveEditorDraft() {
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
-    baseFingerprint:editorDraftBaseFingerprint || window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)),
+    baseFingerprint:draftCharacter?.__editorBaseFingerprint || window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)),
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -6342,7 +6341,7 @@ function clearEditorDraft() {
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
-  editorDraftBaseFingerprint = c ? window.PoyozzCityMap.editorCharacterFingerprint(c) : '';
+  if(draftCharacter)draftCharacter.__editorBaseFingerprint=window.PoyozzCityMap.editorCharacterFingerprint(c);
   draftTags = normalizeCharacterTagsForRead(c?.tags || []);
   draftImage = c?.image || '';
   draftIllustrations = [];
@@ -6392,14 +6391,9 @@ function renderCharacterIllustrationGallery(items = []) {
 function renderEditor() {
   let savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
-  if (route.id && savedDraft) {
+  if(route.id&&savedDraft){
     const reconciled=window.PoyozzCityMap.reconcileEditorDraft(original,savedDraft);
-    if (reconciled.stale) {
-      clearEditorDraft();
-      savedDraft=null;
-    }
-    editorDraftBaseFingerprint=reconciled.fingerprint;
-    if (!reconciled.stale) savedDraft=reconciled.draft;
+    if(reconciled.stale){clearEditorDraft();savedDraft=null;}else savedDraft=reconciled.draft;
   }
   const c = savedDraft ? {...original, ...savedDraft} : original;
   const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
@@ -6412,6 +6406,7 @@ function renderEditor() {
   }
   if (!draftCharacter && route.id) {
     draftCharacter = clone(original);
+    draftCharacter.__editorBaseFingerprint=window.PoyozzCityMap.editorCharacterFingerprint(original);
     if (!savedDraft) {
       draftTags = normalizeCharacterTagsForRead(original.tags || []);
       draftImage = original.image || '';
