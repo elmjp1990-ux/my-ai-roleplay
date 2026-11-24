@@ -6,8 +6,10 @@ const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
 const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
-assert.match(html,/session_id:metadata->>session_id/,
-  'Encounter diary list must select only the session ID from JSON metadata');
+assert.match(html,/historyApi\.loadCloudHistory\(person,currentUser,client,\{append\}\)/,
+  'Encounter Diary must share the exact session-history loader with the city map');
+assert.match(html,/historyApi\.previewText\(record\)/,
+  'Encounter Diary must share the same fifty-character preview formatter as the city map');
 assert.doesNotMatch(html,/select\('id,summary,occurred_at,metadata'\)/,
   'Encounter diary list and detail pages must not transfer unused metadata JSON');
 assert.match(encounterHistory,/const N=10/);
