@@ -28,6 +28,7 @@ DECLARE
   v_new_version text := 'poyozz-encounter-schedule-v11-worldview-tags-construction-2026-11-24';
   v_old_versions text[] := ARRAY[
     'poyozz-encounter-schedule-v10-modern-context-signals-2026-11-23',
+    'poyozz-encounter-schedule-v9-modern-setting-inference-2026-11-19',
     'poyozz-encounter-schedule-v9-worldview-tags-construction-2026-11-24',
     'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19'
   ];
