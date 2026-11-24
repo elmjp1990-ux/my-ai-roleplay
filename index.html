@@ -6297,7 +6297,7 @@ function saveEditorDraft() {
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
-    baseFingerprint:route.id ? window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)) : '',
+    baseFingerprint:route.id ? window.PoyozzCityMap.editorCharacterFingerprint(draftCharacter) : '',
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -6371,7 +6371,8 @@ function renderCharacterIllustrationGallery(items = []) {
 
 function renderEditor() {
   let savedDraft = readEditorDraft();
-  const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
+  const original = state.characters.find(c => c.id === route.id) || draftCharacter || {};
+  if(route.id && original.id===route.id)draftCharacter=clone(original);
   if(route.id&&savedDraft){
     const reconciled=window.PoyozzCityMap.reconcileEditorDraft(original,savedDraft);
     if(reconciled.stale){clearEditorDraft();savedDraft=null;}else savedDraft=reconciled.draft;
