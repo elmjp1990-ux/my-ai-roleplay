@@ -6346,7 +6346,8 @@ function startEditor(c = null) {
     const characterId=c.id;
     const promise=refreshOwnedCharacterForEditor(characterId);
     editorCloudRefresh.promise=promise;
-    promise.then(()=>{
+    promise.then(refreshed=>{
+      draftCharacter=clone(refreshed);
       if(route.page==='editor'&&route.id===characterId&&editorCloudRefresh.characterId===characterId){
         editorCloudRefresh={characterId,status:'ready',error:null,promise:null};
         render();
@@ -12172,7 +12173,8 @@ document.addEventListener('click',async event => {
         render();
         const promise=refreshOwnedCharacterForEditor(characterId);
         editorCloudRefresh.promise=promise;
-        promise.then(()=>{
+        promise.then(refreshed=>{
+          draftCharacter=clone(refreshed);
           if(route.page==='editor'&&route.id===characterId){
             editorCloudRefresh={characterId,status:'ready',error:null,promise:null};
             render();
