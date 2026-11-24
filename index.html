@@ -7960,6 +7960,10 @@ function loadEncounterMemoryList(panel,session){
   const uid=currentUser()?.uid;
   if(!client||!uid){list.innerHTML='<div class="empty">請先登入，才能查看你的相遇日記。</div>';return;}
   const pager=window.PoyozzListPagination.createState('encounterMemories');
+  // Legacy diary rows have no chat_sessions row; start their independent cursor on page one.
+  pager.legacyHasMore=true;
+  pager.legacyOffset=0;
+  pager.buffer=[];
   list._encounterPager=pager;
   if(!list.dataset.paginationBound){
     list.dataset.paginationBound='true';
@@ -8122,7 +8126,7 @@ async function loadEncounterMemoryDetailOlder(){
       if(error)throw error;
       const descendingRows=Array.isArray(rows)?rows:[];
       const olderRows=[...descendingRows].reverse();
-      if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+      if(currentUser()?.uid!==uid||encounterMemoryDetailPager!==pager)return;
       pager.entries=window.PoyozzListPagination.mergeUnique(olderRows,pager.entries,row=>row.id);
       pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
       pager.hasMore=descendingRows.length===pageSize;
@@ -8135,7 +8139,7 @@ async function loadEncounterMemoryDetailOlder(){
       if(error)throw error;
       const descendingRows=Array.isArray(rows)?rows:[];
       const olderRows=[...descendingRows].reverse();
-      if(currentUser()?.uid!==uid||currentSession()?.id!==pager.sessionId)return;
+      if(currentUser()?.uid!==uid||encounterMemoryDetailPager!==pager)return;
       pager.messages=window.PoyozzListPagination.mergeUnique(olderRows,pager.messages,message=>message.id);
       pager.cursor=descendingRows.length?descendingRows[descendingRows.length-1]:pager.cursor;
       pager.hasMore=descendingRows.length===pageSize;
