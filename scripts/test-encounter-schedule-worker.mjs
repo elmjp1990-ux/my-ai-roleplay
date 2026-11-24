@@ -34,6 +34,17 @@ assert.match(worker, /fail_encounter_schedule_batch/);
 assert.match(worker, /parseEncounterScheduleBatchOutput/);
 assert.match(worker, /recordRawGenerationOutput/);
 assert.match(worker, /handleScheduleRepair/);
+const repairDraftHandler = worker.slice(
+  worker.indexOf("async function handleScheduleRepairDraft"),
+  worker.indexOf("async function handleScheduleRepair(", worker.indexOf("async function handleScheduleRepairDraft"))
+);
+assert.ok(repairDraftHandler.length > 0, "Persistent repair draft handler must exist");
+assert.match(repairDraftHandler, /status: "draft"/);
+assert.match(repairDraftHandler, /ai_called: false/);
+assert.doesNotMatch(repairDraftHandler, /requestProvider|claim_encounter_schedule_repair|publish_encounter_schedule_batch/,
+  "Saving a repair draft must never call AI or publish schedules");
+assert.match(replayWorkflow, /20261124090000_encounter_schedule_repair_drafts\.sql/);
+assert.match(replayWorkflow, /replay-encounter-schedule-repair-drafts\.sql/);
 assert.match(worker, /mode === "repair_list"/);
 assert.match(worker, /mode === "repair_draft"/);
 assert.match(worker, /handleScheduleRepairDraft/);
