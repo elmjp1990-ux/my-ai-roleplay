@@ -502,6 +502,17 @@ Deno.test("recognizes contemporary interior-design and construction professions 
     character_id: id1, placement: "modern_map", variants: variants(),
   }], [designProfessional]);
   if (!parsed.ok) throw new Error("modern-map schedule for a contemporary design professional was rejected: " + parsed.errors.join(","));
+
+  const historicalDesigner = source(id1, {
+    intro: "中世紀古堡中的室內設計師，負責規劃領主寢宮。",
+    world_era: "medieval",
+    modern_setting_compatible: false,
+    schedule_description: "",
+  });
+  if (classifyEncounterWorldview(historicalDesigner).category !== "historical" ||
+      isEncounterModernMapCompatible(historicalDesigner)) {
+    throw new Error("historical era must retain priority over contemporary profession keywords");
+  }
 });
 
 Deno.test("classifies worldviews locally and keeps species separate from era", () => {
