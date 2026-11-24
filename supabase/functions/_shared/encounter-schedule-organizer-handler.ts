@@ -147,6 +147,50 @@ async function handleScheduleRepairHide(admin: any, actorUserId: string, body: R
   return json({ status: "hidden", ai_called: false, original_preserved: true });
 }
 
+async function handleScheduleRepairDraft(admin: any, actorUserId: string, body: Record<string, unknown>) {
+  const outputId = asText(body.output_id);
+  const correctedText = typeof body.corrected_response === "string" ? body.corrected_response : "";
+  if (!/^[0-9a-f-]{36}$/i.test(outputId) || correctedText.length < 2 || correctedText.length > 500000) {
+    return json({ error: "schedule_repair_input_invalid" }, 400);
+  }
+
+  const { data: output, error: outputError } = await admin.from("encounter_schedule_generation_outputs")
+    .select("id,batch_id,character_id,source_hash")
+    .eq("id", outputId).eq("actor_user_id", actorUserId)
+    .is("removed_at", null).gt("expires_at", new Date().toISOString()).maybeSingle();
+  if (outputError || !output) return json({ error: "schedule_repair_output_not_found" }, 404);
+  if (!output.source_hash || !output.batch_id || !output.character_id) {
+    return json({ error: "schedule_repair_source_metadata_missing" }, 409);
+  }
+
+  const { data: originalBatch, error: batchError } = await admin.from("encounter_schedule_batch_runs")
+    .select("actor_user_id,is_manual,character_ids").eq("id", output.batch_id).maybeSingle();
+  if (batchError || !originalBatch || originalBatch.is_manual !== true ||
+      originalBatch.actor_user_id !== actorUserId ||
+      !Array.isArray(originalBatch.character_ids) || !originalBatch.character_ids.includes(output.character_id)) {
+    return json({ error: "schedule_repair_not_authorized" }, 403);
+  }
+
+  const { data: revision, error: revisionError } = await admin.from("encounter_schedule_generation_output_revisions")
+    .insert({
+      output_id: output.id,
+      corrected_response_text: correctedText,
+      validation_errors: [],
+      status: "draft",
+      created_by: actorUserId,
+    }).select("id,created_at").single();
+  if (revisionError || !revision?.id) return json({ error: "schedule_repair_draft_save_failed" }, 503);
+
+  return json({
+    status: "draft_saved",
+    revision_id: revision.id,
+    saved_at: revision.created_at,
+    ai_called: false,
+    published: false,
+    original_preserved: true,
+  });
+}
+
 async function handleScheduleRepair(admin: any, actorUserId: string, body: Record<string, unknown>) {
   const outputId = asText(body.output_id);
   const correctedText = typeof body.corrected_response === "string" ? body.corrected_response : "";
@@ -335,7 +379,7 @@ export async function handleEncounterScheduleOrganizer(
 
   let body: Record<string, unknown> = {};
   try { body = asRow(await request.json()); } catch { return json({ error: "invalid_json" }, 400); }
-  const mode = ["manual", "status", "repair_list", "repair", "repair_hide", "reconcile_confirm"].includes(asText(body.mode))
+  const mode = ["manual", "status", "repair_list", "repair", "repair_draft", "repair_hide", "reconcile_confirm"].includes(asText(body.mode))
     ? asText(body.mode)
     : "scheduled";
   const isServiceRoleRequest = authorization === "Bearer " + service;
@@ -532,7 +576,7 @@ export async function handleEncounterScheduleOrganizer(
     });
   }
 
-  if (mode === "repair_list" || mode === "repair" || mode === "repair_hide") {
+  if (mode === "repair_list" || mode === "repair" || mode === "repair_draft" || mode === "repair_hide") {
     if (env.get("ENCOUNTER_SCHEDULE_TEST_MODE") !== "true" || isServiceRoleRequest) {
       return json({ error: "schedule_repair_disabled" }, 403);
     }
@@ -555,6 +599,18 @@ export async function handleEncounterScheduleOrganizer(
         .order("created_at", { ascending: false })
         .limit(20);
       if (outputsError) return json({ error: "schedule_repair_list_unavailable" }, 503);
+      const outputIds = (outputs || []).map((item: any) => item.id).filter(Boolean);
+      const { data: revisions, error: revisionsError } = outputIds.length
+        ? await admin.from("encounter_schedule_generation_output_revisions")
+          .select("id,output_id,corrected_response_text,status,created_at")
+          .in("output_id", outputIds)
+          .order("created_at", { ascending: false })
+        : { data: [], error: null };
+      if (revisionsError) return json({ error: "schedule_repair_revisions_unavailable" }, 503);
+      const latestRevisionByOutput = new Map<string, any>();
+      for (const revision of revisions || []) {
+        if (!latestRevisionByOutput.has(revision.output_id)) latestRevisionByOutput.set(revision.output_id, revision);
+      }
       const ids = [...new Set((outputs || []).map((item: any) => item.character_id).filter(Boolean))];
       const [{ data: characters }, { data: jobs, error: jobsError }] = await Promise.all([
         ids.length
@@ -575,10 +631,14 @@ export async function handleEncounterScheduleOrganizer(
           ...item,
           character_name: names.get(item.character_id) || "角色",
           raw_response_text: item.raw_response_text || item.raw_response_body || "",
+          latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
+          latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
+          latest_revision_at: latestRevisionByOutput.get(item.id)?.created_at || null,
         })),
       });
     }
     if (mode === "repair_hide") return await handleScheduleRepairHide(admin, authData.user.id, body);
+    if (mode === "repair_draft") return await handleScheduleRepairDraft(admin, authData.user.id, body);
     return await handleScheduleRepair(admin, authData.user.id, body);
   }
 
