@@ -277,6 +277,14 @@ assert.doesNotMatch(frontend, /sessionsWithAssistantReply/,
   'Encounter memory list must not scan chat_messages just to detect completed sessions');
 assert.match(frontend, /這裡收藏你與['"]\+e\(sessionCharacter\(session\)\?\.name\|\|['"]角色['"]\)/);
 assert.ok(frontend.includes('<span>陌生人</span>'));
+assert.match(frontend, /profileJobStatus==='failed'[\s\S]*?手動重試 AI 整理/);
+assert.match(frontend, /enqueue_character_profile_organization/);
+assert.match(frontend, /前次已完成的模型請求重複計費/);
+assert.match(frontend, /historyApi\.loadCloudHistory\(person,currentUser,client,\{append\}\)/);
+assert.match(frontend, /historyApi\.previewText\(record\)/);
+assert.match(frontend, /preview\.length>=50/);
+assert.match(frontend, /encounter_mode:session_data->>encounterMode/);
+assert.match(frontend, /session_data->>encounterMode\.eq\.true/);
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
 assert.match(frontend, /data-action="encounter-memory-open"/);
 assert.match(frontend, /相遇日記/);
@@ -295,7 +303,7 @@ assert.match(cityMap, /findResumableEncounterSession\(person\.id,placeKey\)/);
 assert.match(frontend, /encounterDay/);
 assert.match(frontend, /encounter-dialog-dismiss/);
 assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結果。'\)/);
-assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
+assert.match(frontend, /\.or\(['"]chat_mode\.eq\.encounter,session_data->>encounterMode\.eq\.true['"]\)/);
 assert.match(frontend, /item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
 assert.match(frontend, /const hasConversation=hasUserMessage\(s\)\|\|\(s\.cloudOwned&&s\.cloudHasUserMessage==null\)/);
 assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
@@ -471,13 +479,34 @@ assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
 
 const encounterPresentation = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
+assert.match(encounterHistory, /const previewText=s=>clean\(s\?\.lastMessagePreview\|\|s\?\.encounterSummary/);
+assert.ok(cityMap.includes("meetButton.textContent='正在建立相遇…'"),
+  "the city-map Encounter action must show immediate pending feedback");
+assert.ok(cityMap.includes("if(meetButton?.disabled)return"),
+  "the city-map Encounter action must reject duplicate clicks");
+assert.ok(encounterHistory.includes("等他發現你"),
+  "the discovery sentinel must be presented as 等他發現你 in Encounter history");
+
+const splitBeatsSource = encounterPresentation.slice(
+  encounterPresentation.indexOf("const splitEncounterBeats="),
+  encounterPresentation.indexOf("const encounterBeatMarkup="),
+).trim();
+const splitEncounterBeats = vm.runInNewContext(`(()=>{${splitBeatsSource};return splitEncounterBeats})()`);
+assert.deepEqual(
+  Array.from(splitEncounterBeats("*咬著半片吐司抬頭，瞇眼看你一眼* 門沒鎖，自己進來的？")),
+  ["*咬著半片吐司抬頭，瞇眼看你一眼*", "門沒鎖，自己進來的？"],
+  "Encounter narration must appear as its own beat before the character's spoken dialogue",
+);
 assert.match(encounterHistory, /loadCloudHistory/);
+assert.match(encounterHistory, /const previewText=s=>clean\(s\?\.lastMessagePreview\|\|s\?\.encounterSummary/);
+assert.match(encounterHistory, /g\.PoyozzEncounterHistory=Object\.freeze\(\{renderHistory,loadCloudHistory,openHistory,previewText\}\)/);
 assert.match(encounterHistory, /const N=10/);
 assert.match(encounterHistory, /range\(offset,offset\+N-1\)/);
 assert.match(encounterHistory, /session_data->>encounterMode/);
 assert.match(encounterHistory, /encounterSummary:clean\(r\.encounter_summary/);
 assert.match(encounterHistory, /archived:r\.session_archived==='true'\|\|!!ended/);
 assert.match(encounterHistory, /本次相遇已結束，尚未產生文字摘要/);
+assert.doesNotMatch(encounterHistory, /city-encounter-history-status/);
 assert.doesNotMatch(encounterHistory, /limit\(2\)/);
 assert.match(encounterHistory, /chat_messages/, "speaker preview query is expected");
 assert.match(encounterHistory, /limit\(N\)/, "preview query must remain capped at ten");
@@ -521,6 +550,10 @@ assert.match(encounterOutputParser, /\.filter\(Boolean\)\.slice\(0, 3\)/);
 assert.doesNotMatch(encounterOutputParser, /size >= 30 && size <= 90/);
 assert.match(frontend, /background:transparent!important/);
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
+assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*font-size:10px/);
+assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*padding:4px 9px/);
+assert.match(frontend, /background:rgba\(38,35,46,\.94\)/);
+assert.match(frontend, /body\.day \.encounter-memory-card,body\.day \.encounter-memory-message/);
 assert.match(encounterSceneCss, /encounter-dialogue-text em/);
 assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
@@ -567,7 +600,7 @@ assert.deepEqual(rangeCalls,[[0,9]],"initial history load must fetch only ten re
 assert.equal(historyPerson.encounterHistoryCloud.length,9,"blank discovery-only session is excluded from the visible history");
 assert.match(orFilter,/session_data->>encounterMode/,"legacy sessions marked in session_data remain discoverable");
 const historyHtml=historyApi.renderHistory(historyPerson,historyPerson.encounterHistoryCloud,value=>value,{});
-assert.match(historyHtml,/已結束/,"ended sessions may retain ended-only status");
+assert.doesNotMatch(historyHtml,/city-encounter-history-status/,"ended sessions must not show the ended-status badge");
 assert.match(historyHtml,/data-encounter-history-sentinel/,"more history is exposed through a scroll sentinel");
 assert.match(historyPerson.encounterHistoryCloud[0].lastMessagePreview,/你：/,"player preview uses you prefix");
 await historyApi.loadCloudHistory(historyPerson,user,client,{append:true});

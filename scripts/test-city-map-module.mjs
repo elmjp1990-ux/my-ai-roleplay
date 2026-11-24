@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import vm from 'node:vm';
 
 const html = fs.readFileSync('index.html', 'utf8');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
 const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
-assert.match(html,/session_id:metadata->>session_id/,
-  'Encounter diary list must select only the session ID from JSON metadata');
+assert.match(html,/historyApi\.loadCloudHistory\(person,currentUser,client,\{append\}\)/,
+  'Encounter Diary must share the exact session-history loader with the city map');
+assert.match(html,/historyApi\.previewText\(record\)/,
+  'Encounter Diary must share the same fifty-character preview formatter as the city map');
 assert.doesNotMatch(html,/select\('id,summary,occurred_at,metadata'\)/,
   'Encounter diary list and detail pages must not transfer unused metadata JSON');
 assert.match(encounterHistory,/const N=10/);
@@ -280,7 +283,28 @@ assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)
   'Null or empty schedule profile fields must fall back to the cached character profile.');
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
 assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
-assert.match(cityMap, /const isSleepingSchedule=.*睡夢.*淺眠/);
+const sleepingHelperSource = cityMap.slice(
+  cityMap.indexOf('const isSleepingSchedule='),
+  cityMap.indexOf('const isCurrentCityCharacterEligible='),
+).trim();
+const isSleepingSchedule = vm.runInNewContext(
+  `(()=>{${sleepingHelperSource};return isSleepingSchedule})()`,
+);
+assert.equal(
+  isSleepingSchedule('補眠', '手機放在茶几上保持待命狀態，隨時準備接聽電話'),
+  false,
+  'A resting character who is explicitly on call must remain available for an encounter.',
+);
+assert.equal(
+  isSleepingSchedule('補眠', '手機靜音，請勿打擾'),
+  true,
+  'Rest without an explicit availability signal must remain unavailable.',
+);
+assert.equal(
+  isSleepingSchedule('深層睡眠', '手機保持待命'),
+  true,
+  'An explicit deep-sleep state must remain unavailable.',
+);
 assert.match(fixedSceneMigration, /marker_x\s*=\s*EXCLUDED\.marker_x/);
 assert.match(fixedSceneMigration, /marker_y\s*=\s*EXCLUDED\.marker_y/);
 assert.match(cityMap, /return schedules\.some\(row=>row\?\.location_key===sceneKey\)/,
@@ -303,3 +327,12 @@ assert.doesNotMatch(cityMap, /cityPlaceSubtitles/,
 assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=''/,
   'The unused subtitle element must be cleared rather than retaining a second scene-name dictionary.');
 
+
+
+// PR #277 follow-up: make Encounter creation latency visible immediately and prevent duplicate clicks.
+assert.ok(cityMap.includes("meetButton.textContent='正在建立相遇…'"),
+  "the meet button must immediately show a clear pending state while the Encounter session is created");
+assert.ok(cityMap.includes("meetButton.setAttribute('aria-busy','true')"),
+  "the meet button must expose its pending state accessibly");
+assert.ok(cityMap.includes("if(meetButton?.disabled)return"),
+  "repeated clicks must not dispatch duplicate Encounter creation requests");

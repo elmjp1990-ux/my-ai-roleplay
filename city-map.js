@@ -324,7 +324,14 @@
  if(!cached)console.warn('城市天氣資料載入失敗：',error?.message||error);
  }
  };
- const isSleepingSchedule=(activity='',scene='')=>/(熟睡|沉睡|酣睡|安睡|睡著|睡着|睡覺|睡眠|睡夢|睡得很沉|淺眠|深層睡眠|入睡|睡去|午睡|補眠|就寢)/.test((activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,''));
+ const isSleepingSchedule=(activity='',scene='')=>{
+ const status=(activity+' '+scene).normalize('NFKC').replace(/準備(?:要)?睡覺/g,'');
+ // Explicit on-call/standby instructions take priority over generic rest words such as 補眠.
+ // Deep-sleep descriptions remain unavailable even if unrelated standby wording appears.
+ if(/熟睡|沉睡|酣睡|安睡|睡得很沉|深層睡眠/.test(status))return true;
+ if(/待命|隨時.{0,8}(接聽|接電話|聯絡|回應)|保持.{0,8}(待命|開機)|手機.{0,12}(接聽|待命)|可.{0,4}(接聽|聯絡)|接聽電話/.test(status))return false;
+ return /(睡著|睡着|睡覺|睡眠|睡夢|淺眠|入睡|睡去|午睡|補眠|就寢)/.test(status);
+};
  const isCurrentCityCharacterEligible=(person)=>{
  const live=(Array.isArray(state.characters)?state.characters:[]).find(item=>item?.id===person?.id);
  return !!live&&live.visibility==='public'&&!live.deletedAt&&live.cloudPublic!==false&&live.localOnly!==true&&!String(live.id||'').startsWith('seed-')&&accessible(live);
@@ -669,13 +676,15 @@
  return;
  }
  if(cardAction==='city-character-meet'){
+ const meetButton=event.target.closest('[data-action="city-character-meet"]');
+ if(meetButton?.disabled)return;
  const index=Number(locationModal.dataset.selectedPersonIndex);
  const placeKey=locationModal.dataset.place;
  const person=cityPresenceByPlace[placeKey]?.[index];
  if(!person||!isCurrentCityCharacterEligible(person)){toast('此角色已不在公開城市行程中。');await openCityLocation({dataset:{place:placeKey}});return;}
  if(!requireLogin({page:'citymap',id:person.id}))return;
- const meetButton=event.target.closest('[data-action="city-character-meet"]');
- if(meetButton)meetButton.disabled=true;
+ const originalMeetLabel=meetButton?.textContent||'與他相遇';
+ if(meetButton){meetButton.disabled=true;meetButton.setAttribute('aria-busy','true');meetButton.textContent='正在建立相遇…';}
  try{
  const resumedSession=await findResumableEncounterSession(person.id,placeKey);
  let encounterSession=null;
@@ -708,7 +717,7 @@
  }catch(error){
  console.error('從城市地點開始相遇失敗：',error);
  toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
- }finally{if(meetButton)meetButton.disabled=false;}
+ }finally{if(meetButton){meetButton.disabled=false;meetButton.removeAttribute('aria-busy');meetButton.textContent=originalMeetLabel;}}
  }
  });
  $('cityMapAvatarStrip')?.addEventListener('error',event=>{

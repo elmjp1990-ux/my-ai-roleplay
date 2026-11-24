@@ -575,6 +575,18 @@ Deno.test("keeps sleeping detection aligned across frontend and server availabil
   if (resolveEncounterScheduleAvailability("在家休息") !== "available") {
     throw new Error("ordinary rest incorrectly blocked");
   }
+  if (resolveEncounterScheduleAvailability("補眠", "手機放在茶几上保持待命狀態，隨時準備接聽電話") !== "available") {
+    throw new Error("on-call rest must remain available for an Encounter");
+  }
+  if (resolveEncounterScheduleAvailability("補眠", "手機靜音，請勿打擾") !== "sleeping") {
+    throw new Error("rest without an explicit availability signal must remain unavailable");
+  }
+  if (resolveEncounterScheduleAvailability("深層睡眠", "手機保持待命") !== "sleeping") {
+    throw new Error("explicit deep sleep must override unrelated standby wording");
+  }
+  if (resolveEncounterScheduleAvailability("午睡", "手機保持待命，隨時接聽電話") !== "available") {
+    throw new Error("clear standby instruction must override generic nap wording");
+  }
 });
 
 Deno.test("rejects airport as a generic everyday location without character context", () => {

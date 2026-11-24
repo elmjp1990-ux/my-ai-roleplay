@@ -332,44 +332,23 @@ assert.match(exploreGrid,/window\.loadNextPublicCharacterPage\(\)/,
 assert.match(exploreGrid,/characterVideoObserver\.unobserve\(previousVideo\)/,
   "Explore pagination must preserve the existing video-node reuse behavior");
 
-const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function openEncounterMemoryDetail(button)");
-assert.match(encounterMemory,/pageSize\('encounterMemories'\)/,
-  "Encounter memory lists must use the shared ten-session page size");
-assert.match(encounterMemory,/\.range\(pageStart,pageStart\+pageSize-1\)/,
-  "Encounter sessions must be paginated by the backend instead of fetching 200 diary rows");
-assert.match(encounterMemory,/\.in\('metadata->>session_id',sessionIds\)/,
-  "diary summaries must be hydrated only for the current page of Encounter sessions");
-assert.match(encounterMemory,/row\.encounter_archived==='true'\|\|diaryBySession\.has\(row\.id\)/,
-  "unfinished Encounter sessions must stay hidden until archived or diary evidence exists");
+const encounterMemory=between("function loadEncounterMemoryList(panel,session)","async function loadEncounterMemoryPage(list,session,pager)");
+assert.ok(encounterMemory.includes("pager.historyPerson={id:session.characterId"),
+  "Encounter Diary must initialize the same canonical session-history source as City Encounter History");
 const encounterListPage=between("async function loadEncounterMemoryPage(list,session,pager)","let encounterMemoryDetailPager");
-assert.doesNotMatch(encounterListPage,/from\(['"]chat_messages['"]\)/,
-  "Encounter list hydration must not scan message rows just to detect completed sessions");
+assert.ok(encounterListPage.includes("historyApi.loadCloudHistory(person,currentUser,client,{append})"),
+  "Encounter Diary must use the exact same cloud-session loader and eligibility filters as City Encounter History");
+assert.ok(encounterListPage.includes("historyApi.previewText(record)"),
+  "both Encounter views must use the same fifty-character preview text");
+assert.ok(encounterListPage.includes("preview.length>=50"),
+  "Encounter Diary previews must be limited to fifty characters");
 const encounterDetail=between("function renderEncounterMemoryDetailDialog()","function renderChatSettingsOverlay");
 assert.match(encounterDetail,/const pageSize=10/);
 assert.match(encounterDetail,/observeEnd\(nextSentinel/);
 assert.match(encounterDetail,/pager\.source==='diary'/);
 assert.match(encounterDetail,/\.limit\(10\)/,
   "Encounter message and diary details must fetch only ten records per page");
-assert.doesNotMatch(encounterDetail,/載入更早的 5 則訊息/,
-  "Encounter details must use scroll-triggered pagination instead of a manual five-message button");
-assert.match(encounterMemory,/PoyozzListPagination\.observeEnd/,
-  "Encounter memory lists must load the next ten sessions when the user reaches the end");
-assert.doesNotMatch(encounterMemory,/\.limit\(200\)/,
-  "Encounter memory list initialization must not fetch 200 diary records");
-assert.match(encounterMemory,/visibleCards=combinedCards\.slice\(0,pageSize\)/,
-  "Encounter list rendering must cap each visible page at ten cards, including legacy rows");
-assert.match(encounterMemory,/pager\.buffer=combinedCards\.slice\(pageSize\)/,
-  "overflow cards must be buffered for the next page instead of rendering more than twenty initially");
-assert.match(encounterMemory,/pager\.hasMore\|\|pager\.buffer\.length/,
-  "the Encounter sentinel must remain available while buffered cards remain");
-assert.match(encounterMemory,/\.limit\(pageSize\)/,
-  "only one compact diary preview per page may be hydrated for Encounter list cards");
-assert.match(encounterMemory,/legacyOffset,pager\.legacyOffset\+pageSize-1/,
-  "legacy Encounter diary rows must also use bounded backend pagination");
-assert.match(encounterMemory,/encounter_place:session_data->>encounterPlace/,
-  "Encounter list hydration must select only the required place metadata");
-assert.doesNotMatch(encounterMemory,/select\('id,chat_mode,session_data,updated_at'\)/,
-  "Encounter list pages must not transfer the entire session_data JSON payload");
+assert.doesNotMatch(encounterDetail,/載入更早的 5 則訊息/);
 
 
 console.log("Story relationship RPC dedupe, illustration write dedupe, group list refresh avoidance, incremental group-turn loading, phone-state cache, shared login auth verification, and author-profile hydration reuse checks passed.");
@@ -830,3 +809,20 @@ assert.match(avatarRecovery,/image\.replaceWith\(fallback\)/,
   "a failed role portrait must become a stable name fallback instead of remaining a dark broken image");
 assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset\.characterPrimaryIllustration/,
   "the generic low-opacity image handler must not dim failed character avatars");
+
+
+// PR #277 follow-up: historical Encounter diary details must paginate independently of the currently open chat.
+const encounterMemoryListSource=between("function loadEncounterMemoryList(panel,session)","async function loadEncounterMemoryPage(list,session,pager)");
+assert.ok(encounterMemoryListSource.includes("pager.historyPerson={id:session.characterId"),
+  "Encounter Diary must use the same canonical session source as City Encounter History");
+const encounterDetailPagerSource=between("async function loadEncounterMemoryDetailOlder()","async function openEncounterMemoryDetail(button)");
+assert.ok(!encounterDetailPagerSource.includes("currentSession()?.id!==pager.sessionId"),
+  "opening an older Encounter diary must not disable its load-more path just because another chat is currently open");
+assert.ok(encounterDetailPagerSource.includes("uid!==pager.uid"),
+  "historical Encounter pagination must remain bound to the owning account");
+assert.ok(encounterDetailPagerSource.includes(".or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')"),
+  "legacy Encounter sessions must pass the same ownership check as current Encounter sessions");
+assert.ok(appIndexSource.includes("modal.dataset.encounterMemoryDialog==='true'){modal.close();return;}"),
+  "closing an Encounter diary detail must close only the detail dialog, not navigate to Chat Features");
+assert.ok(appIndexSource.includes("encounterDiaryDisplayText(entry.content||'')"),
+  "the internal discovery sentinel must be rendered as player-facing text in diary details");
