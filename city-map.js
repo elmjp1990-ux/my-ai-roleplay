@@ -676,13 +676,15 @@
  return;
  }
  if(cardAction==='city-character-meet'){
+ const meetButton=event.target.closest('[data-action="city-character-meet"]');
+ if(meetButton?.disabled)return;
  const index=Number(locationModal.dataset.selectedPersonIndex);
  const placeKey=locationModal.dataset.place;
  const person=cityPresenceByPlace[placeKey]?.[index];
  if(!person||!isCurrentCityCharacterEligible(person)){toast('此角色已不在公開城市行程中。');await openCityLocation({dataset:{place:placeKey}});return;}
  if(!requireLogin({page:'citymap',id:person.id}))return;
- const meetButton=event.target.closest('[data-action="city-character-meet"]');
- if(meetButton)meetButton.disabled=true;
+ const originalMeetLabel=meetButton?.textContent||'與他相遇';
+ if(meetButton){meetButton.disabled=true;meetButton.setAttribute('aria-busy','true');meetButton.textContent='正在建立相遇…';}
  try{
  const resumedSession=await findResumableEncounterSession(person.id,placeKey);
  let encounterSession=null;
@@ -715,7 +717,7 @@
  }catch(error){
  console.error('從城市地點開始相遇失敗：',error);
  toast(error?.message||'相遇模式暫時無法使用，請稍後再試。');
- }finally{if(meetButton)meetButton.disabled=false;}
+ }finally{if(meetButton){meetButton.disabled=false;meetButton.removeAttribute('aria-busy');meetButton.textContent=originalMeetLabel;}}
  }
  });
  $('cityMapAvatarStrip')?.addEventListener('error',event=>{
