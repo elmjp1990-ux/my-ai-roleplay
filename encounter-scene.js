@@ -244,7 +244,7 @@ body.encounter-mode-active .chat-main.encounter-scene .composer-bottom-row{
         // Keep stage directions and spoken dialogue as separate tap-to-advance beats.
         // A response such as "*looks up*" followed by "The door is unlocked." must
         // never render both parts on the same screen.
-        const segments=sentence.split(/(\\*(?!\\*)[^*]+?\\*(?!\\*))/gu).filter(Boolean);
+        const segments=sentence.split(/(\*(?!\*)[^*]+?\*(?!\*))/gu).filter(Boolean);
         for(const segment of segments){
           const part=segment.trim();
           if(part)pushSentence(part);
