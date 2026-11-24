@@ -17,6 +17,7 @@ const pendingPriorityMigration = fs.readFileSync("supabase/migrations/2026111807
 const rawOutputRepairMigration = fs.readFileSync("supabase/migrations/20261118074727_encounter_schedule_raw_output_repair.sql", "utf8");
 const rawOutputRepairReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-repair.sql", "utf8");
 const rawOutputSoftHideMigration = fs.readFileSync("supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql", "utf8");
+const reconciliationRepairMigration = fs.readFileSync("supabase/migrations/20261124130000_allow_reconciliation_schedule_repair.sql", "utf8");
 const rawOutputSoftHideReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-output-soft-hide.sql", "utf8");
 const scheduleRepairDraftMigration = fs.readFileSync("supabase/migrations/20261124090000_encounter_schedule_repair_drafts.sql", "utf8");
 const scheduleRepairDraftReplay = fs.readFileSync("supabase/drafts/replay-encounter-schedule-repair-drafts.sql", "utf8");
@@ -61,6 +62,10 @@ assert.match(worker, /claim_encounter_schedule_repair/);
 assert.match(worker, /eq\("actor_user_id", actorUserId\)/);
 assert.match(worker, /originalBatch\.is_manual !== true/);
 assert.match(worker, /job\.source_hash !== output\.source_hash/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/);
+assert.match(reconciliationRepairMigration, /needs_reconciliation/);
+assert.match(reconciliationRepairMigration, /last_completed_source_hash/);
+assert.match(reconciliationRepairMigration, /character_schedules/);
 assert.doesNotMatch(worker, /\.delete\(\)\.lt\("expires_at"/, "Expired originals must never be hard-deleted by repair_list");
 assert.match(worker, /"dismissed"/);
 assert.match(worker, /"repair_hide"/);
