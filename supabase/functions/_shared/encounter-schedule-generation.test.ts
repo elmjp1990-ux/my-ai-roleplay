@@ -525,6 +525,25 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (vampireClass.category !== "modern_fantasy" || !vampireClass.modern_map_compatible) {
     throw new Error("modern vampire should be modern-fantasy and map compatible");
   }
+  const taggedModernFantasy = classifyEncounterWorldview(source(id1, {
+    race: "狼人",
+    worldview_tags: ["modern", "fantasy"],
+    intro: "居住在現代城市的狼人。",
+  }));
+  if (taggedModernFantasy.category !== "modern_fantasy" || !taggedModernFantasy.modern_map_compatible) {
+    throw new Error("author tags modern+fantasy should be modern-map compatible");
+  }
+  const taggedAncientFantasy = classifyEncounterWorldview(source(id1, {
+    worldview_tags: ["ancient", "fantasy"],
+    intro: "修仙宗門中的狐妖。",
+  }));
+  if (taggedAncientFantasy.modern_map_compatible) {
+    throw new Error("author tags ancient+fantasy must not be forced onto the modern map");
+  }
+  const taggedFantasyOnly = classifyEncounterWorldview(source(id1, { worldview_tags: ["fantasy"] }));
+  if (taggedFantasyOnly.category !== "fantasy" || taggedFantasyOnly.modern_map_compatible) {
+    throw new Error("fantasy-only author tag should not imply a modern era");
+  }
 
   const ancientVampire = source(id1, {
     race: "吸血鬼",
@@ -540,6 +559,27 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (classifyEncounterWorldview(cultivation).category !== "cultivation") {
     throw new Error("cultivation worldview was not classified");
   }
+  if (classifyEncounterActivitySpace("室內裝修監工與水電管線確認", "豪宅", false) !== "indoor") {
+    throw new Error("indoor residential construction must remain indoors");
+  }
+  if (classifyEncounterActivitySpace("道路施工與路面修繕監督", "商店街", false) !== "outdoor") {
+    throw new Error("road construction must be weather-exposed outdoor activity");
+  }
+  if (classifyEncounterActivitySpace("公園步道整修與景觀施工", "公園", false) !== "outdoor") {
+    throw new Error("park path construction must be classified as outdoor");
+  }
+  if (normalizeEncounterSceneKey("工地", "室內裝修監工") !== null) {
+    throw new Error("generic worksite must not become a standalone map scene");
+  }
+  if (normalizeEncounterSceneKey("豪宅", "室內裝修監工") !== "luxury-apartment") {
+    throw new Error("luxury residence construction should map to the existing luxury-apartment scene");
+  }
+  if (normalizeEncounterSceneKey("店面", "店內裝修") !== "shopping-street") {
+    throw new Error("shopfront construction should map to the existing shopping-street scene");
+  }
+  if (normalizeEncounterSceneKey("校舍", "校舍修繕") !== "university") {
+    throw new Error("school building construction should map to the existing university scene");
+  }
 
   const unknown = source(id1, {
     intro: "一位神秘旅人。", world_era: "", modern_setting_compatible: false,
@@ -549,8 +589,11 @@ Deno.test("classifies worldviews locally and keeps species separate from era", (
   if (unknownClass.category !== "unknown" || unknownClass.modern_map_compatible) {
     throw new Error("unknown worldview must be held out of the modern map");
   }
-  if (getEncounterWorldviewScheduleDisposition(unknownClass) !== "needs_review") {
-    throw new Error("unknown worldview must enter manual review instead of completed/unplaced");
+  if (getEncounterWorldviewScheduleDisposition(unknownClass) !== "generate") {
+    throw new Error("unknown legacy worldview must generate instead of blocking schedule publication");
+  }
+  if (!isEncounterModernMapCompatible(unknown)) {
+    throw new Error("unknown legacy characters should be allowed through the safe scene resolver");
   }
   if (getEncounterWorldviewScheduleDisposition(unknownClass, "modern_map_compatible") !== "generate") {
     throw new Error("explicit author review decision should authorize modern-map generation");
