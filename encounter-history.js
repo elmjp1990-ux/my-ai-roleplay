@@ -1,7 +1,7 @@
 (function(g){
 'use strict';
 const N=10;
-const clean=v=>String(v||'').replaceAll('你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。','你選擇讓角色主動發現你。').replaceAll('[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','你選擇讓角色主動發現你').replaceAll('（請接續目前的故事。）','').trim();
+const clean=v=>String(v||'').replaceAll('你說：「[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]」。','等他發現你。').replaceAll('[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]','等他發現你').replaceAll('（請接續目前的故事。）','').trim();
 const renderHistory=(p,rows,esc,places)=>{
  rows=Array.isArray(rows)?rows:[];
  const cards=rows.map(s=>{
