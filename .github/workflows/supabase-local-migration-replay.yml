@@ -619,6 +619,7 @@ jobs:
           DECLARE
             v_source_definition text;
             v_trigger_definition text;
+            v_trigger_function_definition text;
           BEGIN
             IF NOT EXISTS (
               SELECT 1 FROM information_schema.columns
@@ -650,6 +651,12 @@ jobs:
             IF v_trigger_definition IS NULL
                OR pg_catalog.strpos(v_trigger_definition, 'worldview_tags') = 0 THEN
               RAISE EXCEPTION 'worldview tag change trigger missing';
+            END IF;
+            v_trigger_function_definition := pg_catalog.pg_get_functiondef(
+              'public.on_encounter_character_visibility_changed()'::regprocedure
+            );
+            IF pg_catalog.strpos(v_trigger_function_definition, 'OLD.worldview_tags') = 0 THEN
+              RAISE EXCEPTION 'worldview tag trigger function does not enqueue changed tags';
             END IF;
           END
           $worldview_contract$;
