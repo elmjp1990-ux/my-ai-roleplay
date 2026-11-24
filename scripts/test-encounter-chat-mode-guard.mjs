@@ -283,7 +283,6 @@ assert.match(frontend, /前次已完成的模型請求重複計費/);
 assert.match(frontend, /historyApi\.loadCloudHistory\(person,currentUser,client,\{append\}\)/);
 assert.match(frontend, /historyApi\.previewText\(record\)/);
 assert.match(frontend, /preview\.length>=50/);
-assert.match(encounterHistory, /const previewText=s=>clean\(s\?\.lastMessagePreview\|\|s\?\.encounterSummary/);
 assert.match(frontend, /encounter_mode:session_data->>encounterMode/);
 assert.match(frontend, /session_data->>encounterMode\.eq\.true/);
 assert.match(frontend, /async function openEncounterMemoryDetail\(button\)/);
@@ -480,6 +479,7 @@ assert.ok(frontend.includes("client.rpc('find_existing_story_chat_session'"));
 
 const encounterPresentation = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
+assert.match(encounterHistory, /const previewText=s=>clean\(s\?\.lastMessagePreview\|\|s\?\.encounterSummary/);
 assert.ok(cityMap.includes("meetButton.textContent='正在建立相遇…'"),
   "the city-map Encounter action must show immediate pending feedback");
 assert.ok(cityMap.includes("if(meetButton?.disabled)return"),
