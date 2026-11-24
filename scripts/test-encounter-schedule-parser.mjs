@@ -6,9 +6,11 @@ const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
+const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
 const worldviewReviewMigration = fs.readFileSync("supabase/migrations/20261119000500_encounter_schedule_worldview_review_decisions.sql", "utf8");
 const modernContextMigration = fs.readFileSync("supabase/migrations/20261123115500_encounter_schedule_modern_context_signals.sql", "utf8");
 assert.ok(modernContextMigration.includes("男公關|牛郎|夜生活|地下樂團"));
+assert.match(scheduleGeneration, /室內設計師\|室內設計\|空間設計師\|空間規劃\|設計事務所/);
 assert.match(modernContextMigration, /poyozz-encounter-schedule-v10-modern-context-signals-2026-11-23/);
 
 

@@ -479,6 +479,42 @@ Deno.test("recognizes contemporary nightlife host settings as modern", () => {
   }
 });
 
+Deno.test("recognizes contemporary interior-design and construction professions as modern", () => {
+  const designProfessional = source(id1, {
+    name: "江辰遠",
+    intro: "住在城市公寓，任職於知名設計事務所的室內設計師，專長空間規劃與家居美學。",
+    world_era: "",
+    modern_setting_compatible: false,
+    time_travel_explicit: false,
+    schedule_description: "平日前往設計工地監工，與施工工班確認進度，傍晚回工作室繪製設計圖。",
+    private_info: "曾在裝修工程與樣品屋現場協調空間配置。",
+  });
+  const classification = classifyEncounterWorldview(designProfessional);
+  if (classification.category !== "modern" || !classification.modern_map_compatible ||
+      getEncounterWorldviewScheduleDisposition(classification) !== "generate") {
+    throw new Error("contemporary interior-design profession was incorrectly held for review: " + JSON.stringify(classification));
+  }
+  const promptPayload = JSON.parse(buildEncounterScheduleBatchMessages([designProfessional]).messages[1].content).characters[0];
+  if (promptPayload.modern_setting_compatible !== true) {
+    throw new Error("modern-map compatibility was not passed to the schedule AI for a contemporary design professional");
+  }
+  const parsed = result([{
+    character_id: id1, placement: "modern_map", variants: variants(),
+  }], [designProfessional]);
+  if (!parsed.ok) throw new Error("modern-map schedule for a contemporary design professional was rejected: " + parsed.errors.join(","));
+
+  const historicalDesigner = source(id1, {
+    intro: "中世紀古堡中的室內設計師，負責規劃領主寢宮。",
+    world_era: "medieval",
+    modern_setting_compatible: false,
+    schedule_description: "",
+  });
+  if (classifyEncounterWorldview(historicalDesigner).category !== "historical" ||
+      isEncounterModernMapCompatible(historicalDesigner)) {
+    throw new Error("historical era must retain priority over contemporary profession keywords");
+  }
+});
+
 Deno.test("classifies worldviews locally and keeps species separate from era", () => {
   const modernVampire = source(id1, {
     race: "吸血鬼",
