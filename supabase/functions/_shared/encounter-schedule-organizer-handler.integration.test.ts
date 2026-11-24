@@ -202,17 +202,18 @@ Deno.test("manual POST mock executes authenticated AI-to-publish happy path with
   }
 });
 
-Deno.test("manual POST moves unknown-worldview roles to needs_review without AI or parser failure", async () => {
+Deno.test("manual POST publishes unknown legacy worldview before adding non-blocking review", async () => {
   const mock = createMock("worldview_review");
   const response = await invoke(mock);
   const body = await response.json();
   if (response.status !== 200 || body.status !== "completed" ||
-      body.needs_review_character_count !== 1 || body.failed_character_count !== 0) {
-    throw new Error("Unknown worldview should complete into manual review, not fail: " + JSON.stringify({ status: response.status, body }));
+      body.needs_review_character_count !== 1 || body.failed_character_count !== 0 ||
+      body.published_character_count !== 1) {
+    throw new Error("Unknown legacy worldview should publish first, then enter soft review: " + JSON.stringify({ status: response.status, body }));
   }
-  if (mock.calls.provider !== 0 || mock.calls.publish !== 0 || mock.calls.reviewUpdates !== 1 ||
-      mock.calls.batchCompletions !== 1) {
-    throw new Error("Review-only character must skip AI/publisher and persist review + batch completion: " + JSON.stringify(mock.calls));
+  if (mock.calls.provider !== 1 || mock.calls.publish !== 1 || mock.calls.reviewUpdates !== 1 ||
+      mock.calls.batchCompletions !== 0) {
+    throw new Error("Unknown legacy character must run AI/publisher once and persist post-publish review: " + JSON.stringify(mock.calls));
   }
 });
 
