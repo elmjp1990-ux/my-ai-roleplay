@@ -51,7 +51,7 @@
  render(dependencies) {
  destroyActiveMap();
  const {
- ICON, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
+ ICON, chatNavUnreadBadge, $, state, accessible, escapeHTML, safeImage, characterAvatarMarkup, currentUser, toast, go, requireLogin,
  persist, hydratePublicCharacterIllustrations, characterVideoObserver,
  releaseCharacterVideo, hydrateCharacterVideo, loadCloudChatSessions,
  setEncounterLifecycleState, createEncounterSession, loadCityCharacterPage, loadCityCharacterSchedules
@@ -125,7 +125,7 @@
         <div class="city-map-bottom" aria-label="主要導覽">
           <button type="button" class="nav-btn active" data-action="nav" data-page="citymap" aria-current="page">${ICON.home}<span class="nav-label">探索</span></button>
           <button type="button" class="nav-btn" data-action="nav" data-page="create">${ICON.create}<span class="nav-label">創建</span></button>
-          <button type="button" class="nav-btn" data-action="nav" data-page="chat">${ICON.chat}<span class="nav-label">聊天</span></button>
+          <button type="button" class="nav-btn" data-action="nav" data-page="chat"><span class="nav-icon-wrap">${ICON.chat}${chatNavUnreadBadge()}</span><span class="nav-label">聊天</span></button>
           <button type="button" class="nav-btn" data-action="nav" data-page="shop">${ICON.shop}<span class="nav-label">商店</span></button>
           <button type="button" class="nav-btn" data-action="nav" data-page="profile">${ICON.profile}<span class="nav-label">我的</span></button>
         </div>
