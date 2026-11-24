@@ -347,6 +347,8 @@ async function generateProfile(
       if (!validation.ok) {
         throw new ProfileGenerationError("profile_schema_invalid_" + validation.errors[0], metadata);
       }
+      await trace("output_validated", provider);
+      metadata.requestTrace = requestTrace;
       return { ...metadata, profile: parsed as Record<string, unknown> };
     } catch (error) {
       // Include earlier safe failover attempts (for example DeepInfra 429)
