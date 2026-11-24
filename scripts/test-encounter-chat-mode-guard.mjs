@@ -303,7 +303,7 @@ assert.match(cityMap, /findResumableEncounterSession\(person\.id,placeKey\)/);
 assert.match(frontend, /encounterDay/);
 assert.match(frontend, /encounter-dialog-dismiss/);
 assert.match(frontend, /saved!==true\)throw new Error\('雲端未確認儲存結果。'\)/);
-assert.match(frontend, /\.eq\(["']chat_mode["'],["']encounter["']\)/);
+assert.match(frontend, /\.or\(['"]chat_mode\.eq\.encounter,session_data->>encounterMode\.eq\.true['"]\)/);
 assert.match(frontend, /item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
 assert.match(frontend, /const hasConversation=hasUserMessage\(s\)\|\|\(s\.cloudOwned&&s\.cloudHasUserMessage==null\)/);
 assert.match(frontend, /session_encounter_metadata:session_data->encounter/);
