@@ -68,7 +68,29 @@ BEGIN
 
   EXECUTE v_definition;
 END;
-$migration$;-- Re-queue only active AI schedules that used the generic "工地" label.
+$migration$;-- Keep the existing enqueue trigger function aware of the new worldview source field.
+DO $trigger_function$
+DECLARE
+  v_definition text;
+  v_old_condition text := 'OR OLD.tags IS DISTINCT FROM NEW.tags';
+  v_new_condition text := 'OR OLD.tags IS DISTINCT FROM NEW.tags' || E'\n     OR OLD.worldview_tags IS DISTINCT FROM NEW.worldview_tags';
+BEGIN
+  SELECT pg_catalog.pg_get_functiondef(
+    'public.on_encounter_character_visibility_changed()'::regprocedure
+  ) INTO v_definition;
+
+  IF pg_catalog.strpos(v_definition, v_new_condition) = 0 THEN
+    IF pg_catalog.strpos(v_definition, v_old_condition) = 0 THEN
+      RAISE EXCEPTION 'encounter_character_visibility_trigger_tags_condition_not_found';
+    END IF;
+    v_definition := pg_catalog.replace(v_definition, v_old_condition, v_new_condition);
+  END IF;
+
+  EXECUTE v_definition;
+END;
+$trigger_function$;
+
+-- Re-queue only active AI schedules that used the generic "工地" label.
 -- The Edge Function must be deployed before this migration is applied.
 DO $requeue$
 DECLARE
