@@ -88,8 +88,7 @@ export async function recordAiGenerationDiagnostic(
 export async function updateAiGenerationDiagnostic(
   admin: any,
   id: string | null,
-  update: Pick<AiGenerationDiagnosticInput,
-    "status" | "failureStage" | "failureCode" | "validationErrors" | "metadata">,
+  update: Partial<AiGenerationDiagnosticInput>,
 ): Promise<void> {
   if (!id) return;
   try {
@@ -99,6 +98,21 @@ export async function updateAiGenerationDiagnostic(
     if (update.failureCode !== undefined) patch.failure_code = update.failureCode;
     if (update.validationErrors !== undefined) patch.validation_errors = update.validationErrors;
     if (update.metadata !== undefined) patch.metadata = update.metadata;
+    if (update.model !== undefined) patch.model = update.model;
+    if (update.provider !== undefined) patch.provider = update.provider;
+    if (update.requestId !== undefined) {
+      patch.gateway_request_id = /^[A-Za-z0-9._:-]{1,128}$/.test(asText(update.requestId))
+        ? update.requestId : null;
+    }
+    if (update.httpStatus !== undefined) patch.http_status = update.httpStatus;
+    if (update.finishReason !== undefined) patch.finish_reason = update.finishReason;
+    if (update.responseContentType !== undefined) patch.response_content_type = update.responseContentType;
+    if (update.responseBodyLength !== undefined) patch.response_body_length = update.responseBodyLength;
+    if (update.responseParsed !== undefined) patch.response_parsed = update.responseParsed;
+    if (update.rawOutputText !== undefined) patch.raw_output_text = update.rawOutputText;
+    if (update.rawResponseBody !== undefined) patch.raw_response_body = update.rawResponseBody;
+    if (update.refusalText !== undefined) patch.refusal_text = update.refusalText;
+    if (update.usage !== undefined) patch.usage = update.usage;
     const { error } = await admin.from("ai_generation_diagnostics").update(patch).eq("id", id);
     if (error) console.warn("ai_generation_diagnostic_update_failed", { code: error.code || "database_error" });
   } catch {
