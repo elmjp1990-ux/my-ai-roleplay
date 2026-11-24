@@ -328,9 +328,9 @@ assert.match(cityMap, /placeSubtitle\)placeSubtitle\.textContent=''/,
 
 
 // PR #277 follow-up: make Encounter creation latency visible immediately and prevent duplicate clicks.
-assert.match(cityMap,/meetButton\\.textContent='正在建立相遇…'/,
-  'the meet button must immediately show a clear pending state while the Encounter session is created');
-assert.match(cityMap,/meetButton\\.setAttribute\\('aria-busy','true'\\)/,
-  'the meet button must expose its pending state accessibly');
-assert.match(cityMap,/if\\(meetButton\\?\\.disabled\\)return/,
-  'repeated clicks must not dispatch duplicate Encounter creation requests');
+assert.ok(cityMap.includes("meetButton.textContent='正在建立相遇…'"),
+  "the meet button must immediately show a clear pending state while the Encounter session is created");
+assert.ok(cityMap.includes("meetButton.setAttribute('aria-busy','true')"),
+  "the meet button must expose its pending state accessibly");
+assert.ok(cityMap.includes("if(meetButton?.disabled)return"),
+  "repeated clicks must not dispatch duplicate Encounter creation requests");
