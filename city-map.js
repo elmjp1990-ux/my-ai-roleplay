@@ -150,7 +150,6 @@
     latestEligible:row.latest_eligible!==false
   };
   state.characters=state.characters.map(item=>item.id===characterId?refreshed:item);
-  draftCharacter=clone(refreshed);
   persist();
   return refreshed;
 }
