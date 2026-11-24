@@ -1,8 +1,8 @@
 -- Preserve Jiang Chenyuan's existing AI schedules without another provider call.
 -- The previous worldview migration re-queued this character solely because the
 -- source payload version gained an empty legacy worldview_tags array.
--- Keep all 96 existing schedule rows; only map the nine generic indoor-work rows
--- to the already-enabled high-end apartment scene so the character can appear.
+-- Keep all 96 existing schedule rows. Map indoor worksite activity to the existing
+-- high-end apartment scene, and reuse existing office/home scenes for known venues.
 BEGIN;
 
 DO $repair$
