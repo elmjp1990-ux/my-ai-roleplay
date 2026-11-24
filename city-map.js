@@ -55,6 +55,20 @@
      </div>
    </section>`;
  };
+ const normalizePhoneNoticeRows = value => (Array.isArray(value) ? value : []).slice(0,8).map(item => {
+   const raw = String(item || "");
+   const separator = raw.indexOf("|");
+   return separator < 0 ? { display: raw.trim(), instruction: "" }
+     : { display: raw.slice(0, separator).trim(), instruction: raw.slice(separator + 1).trim() };
+ });
+ const readPhoneNoticeRows = form => {
+   const values = new FormData(form);
+   return Array.from({ length: 8 }, (_, index) => {
+     const display = String(values.get("phoneDisplay" + index) || "").trim().slice(0, 80);
+     const instruction = String(values.get("phoneInstruction" + index) || "").trim().slice(0, 150);
+     return display || instruction ? display + " | " + instruction : "";
+   }).filter(Boolean);
+ };
  const editorCharacterFingerprint = character => {
    const c = character || {};
    const profile = c.personalityProfile || {};
@@ -96,6 +110,8 @@
  renderWorldviewField,
  editorCharacterFingerprint,
  reconcileEditorDraft,
+ normalizePhoneNoticeRows,
+ readPhoneNoticeRows,
  destroy: destroyActiveMap,
  refreshScenes() {
  return activeSceneRefresh ? activeSceneRefresh() : Promise.resolve();
