@@ -10271,7 +10271,7 @@ async function loadEncounterScheduleTestTools(){
         return '<article class="panel stack" style="padding:12px">'+
           '<strong>'+name+'｜待人工審核</strong>'+
           '<p class="small muted">原因：'+reason+'｜保留時間：'+e(updated)+'</p>'+
-          '<p class="small">系統無法可靠判定此角色的世界觀是否適用現代地圖，因此已暫停行程生成。請依角色設定明確分類；選擇現代地圖適用只會加入待生成佇列，不會立即呼叫 AI。選擇不適用則結束審核並保留既有行程與招呼池。</p>'+
+          '<p class="small">行程會先依角色設定自動生成並發布；低信心舊角色會列在此處供日後人工核對，核對不會阻擋行程先行出現。</p>'+
           '<div class="row wrap"><button type="button" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="modern_map_compatible">判定為現代地圖適用</button><button type="button" class="ghost" data-action="worldview-review-decision" data-character-id="'+e(item.character_id||'')+'" data-decision="not_applicable">判定不適用（保留既有資料）</button></div>'+
         '</article>';
       }).join(''):'<p class="small muted">目前沒有待人工審核的未知世界觀角色。</p>';
