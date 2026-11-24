@@ -325,8 +325,10 @@ assert.ok(worker.includes("error.metadata.providerAttempts = providerAttempts"),
 assert.ok(worker.includes("providerAttempts?: Array<Record<string, unknown>>"),
   "Profile diagnostics must support a compact history of provider attempts");
 
-assert.ok(worker.includes('status: "received"') && worker.includes('metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [] }'),
-  "A valid provider response must remain received until the Profile is persisted");
+assert.ok(worker.includes('status: "received"') &&
+  worker.includes('metadata: { persistence_status: "not_started"') &&
+  worker.includes('metadata: { persistence_status: "pending", provider_attempts: generated.providerAttempts || [], request_trace:'),
+  "A request checkpoint must exist before provider dispatch, then retain a valid response until the Profile is persisted");
 assert.ok(worker.includes('status: "completed", failureStage: null, failureCode: null') &&
   worker.includes('metadata: { persistence_status: "completed" }'),
   "A Profile diagnostic may be marked completed only after the database completion RPC succeeds");
