@@ -71,8 +71,10 @@ assert.match(rawOutputSoftHideMigration, /ADD COLUMN IF NOT EXISTS removed_at ti
 assert.ok(rawOutputSoftHideMigration.includes("REVOKE DELETE ON TABLE public.encounter_schedule_generation_outputs FROM service_role"));
 assert.ok(rawOutputSoftHideMigration.includes("REVOKE DELETE ON TABLE public.encounter_schedule_generation_output_revisions FROM service_role"));
 assert.match(rawOutputSoftHideReplay, /encounter_schedule_output_physical_delete_still_granted/);
-assert.match(worker, /repairableCharacterIds/);
-assert.match(worker, /job\.status === "failed"/);
+assert.match(worker, /repairableJobByCharacter/);
+assert.match(worker, /\["failed", "needs_reconciliation"\]\.includes\(job\.status\)/);
+assert.match(worker, /job\.status !== "failed"/,
+  "Publishing remains restricted to failed jobs even though reconciliation drafts are visible");
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputIdByCharacter\.get\(item\.sourceId\)[\s\S]*?"completed"/);
 
 assert.match(worker, /updateRawGenerationOutput\(admin, rawOutputId/);
