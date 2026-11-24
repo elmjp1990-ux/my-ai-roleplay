@@ -833,14 +833,17 @@ assert.match(avatarRecovery,/image\.dataset\.characterAvatarId\|\|image\.dataset
 
 
 // PR #277 follow-up: historical Encounter diary details must paginate independently of the currently open chat.
+const encounterMemoryListSource=between("function loadEncounterMemoryList(panel,session)","async function loadEncounterMemoryPage(list,session,pager)");
+assert.ok(encounterMemoryListSource.includes("pager.legacyHasMore=true")&&encounterMemoryListSource.includes("pager.legacyOffset=0"),
+  "legacy Encounter diary rows without a session_id must be included from the first page");
 const encounterDetailPagerSource=between("async function loadEncounterMemoryDetailOlder()","async function openEncounterMemoryDetail(button)");
-assert.doesNotMatch(encounterDetailPagerSource,/currentSession\\(\\)\\?\\.id!==pager\\.sessionId/,
+assert.ok(!encounterDetailPagerSource.includes("currentSession()?.id!==pager.sessionId"),
   "opening an older Encounter diary must not disable its load-more path just because another chat is currently open");
-assert.match(encounterDetailPagerSource,/uid!==pager\\.uid/,
+assert.ok(encounterDetailPagerSource.includes("uid!==pager.uid"),
   "historical Encounter pagination must remain bound to the owning account");
-assert.match(encounterDetailPagerSource,/chat_mode\\.eq\\.encounter,session_data->>encounterMode\\.eq\\.true/,
+assert.ok(encounterDetailPagerSource.includes(".or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true')"),
   "legacy Encounter sessions must pass the same ownership check as current Encounter sessions");
-assert.match(appIndexSource,/encounterMemoryDialog==='true'[\\s\\S]*?modal\\.close\\(\\)/,
+assert.ok(appIndexSource.includes("modal.dataset.encounterMemoryDialog==='true'){modal.close();return;}"),
   "closing an Encounter diary detail must close only the detail dialog, not navigate to Chat Features");
-assert.match(appIndexSource,/encounterDiaryDisplayText\\(entry\\.content/,
+assert.ok(appIndexSource.includes("encounterDiaryDisplayText(entry.content||'')"),
   "the internal discovery sentinel must be rendered as player-facing text in diary details");
