@@ -11207,9 +11207,7 @@ document.addEventListener('toggle', event => {
   hint.textContent = panel.open ? (hint.dataset.expanded || '滑動或點選燈號可切換') : (hint.dataset.collapsed || '點擊可展開');
 }, true);
 
-/* UI-1024: robust horizontal swipe navigation for single/group suggested replies.
-   Touch devices use touch events (with vertical scrolling preserved); mouse uses pointer events.
-   Delegation keeps the behavior alive across chat rerenders. */
+/* Swipe single/group suggestions; preserve vertical scroll across rerenders. */
 (function installSuggestionSwipe(){
   let gesture = null;
   let suppressClickUntil = 0;
@@ -11274,9 +11272,7 @@ document.addEventListener('toggle', event => {
   }, true);
 })();
  
-/* GROUP-01-OPEN: capture group-open clicks before other delegated handlers.
-   This makes group navigation independent of nested list markup or another handler
-   stopping propagation. The normal bubble handler is skipped to prevent double-open. */
+/* Capture group-open clicks before delegated handlers; prevent double-open. */
 document.addEventListener('click', event => {
   const target = event.target instanceof Element
     ? event.target.closest('[data-action="group-open"]')
@@ -11370,9 +11366,7 @@ document.addEventListener('click',event=>{
   else void toggleChatSessionPin(id);
 },true);
 
-/* GROUP MESSAGE ACTION CAPTURE FIX
-   Handle group-message menu and delete clicks in capture phase so an ancestor
-   handler cannot swallow the click before the action reaches the delegated router. */
+/* Capture group-message menu/delete clicks before ancestor handlers. */
 document.addEventListener('click', async event => {
   const target = event.target instanceof Element ? event.target.closest('[data-action]') : null;
   if (!target || target.disabled) return;
