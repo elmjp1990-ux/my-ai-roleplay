@@ -24,12 +24,16 @@ DO $migration$
 DECLARE
   v_definition text;
   v_marker text := $marker$'tags', COALESCE(pg_catalog.to_jsonb(c.tags), '[]'::jsonb),$marker$;
+  v_worldview_marker text := $marker$'worldview_tags', COALESCE(pg_catalog.to_jsonb(c.worldview_tags), '[]'::jsonb),$marker$;
+  v_old_version text := 'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19';
+  v_new_version text := 'poyozz-encounter-schedule-v9-worldview-tags-construction-2026-11-24';
+  v_version_count integer;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef(
     'public.encounter_schedule_source_payload(uuid)'::regprocedure
   ) INTO v_definition;
 
-  IF pg_catalog.strpos(v_definition, 'worldview_tags') = 0 THEN
+  IF pg_catalog.strpos(v_definition, v_worldview_marker) = 0 THEN
     IF pg_catalog.strpos(v_definition, v_marker) = 0 THEN
       RAISE EXCEPTION 'encounter_schedule_source_payload_tags_marker_not_found';
     END IF;
@@ -38,16 +42,19 @@ BEGIN
       v_marker,
       v_marker || E'\n    ''worldview_tags'', COALESCE(pg_catalog.to_jsonb(c.worldview_tags), ''[]''::jsonb),'
     );
-    v_definition := pg_catalog.replace(
-      v_definition,
-      'poyozz-encounter-schedule-v3-relationship-greetings-2026-11-17',
-      'poyozz-encounter-schedule-v4-worldview-tags-2026-11-24'
-    );
-    EXECUTE v_definition;
   END IF;
+
+  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old_version, '')))
+    / pg_catalog.length(v_old_version) INTO v_version_count;
+  IF v_version_count = 1 THEN
+    v_definition := pg_catalog.replace(v_definition, v_old_version, v_new_version);
+  ELSIF v_version_count = 0 AND pg_catalog.strpos(v_definition, v_new_version) = 0 THEN
+    RAISE EXCEPTION 'encounter_schedule_source_version_contract_unexpected';
+  END IF;
+
+  EXECUTE v_definition;
 END;
 $migration$;
-
 -- Re-queue only active AI schedules that used the generic "工地" label.
 -- The Edge Function must be deployed before this migration is applied.
 DO $requeue$
