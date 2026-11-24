@@ -19,7 +19,7 @@ BEGIN
   v_definition := pg_catalog.pg_get_functiondef(
     'public.claim_encounter_schedule_repair(uuid,uuid,uuid,text)'::regprocedure
   );
-  IF pg_catalog.position(v_old IN v_definition) = 0 THEN
+  IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
     RAISE EXCEPTION 'claim_encounter_schedule_repair_definition_unexpected';
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, v_new);
