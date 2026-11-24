@@ -3499,6 +3499,7 @@ let pendingDeletionWalletSyncUid =
 let route = {page:'citymap'};
 const GROUP_CONTINUE_SENTINEL = '（請接續目前的故事。）';
 const ENCOUNTER_DISCOVERY_SENTINEL = '[POYOZZ_ENCOUNTER_DISCOVERY_EVENT]';
+const encounterDiaryDisplayText = value => String(value||'').replaceAll(ENCOUNTER_DISCOVERY_SENTINEL,'等他發現你').replaceAll(GROUP_CONTINUE_SENTINEL,'').trim();
 let personaPickerSelection = null;
 let groupPersonaPickerSelection = null;
 let groupPrototype = {step:1,draft:{name:'',world:'',mode:'shared',scenes:[{name:'初始相遇',description:''}],memberIds:[],playerName:'',playerPersona:'',worldCharacterId:''},active:null,turn:0,messages:[],groups:[],groupPreviews:{},groupMembers:{},groupsLoaded:false,loadingGroups:false,loading:false,sending:false,pendingRequest:null,ownerUid:null,formError:'',loadError:'',openError:'',failedGroupId:null,openRequestId:0,groupListOffset:0,groupListHasMore:false,groupPinnedLoaded:false,groupPinnedOffset:0,groupPinnedHasMore:null,groupListObserver:null,historyCursor:null,historyHasMore:false,historyLoading:false,historyError:'',historyScrollAnchor:null};
@@ -5058,7 +5059,7 @@ window.addEventListener('popstate',event => {
   render();
 });
 $('modal').addEventListener('cancel',event => {
-  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') {
+  if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true' || $('modal').dataset.encounterMemoryDialog === 'true') {
     event.preventDefault();
     $('modal').close();
     return;
@@ -5071,7 +5072,7 @@ $('modal').addEventListener('click',event => {
   const r = $('modal').getBoundingClientRect();
   if (event.clientX < r.left || event.clientX > r.right ||
       event.clientY < r.top || event.clientY > r.bottom) {
-    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true') $('modal').close();
+    if ($('modal').dataset.walletDialog === 'true' || $('modal').dataset.encounterLeaveDialog === 'true' || $('modal').dataset.storyStartDialog === 'true' || $('modal').dataset.encounterMemoryDialog === 'true') $('modal').close();
     else dismissPendingDeletionModal();
   }
 });
@@ -5086,6 +5087,7 @@ function showDialog(title,content) {
 
     modal.addEventListener('cancel',event => {
       event.preventDefault();
+      if(modal.dataset.encounterMemoryDialog==='true'){modal.close();return;}
       back();
     });
 
@@ -5093,7 +5095,10 @@ function showDialog(title,content) {
       if (event.target !== modal) return;
       const r = modal.getBoundingClientRect();
       if (event.clientX < r.left || event.clientX > r.right ||
-          event.clientY < r.top || event.clientY > r.bottom) back();
+          event.clientY < r.top || event.clientY > r.bottom) {
+        if(modal.dataset.encounterMemoryDialog==='true')modal.close();
+        else back();
+      }
     });
   }
 
@@ -8073,9 +8078,10 @@ function renderEncounterMemoryDetailDialog(){
   const entries=pager.source==='diary'?(pager.entries||[]):(pager.messages||[]);
   const body=entries.map(entry=>{
     const isDiary=pager.source==='diary';
+    const displayText=isDiary?entry.summary:encounterDiaryDisplayText(entry.content||'');
     const speaker=isDiary?'相遇摘要':entry.role==='user'?'你':pager.characterName;
     const stamp=(isDiary?entry.occurred_at:entry.created_at)?new Date(isDiary?entry.occurred_at:entry.created_at).toLocaleString('zh-TW',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
-    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(isDiary?entry.summary:entry.content||'')+'</p></article>';
+    return '<article class="encounter-memory-message"><div class="row between"><strong>'+e(speaker)+'</strong><span class="small muted">'+e(stamp)+'</span></div><p>'+e(displayText)+'</p></article>';
   }).join('');
   const sentinel=pager.hasMore
     ?'<div data-encounter-memory-detail-sentinel="true" class="small muted" style="padding:12px;text-align:center">'+(pager.loading?'正在載入更早的紀錄…':'繼續往下滑動，載入更早的紀錄…')+'</div>'
@@ -8094,15 +8100,15 @@ function renderEncounterMemoryDetailDialog(){
 async function loadEncounterMemoryDetailOlder(){
   const pager=encounterMemoryDetailPager;
   const client=window.mySupabase,uid=currentUser()?.uid;
-  if(!pager||pager.loading||!pager.hasMore||!pager.cursor||uid!==pager.uid||currentSession()?.id!==pager.sessionId||!client)return;
+  if(!pager||pager.loading||!pager.hasMore||!pager.cursor||uid!==pager.uid||!client||!$('modal')?.open)return;
   pager.loading=true;renderEncounterMemoryDetailDialog();
   try{
     const {data:{user},error:authError}=await client.auth.getUser();
     if(authError||!user||user.id!==uid)throw new Error('登入狀態已失效，請重新登入。');
     const {data:ownedSession,error:sessionError}=await client.from('chat_sessions')
-      .select('id,user_id,character_id,chat_mode').eq('id',pager.sessionId)
-      .eq('user_id',uid).eq('character_id',pager.characterId)
-      .eq('chat_mode','encounter').maybeSingle();
+      .select('id,user_id,character_id,chat_mode,deleted_at').eq('id',pager.sessionId)
+      .eq('user_id',uid).eq('character_id',pager.characterId).is('deleted_at',null)
+      .or('chat_mode.eq.encounter,session_data->>encounterMode.eq.true').maybeSingle();
     if(sessionError)throw sessionError;
     if(!ownedSession)throw new Error('無法讀取這段相遇日記。');
     const pageSize=10;
@@ -8139,7 +8145,7 @@ async function loadEncounterMemoryDetailOlder(){
     toast(error?.message||'載入更早的相遇日記失敗，請稍後重試。');
   }finally{
     pager.loading=false;
-    if(encounterMemoryDetailPager===pager&&currentSession()?.id===pager.sessionId)renderEncounterMemoryDetailDialog();
+    if(encounterMemoryDetailPager===pager&&$('modal')?.open)renderEncounterMemoryDetailDialog();
   }
 }
 async function openEncounterMemoryDetail(button){
