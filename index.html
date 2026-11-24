@@ -6213,6 +6213,22 @@ function renderCreate() {
     });
   }
 }
+function editorCharacterFingerprint(character) {
+  const c=character || {};
+  const profile=c.personalityProfile || {};
+  const phone=c.phoneSettings || {};
+  const source=JSON.stringify([
+    String(c.name || ''),String(c.intro || ''),String(c.opening || ''),
+    String(c.privateInfo || ''),String(c.style || ''),
+    ['coreTraits','values','speechStyle','behaviorRules','boundaries','relationshipPacing','likes','dislikes','primaryIllustrationName']
+      .map(key=>String(profile[key] || '')),
+    (Array.isArray(phone.noticePrompts)?phone.noticePrompts:Array.isArray(phone.notices)?phone.notices:[]).map(value=>String(value))
+  ]);
+  let hash=2166136261;
+  for(let index=0;index<source.length;index++) hash=Math.imul(hash ^ source.charCodeAt(index),16777619);
+  return (hash>>>0).toString(16);
+}
+let editorDraftBaseFingerprint = '';
 function editorDraftKey() {
   const uid = currentUser()?.uid;
   if (!uid) return null;
@@ -6315,6 +6331,7 @@ function saveEditorDraft() {
     avatarVideoPath:draftVideoPath,
     illustrations:draftIllustrations.slice(0,5).map((item,index)=>({...((typeof item==='object'&&item)?item:{src:item}),name:String(form.querySelector('[data-illustration-name="'+index+'"]')?.value||'').slice(0,40)})),
     primaryIllustrationPath:draftPrimaryIllustrationPath,
+    baseFingerprint:editorDraftBaseFingerprint || editorCharacterFingerprint(draftCharacter || state.characters.find(item=>item.id===route.id)),
     savedAt:Date.now()
   };
   const serialized = JSON.stringify(draft);
@@ -6340,6 +6357,7 @@ function clearEditorDraft() {
 }
 function startEditor(c = null) {
   draftCharacter = c ? clone(c) : null;
+  editorDraftBaseFingerprint = c ? editorCharacterFingerprint(c) : '';
   draftTags = normalizeCharacterTagsForRead(c?.tags || []);
   draftImage = c?.image || '';
   draftIllustrations = [];
@@ -6387,8 +6405,40 @@ function renderCharacterIllustrationGallery(items = []) {
 }
 
 function renderEditor() {
-  const savedDraft = readEditorDraft();
+  let savedDraft = readEditorDraft();
   const original = draftCharacter || state.characters.find(c => c.id === route.id) || {};
+  if (route.id && savedDraft) {
+    const currentFingerprint=editorCharacterFingerprint(original);
+    if (savedDraft.baseFingerprint && savedDraft.baseFingerprint !== currentFingerprint) {
+      // A newer cloud character revision wins over an older local editor draft.
+      // This prevents stale empty fields from hiding opening text and private settings.
+      clearEditorDraft();
+      savedDraft=null;
+      editorDraftBaseFingerprint=currentFingerprint;
+    } else if (!savedDraft.baseFingerprint) {
+      // Legacy drafts predate source fingerprints. Preserve non-empty draft edits,
+      // but never let their blank fields erase existing cloud content.
+      for (const key of ['intro','opening','privateInfo','style']) {
+        if (!String(savedDraft[key] || '').trim() && String(original[key] || '').trim()) {
+          savedDraft[key]=original[key];
+        }
+      }
+      const originalProfile=original.personalityProfile || {};
+      const draftProfile=savedDraft.personalityProfile || {};
+      const mergedProfile={...originalProfile,...draftProfile};
+      for (const key of ['coreTraits','values','speechStyle','behaviorRules','boundaries','relationshipPacing','likes','dislikes','primaryIllustrationName']) {
+        if (!String(draftProfile[key] || '').trim() && String(originalProfile[key] || '').trim()) {
+          mergedProfile[key]=originalProfile[key];
+        }
+      }
+      savedDraft.personalityProfile=mergedProfile;
+      const originalPrompts=Array.isArray(original.phoneSettings?.noticePrompts) ? original.phoneSettings.noticePrompts
+        : Array.isArray(original.phoneSettings?.notices) ? original.phoneSettings.notices : [];
+      const draftPrompts=Array.isArray(savedDraft.phoneSettings?.noticePrompts) ? savedDraft.phoneSettings.noticePrompts : [];
+      if (!draftPrompts.length && originalPrompts.length) savedDraft.phoneSettings=original.phoneSettings;
+      editorDraftBaseFingerprint=currentFingerprint;
+    }
+  }
   const c = savedDraft ? {...original, ...savedDraft} : original;
   const phoneSettingsEditor = renderPhoneSettingsFields(c, savedDraft);
   if (savedDraft) {
