@@ -9,6 +9,7 @@ on:
       - "supabase/drafts/replay-encounter-schedule-pipeline.sql"
       - "supabase/drafts/replay-encounter-schedule-output-repair.sql"
       - "supabase/drafts/replay-encounter-schedule-output-soft-hide.sql"
+      - "supabase/drafts/replay-encounter-schedule-repair-drafts.sql"
       - "supabase/drafts/replay-encounter-sparse-schedule-windows.sql"
       - "supabase/drafts/replay-encounter-scene-catalog.sql"
       - "supabase/drafts/replay-encounter-session-evaluation-worker.sql"
@@ -420,6 +421,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-worldview-review-decisions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000600_encounter_schedule_output_soft_hide.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-output-soft-hide.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261124090000_encounter_schedule_repair_drafts.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-encounter-schedule-repair-drafts.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119000900_encounter_schedule_strict_hourly_options.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001000_fix_encounter_schedule_publisher_jsonb_key_count.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119001200_fix_encounter_schedule_null_weather_greeting.sql
