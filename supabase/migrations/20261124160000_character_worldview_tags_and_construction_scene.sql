@@ -1,4 +1,5 @@
 -- Add author-selected worldview categories and feed them into schedule generation.
+-- CI replays this after the schedule source and trigger functions exist in its disposable database.
 -- Empty arrays preserve legacy inference for characters created before this field existed.
 ALTER TABLE public.characters
   ADD COLUMN IF NOT EXISTS worldview_tags text[] NOT NULL DEFAULT ARRAY[]::text[];
