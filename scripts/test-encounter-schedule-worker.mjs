@@ -355,6 +355,8 @@ assert.match(cityMap, /data-page="citymap"/);
 assert.match(cityMap, /\$\{ICON\.home\}/);
 assert.match(cityMap, /\$\{ICON\.create\}/);
 assert.match(cityMap, /\$\{ICON\.chat\}/);
+assert.match(cityMap, /chatNavUnreadBadge\(\)/);
+assert.match(html, /ICON, chatNavUnreadBadge/);
 assert.match(cityMap, /\$\{ICON\.shop\}/);
 assert.match(cityMap, /\$\{ICON\.profile\}/);
 assert.doesNotMatch(cityMap, /data-action="city-traditional">✧/);
