@@ -25,9 +25,15 @@ DECLARE
   v_definition text;
   v_marker text := $marker$'tags', COALESCE(pg_catalog.to_jsonb(c.tags), '[]'::jsonb),$marker$;
   v_worldview_marker text := $marker$'worldview_tags', COALESCE(pg_catalog.to_jsonb(c.worldview_tags), '[]'::jsonb),$marker$;
-  v_old_version text := 'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19';
-  v_new_version text := 'poyozz-encounter-schedule-v9-worldview-tags-construction-2026-11-24';
+  v_new_version text := 'poyozz-encounter-schedule-v11-worldview-tags-construction-2026-11-24';
+  v_old_versions text[] := ARRAY[
+    'poyozz-encounter-schedule-v10-modern-context-signals-2026-11-23',
+    'poyozz-encounter-schedule-v9-worldview-tags-construction-2026-11-24',
+    'poyozz-encounter-schedule-v8-compact-24-hour-options-2026-11-19'
+  ];
+  v_old_version text;
   v_version_count integer;
+  v_version_updated boolean := false;
 BEGIN
   SELECT pg_catalog.pg_get_functiondef(
     'public.encounter_schedule_source_payload(uuid)'::regprocedure
@@ -44,18 +50,25 @@ BEGIN
     );
   END IF;
 
-  SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old_version, '')))
-    / pg_catalog.length(v_old_version) INTO v_version_count;
-  IF v_version_count = 1 THEN
-    v_definition := pg_catalog.replace(v_definition, v_old_version, v_new_version);
-  ELSIF v_version_count = 0 AND pg_catalog.strpos(v_definition, v_new_version) = 0 THEN
+  FOREACH v_old_version IN ARRAY v_old_versions LOOP
+    SELECT (pg_catalog.length(v_definition) - pg_catalog.length(pg_catalog.replace(v_definition, v_old_version, '')))
+      / pg_catalog.length(v_old_version) INTO v_version_count;
+    IF v_version_count = 1 THEN
+      v_definition := pg_catalog.replace(v_definition, v_old_version, v_new_version);
+      v_version_updated := true;
+      EXIT;
+    ELSIF v_version_count > 1 THEN
+      RAISE EXCEPTION 'encounter_schedule_source_version_marker_duplicated';
+    END IF;
+  END LOOP;
+
+  IF NOT v_version_updated AND pg_catalog.strpos(v_definition, v_new_version) = 0 THEN
     RAISE EXCEPTION 'encounter_schedule_source_version_contract_unexpected';
   END IF;
 
   EXECUTE v_definition;
 END;
-$migration$;
--- Re-queue only active AI schedules that used the generic "工地" label.
+$migration$;-- Re-queue only active AI schedules that used the generic "工地" label.
 -- The Edge Function must be deployed before this migration is applied.
 DO $requeue$
 DECLARE
