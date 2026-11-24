@@ -10410,13 +10410,6 @@ document.addEventListener('click',async event=>{
 });
 
 
-document.addEventListener('click',async event=>{
-  const loadButton=event.target.closest('[data-action="load-encounter-schedule-repairs"]');
-  if(loadButton){
-    event.preventDefault();
-    await loadEncounterScheduleRepairOutputs();
-    return;
-  }
 document.addEventListener('input',event=>{
   const textarea=event.target.closest('[data-encounter-repair-output]');
   if(!textarea)return;
@@ -10425,6 +10418,13 @@ document.addEventListener('input',event=>{
   if(status)status.textContent='有尚未保存的修改';
 });
 
+document.addEventListener('click',async event=>{
+  const loadButton=event.target.closest('[data-action="load-encounter-schedule-repairs"]');
+  if(loadButton){
+    event.preventDefault();
+    await loadEncounterScheduleRepairOutputs();
+    return;
+  }
   const saveDraftButton=event.target.closest('[data-action="save-encounter-schedule-repair-draft"]');
   if(saveDraftButton){
     event.preventDefault();
