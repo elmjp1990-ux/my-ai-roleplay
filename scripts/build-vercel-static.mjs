@@ -76,6 +76,7 @@ const runtimeFiles = [
   'chat-keyboard-viewport.js',
   'poyozz-ui.css',
   'memory-album.css',
+  'diary-ui.css',
   'wallet-ui.css',
   'group-author-forms.css',
   'character-illustration-gallery.css',
