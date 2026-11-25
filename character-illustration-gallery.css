@@ -1,0 +1,7 @@
+.character-illustration-gallery{margin:8px 0 16px}
+.character-illustration-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.character-illustration-option{display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);cursor:pointer}
+.character-illustration-option img{display:block;width:100%;aspect-ratio:3/4;object-fit:contain;border-radius:7px;background:rgba(0,0,0,.04)}
+.character-illustration-option span{font-size:12px;text-align:center}
+.character-illustration-option.is-selected{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
+@media(max-width:520px){.character-illustration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}

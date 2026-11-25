@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "index.html"
+      - "*.css"
       - "memory-capture.js"
       - "chat-render-lifecycle.js"
       - "image-compression.js"

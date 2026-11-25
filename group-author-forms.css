@@ -1,0 +1,10 @@
+.followed-authors-back{display:inline-flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 12px;border-radius:12px}
+.group-member-avatar-link{cursor:pointer}
+.group-member-avatar-link .avatar{width:44px;height:44px}
+.group-member-avatar-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
+.field input[type=file]::file-selector-button{margin-right:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text)}
+.group-scene-help{display:block;font-variant-numeric:tabular-nums}
+@media(max-width:600px){
+  .followed-authors-back{min-height:42px}
+  .group-member-avatar-link .avatar{width:42px;height:42px}
+}

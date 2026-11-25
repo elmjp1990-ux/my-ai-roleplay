@@ -14056,52 +14056,16 @@ if (window.__pendingSupabaseUser) {
 }
 </script>
 
-<style>
-.memory-album-stack{display:grid;gap:12px}
-.memory-album-items{display:grid;gap:10px}
-.memory-photo-row{display:grid;grid-template-columns:88px minmax(0,1fr) 38px;align-items:center;gap:12px;padding:10px;border:1px solid var(--border);border-radius:14px;background:var(--panel)}
-.memory-photo-actions{display:grid;gap:8px;justify-items:center}.memory-photo-icon{width:34px;height:34px;padding:0;border-radius:50%;display:grid;place-items:center}.memory-photo-title-edit{display:flex;gap:6px;align-items:center;min-width:0}.memory-photo-title-edit strong{min-width:0}.memory-photo-title-edit input{width:100%;min-width:0}.memory-photo-expiry{font-size:12px;color:var(--muted)}
-.memory-viewer{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.94);display:flex;align-items:center;justify-content:center;padding:14px}.memory-viewer img{max-width:100%;max-height:94dvh;object-fit:contain;cursor:pointer}.memory-viewer-controls{position:absolute;right:18px;top:18px;display:flex;gap:10px;opacity:0;pointer-events:none;transition:opacity .18s}.memory-viewer-controls.visible{opacity:1;pointer-events:auto}.memory-viewer-controls button{width:42px;height:42px;border:1px solid rgba(255,255,255,.28);border-radius:50%;background:rgba(120,120,120,.52);color:#fff;backdrop-filter:blur(8px)}
-.memory-photo-thumb{width:88px;height:88px;padding:0;overflow:hidden;border:0;border-radius:10px;background:var(--panel2)}
-.memory-photo-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.memory-photo-details{display:grid;gap:6px;min-width:0}
-.memory-photo-details strong{overflow-wrap:anywhere}
-.memory-photo-download{width:36px;height:36px;padding:0;border-radius:50%}
-@media(max-width:420px){.memory-photo-row{grid-template-columns:72px minmax(0,1fr) 34px;gap:9px;padding:8px}.memory-photo-thumb{width:72px;height:72px}}
-</style>
+<link rel="stylesheet" href="./memory-album.css">
 <script src="./memory-album.js"></script>
 
 
-<style>
-.wallet-cost-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:72px;max-width:118px;white-space:nowrap;padding:8px 10px!important;font-variant-numeric:tabular-nums}
-.wallet-cost-part{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700}
-.wallet-cost-plus{display:inline-block;width:0}
-.wallet-modal-cost{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px;margin:12px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:16px;font-weight:700}
-.wallet-modal-actions{display:flex;gap:10px;margin-top:16px}
-.wallet-remember-choice{display:flex;align-items:flex-start;gap:7px;margin:12px 0;color:var(--muted);font-size:11px;line-height:1.5}
-.wallet-remember-choice input{width:auto;flex:0 0 auto;margin:2px 0 0}
-.wallet-modal-actions button{flex:1;min-width:0}
-.wallet-resource-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
-.wallet-resource-row strong{font-variant-numeric:tabular-nums}
-@media(max-width:520px){.wallet-modal-actions{flex-direction:column}.wallet-cost-button{min-width:62px;padding:7px 8px!important}}
-</style>
+<link rel="stylesheet" href="./wallet-ui.css">
 
 <script src="./wallet-ui.js"></script>
 
 
-<style id="poyozz-ui-quick-polish">
-
-.followed-authors-back{display:inline-flex;align-items:center;gap:8px;margin:0 0 14px;padding:9px 12px;border-radius:12px}
-.group-member-avatar-link{cursor:pointer}
-.group-member-avatar-link .avatar{width:44px;height:44px}
-.group-member-avatar-link:focus-visible{outline:2px solid var(--primary);outline-offset:3px}
-.field input[type=file]::file-selector-button{margin-right:10px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--panel2);color:var(--text)}
-.group-scene-help{display:block;font-variant-numeric:tabular-nums}
-@media(max-width:600px){
-  .followed-authors-back{min-height:42px}
-  .group-member-avatar-link .avatar{width:42px;height:42px}
-}
-</style>
+<link rel="stylesheet" href="./group-author-forms.css">
 <script id="poyozz-ui-quick-polish-script">
 /* UI-172: file-size guard and followed-author return navigation */
 document.addEventListener('change',function(event){
@@ -14122,22 +14086,8 @@ document.addEventListener('submit',function(event){
 </script>
 
 
-<style id="character-illustration-upload-test">
-.character-illustration-gallery{margin:8px 0 16px}
-.character-illustration-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.character-illustration-option{display:flex;flex-direction:column;gap:6px;min-width:0;padding:7px;border:1px solid var(--border);border-radius:12px;background:var(--panel);color:var(--text);cursor:pointer}
-.character-illustration-option img{display:block;width:100%;aspect-ratio:3/4;object-fit:contain;border-radius:7px;background:rgba(0,0,0,.04)}
-.character-illustration-option span{font-size:12px;text-align:center}
-.character-illustration-option.is-selected{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}
-@media(max-width:520px){.character-illustration-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-</style>
-<style id="poyozz-ui-172-send-state">
-.composer-send[disabled]{opacity:1;cursor:progress;background:var(--panel2);color:var(--text);border-color:var(--border)}
-.composer-send[disabled] span[aria-hidden="true"],.composer-send.is-sending span[aria-hidden="true"]{font-size:17px;line-height:1}
-.followed-authors-back{display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:8px;margin:0;color:var(--muted);border:1px solid var(--border);background:var(--panel)}.followed-authors-title-row{display:flex;align-items:center;gap:10px}.followed-authors-title-row h1{margin:0}.group-wizard-title{min-width:0;flex:1}.group-member-confirm-row{display:flex;align-items:center;gap:12px;flex-wrap:nowrap;overflow-x:auto;padding:4px 2px 8px}.group-member-confirm-avatar{display:inline-flex;align-items:center;justify-content:center;flex:0 0 58px;width:58px;height:58px;padding:4px;border-radius:50%;background:var(--panel2);border:1px solid var(--border)}.group-member-confirm-avatar .avatar{width:48px;height:48px;border-radius:50%}
-.followed-authors-back:hover{color:var(--text);background:var(--panel2)}
-@media(max-width:767px){body.group-chat-page .chat-layout.hide-list .chat-list{display:none!important}}
-</style>
+<link rel="stylesheet" href="./character-illustration-gallery.css">
+<link rel="stylesheet" href="./chat-composer-states.css">
 
 
 <script id="poyozz-group-persona-preset">
