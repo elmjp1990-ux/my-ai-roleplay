@@ -82,6 +82,8 @@ const runtimeFiles = [
   'chat-composer-states.css',
   'city-map-ui.css',
   'city-location-panel.css',
+  'chat-layout-shell.css',
+  'chat-keyboard-viewport.css',
   'memory-capture.js',
   'chat-render-lifecycle.js',
   'image-compression.js',
