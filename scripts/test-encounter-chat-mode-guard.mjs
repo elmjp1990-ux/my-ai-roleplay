@@ -460,7 +460,7 @@ assert.match(frontend, /storyRelationshipLabel/);
 assert.match(frontend, /window\.PoyozzAffinityUI\s*=\s*window\.PoyozzAffinityUI\s*\|\|\s*\{/);
 assert.match(frontend, /window\.PoyozzAffinityUI\.render\(affinity,row\.relationship_stage,'story'\)/, 'Story chat affinity must use the shared renderer.');
 assert.match(cityMap, /get_encounter_character_affinity/);
-assert.match(frontend, /city-character-affinity/);
+assert.match(linkedCss, /city-character-affinity/);
 assert.match(cityMap, /你們還不認識/);
 assert.match(cityMap, /登入後查看與角色的好感度/);
 assert.match(cityMap, /loadCityCharacterAffinity\(person.id\)/);
