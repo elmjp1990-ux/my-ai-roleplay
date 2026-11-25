@@ -414,7 +414,7 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
       normalizeEncounterSceneKey("餐廳") !== "department-store") throw new Error("canonical A–N scene aliases regressed");
 
   const tooLong = hourlyBlocks();
-  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
+  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
   const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
   if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
     throw new Error("location label longer than twenty characters accepted");
