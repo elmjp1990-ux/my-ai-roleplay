@@ -103,57 +103,77 @@ Deno.test("accepts descriptive venue labels such as 歸途（酒吧）", () => {
   }
 });
 
-Deno.test("rejects missing hours, gaps, and non-hourly blocks", () => {
+Deno.test("salvages valid hours when a day has missing, duplicated, or malformed blocks", () => {
   const missing = hourlyBlocks().slice(0, 23);
   const missingResult = result([{ character_id: id1, placement: "modern_map", variants: variants(missing) }]);
-  if (missingResult.ok || !missingResult.errors.some((error) => error.includes("must_cover_24_hours"))) throw new Error("23-hour day accepted");
+  if (!missingResult.ok || !missingResult.characters[0].partial) throw new Error("23 valid hours should be published for review");
+  if (missingResult.characters[0].variants.weekday.length !== 23) throw new Error("valid 23-hour subset was not preserved");
+
   const gap = hourlyBlocks();
   gap[12] = { ...gap[12], start_time: "13:00", end_time: "14:00" };
   const gapResult = result([{ character_id: id1, placement: "modern_map", variants: variants(gap) }]);
-  if (gapResult.ok || !gapResult.errors.some((error) => error.includes("contiguous_24_hour_day"))) throw new Error("hour gap accepted");
+  if (!gapResult.ok || !gapResult.characters[0].partial) throw new Error("duplicate hour should be salvaged as a partial day");
+  if (gapResult.characters[0].variants.weekday.length !== 23) throw new Error("overlapping hour was not excluded");
+
   const nonHourly = hourlyBlocks();
   nonHourly[0] = { ...nonHourly[0], start_time: "00:30", end_time: "01:30" };
   const nonHourlyResult = result([{ character_id: id1, placement: "modern_map", variants: variants(nonHourly) }]);
-  if (nonHourlyResult.ok) throw new Error("non-hour interval accepted");
+  if (!nonHourlyResult.ok || nonHourlyResult.characters[0].variants.weekday.length !== 23) {
+    throw new Error("non-hour interval should be excluded without discarding other hours");
+  }
 });
 
-Deno.test("requires at least two options in every hourly block", () => {
+Deno.test("salvages a single valid option and normalizes its weight to 100", () => {
   const blocks = hourlyBlocks();
-  blocks[12] = block(12, [option()]);
+  blocks[12] = block(12, [option({ weight: 40 })]);
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
-  if (parsed.ok || !parsed.errors.some((error) => error.includes("options_count_invalid"))) {
-    throw new Error("hourly block with only one option accepted");
-  }
+  if (!parsed.ok || !parsed.characters[0].partial) throw new Error("single valid option should be retained for review");
+  const saved = parsed.characters[0].variants.weekday[12].options;
+  if (saved.length !== 1 || saved[0].weight !== 100) throw new Error("single option weight was not normalized");
 });
 
-Deno.test("requires 2-3 options and exact 100 percent weight totals per hour", () => {
-  const tooFew = hourlyBlocks();
-  tooFew[0] = block(0, [option()]);
-  const tooFewResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooFew) }]);
-  if (tooFewResult.ok || !tooFewResult.errors.some((error) => error.includes("options_count_invalid"))) {
-    throw new Error("one option accepted");
-  }
+Deno.test("filters excess options and normalizes valid option weights per hour", () => {
   const tooMany = hourlyBlocks();
-  tooMany[0] = block(0, [option({ weight: 34 }), option({ weight: 33 }), option({ weight: 33 }), option()]);
+  tooMany[0] = block(0, [
+    option({ weight: 34 }), option({ weight: 33, activity: "在辦公室檢查待辦並回覆客戶訊息" }),
+    option({ weight: 33, activity: "在公司整理資料並確認今天的工作進度" }),
+    option({ weight: 10, activity: "在公司整理資料並確認今天的工作進度" }),
+  ]);
   const tooManyResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooMany) }]);
-  if (tooManyResult.ok) throw new Error("four options accepted");
+  if (!tooManyResult.ok || !tooManyResult.characters[0].partial) throw new Error("excess option should be excluded");
+  const options = tooManyResult.characters[0].variants.weekday[0].options;
+  if (options.length !== 3 || options.reduce((sum, item) => sum + item.weight, 0) !== 100) {
+    throw new Error("remaining options must be capped and renormalized to 100");
+  }
+
   const wrongWeight = hourlyBlocks();
   wrongWeight[0] = block(0, [option({ weight: 75 }), option({ weight: 20 })]);
   const weightResult = result([{ character_id: id1, placement: "modern_map", variants: variants(wrongWeight) }]);
-  if (weightResult.ok || !weightResult.errors.some((error) => error.includes("option_weights_must_sum_100"))) {
-    throw new Error("invalid weight total accepted");
+  if (!weightResult.ok || !weightResult.characters[0].partial) throw new Error("wrong source weights should be normalized");
+  if (weightResult.characters[0].variants.weekday[0].options.reduce((sum, item) => sum + item.weight, 0) !== 100) {
+    throw new Error("normalized option weights must sum to 100");
   }
 });
 
-Deno.test("limits activity descriptions to 8-30 characters and rejects extra greeting fields", () => {
+Deno.test("excludes invalid options while retaining other valid hours", () => {
   const short = hourlyBlocks();
-  short[0] = block(0, [option({ activity: "睡覺" }), option({ weight: 0, activity: "醒來喝水後又躺回床上休息" })]);
+  short[0] = block(0, [
+    option({ activity: "睡覺" }),
+    option({ weight: 0, activity: "醒來喝水後又躺回床上休息" }),
+  ]);
   const shortResult = result([{ character_id: id1, placement: "modern_map", variants: variants(short) }]);
-  if (shortResult.ok || !shortResult.errors.some((error) => error.includes("activity_length_invalid"))) throw new Error("short activity accepted");
+  if (!shortResult.ok || !shortResult.characters[0].partial) throw new Error("invalid options should not discard the whole character");
+  if (shortResult.characters[0].variants.weekday.some((item) => item.start_time === "00:00")) {
+    throw new Error("an hour with no valid options must be omitted");
+  }
+
   const extra = hourlyBlocks();
-  extra[0] = block(0, [option({ encounter_greeting: "不應由行程 AI 產生的招呼" }), option({ weight: 0 })]);
+  extra[0] = block(0, [
+    option({ encounter_greeting: "不應由行程 AI 產生的招呼" }),
+    option({ weight: 0 }),
+  ]);
   const extraResult = result([{ character_id: id1, placement: "modern_map", variants: variants(extra) }]);
-  if (extraResult.ok || !extraResult.errors.some((error) => error.includes("option_0_keys_invalid"))) throw new Error("generated greeting field accepted");
+  if (!extraResult.ok || !extraResult.characters[0].partial) throw new Error("invalid extra fields should be excluded");
 });
 
 Deno.test("rain fallback fields are optional and unrestricted by scene policy", () => {
