@@ -4,7 +4,7 @@
 
 ## 最新盤點
 
-- [全目錄清單、初步分類與引用關係](../docs/architecture/supabase-drafts-inventory-2026-11-25.md)
+- [全目錄清單、初步分類與引用關係](../../docs/architecture/supabase-drafts-inventory-2026-11-25.md)
 - 124 個 Draft 檔案（67 SQL、51 Markdown、6 JSON）。
 - 48 個引用命中檔案，涵蓋 CI、disposable fixture、測試腳本、migration provenance 與架構文件。
 - 沒有執行 SQL、沒有刪除或搬移 Draft，也沒有修改 Hosted Supabase。
