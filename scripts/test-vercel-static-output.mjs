@@ -35,6 +35,8 @@ const fileBudgets = {
   'chat-composer-states.css': 2_000,
   'city-map-ui.css': 16_000,
   'city-location-panel.css': 33_000,
+  'chat-layout-shell.css': 1_500,
+  'chat-keyboard-viewport.css': 1_000,
   // Scene presentation is feature-rich; the global 1.5 MB budget still bounds total output.
   'encounter-scene.js': 45_000,
   'encounter-scene.css': 5_000,
