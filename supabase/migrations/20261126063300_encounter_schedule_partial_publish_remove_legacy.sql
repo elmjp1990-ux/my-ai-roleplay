@@ -11,6 +11,8 @@ DECLARE
   );
   v_old text;
   v_new text;
+  v_start integer;
+  v_end integer;
 BEGIN
   -- Remove legacy compatibility from the publish function.
   v_old := $replace$source_type IN ('ai', 'legacy')$replace$;
@@ -20,13 +22,17 @@ BEGIN
   v_definition := pg_catalog.replace(v_definition, v_old, $replace$source_type = 'ai'$replace$);
 
   -- Do not clear all existing AI schedules before a partial publish.
-  v_old := $replace$UPDATE public.character_schedules
-      SET is_active = false, updated_at = pg_catalog.clock_timestamp()
-      WHERE character_id = v_character_id AND source_type = 'ai' AND is_active IS TRUE;$replace$;
-  IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
-    RAISE EXCEPTION 'full-schedule deactivation block not found';
+  -- Remove the modern-map full-clear statement by locating it after the placement guard.
+  v_start := pg_catalog.strpos(v_definition, 'IF v_placement <> ''modern_map'' THEN');
+  v_start := pg_catalog.strpos(pg_catalog.substring(v_definition FROM v_start), 'UPDATE public.character_schedules') + v_start - 1;
+  IF v_start < 1 THEN
+    RAISE EXCEPTION 'full-clear statement not found after modern-map guard';
   END IF;
-  v_definition := pg_catalog.replace(v_definition, v_old, '');
+  v_end := pg_catalog.strpos(pg_catalog.substring(v_definition FROM v_start), ';') + v_start - 1;
+  IF v_end < v_start THEN
+    RAISE EXCEPTION 'full-clear statement terminator not found';
+  END IF;
+  v_definition := pg_catalog.substring(v_definition FROM 1 FOR v_start - 1) || pg_catalog.substring(v_definition FROM v_end + 1);
 
   -- Replace old AI rows only for the exact day type and hour being published.
   v_old := $replace$      FOR v_variant IN SELECT value FROM jsonb_array_elements(v_item->'variants'->v_day_type)
@@ -40,8 +46,7 @@ BEGIN
           AND is_active IS TRUE
           AND day_type = v_day_type
           AND start_time = (v_variant->>'start_time')::time
-          AND end_time = (v_variant->>'end_time')::time;
-      LOOP$replace$;
+          AND end_time = (v_variant->>'end_time')::time;$replace$;
   IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
     RAISE EXCEPTION 'hour loop insertion point not found';
   END IF;
