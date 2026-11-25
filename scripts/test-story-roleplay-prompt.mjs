@@ -53,8 +53,8 @@ assert.ok(
 );
 
 assert.ok(
-  prompt.includes("每則 30～90 字"),
-  "Each of the three player suggestions must target 30–90 characters",
+  prompt.includes("每則約 30～90 字"),
+  "Player suggestions should target approximately 30–90 characters when generated",
 );
 assert.ok(
   prompt.includes("玩家旁白／動作（*...*）以及玩家實際說出口的自然對白"),
