@@ -79,6 +79,7 @@ const runtimeFiles = [
   'diary-ui.css',
   'wallet-ui.css',
   'group-author-forms.css',
+  'group-wizard.css',
   'character-illustration-gallery.css',
   'chat-composer-states.css',
   'city-map-ui.css',
