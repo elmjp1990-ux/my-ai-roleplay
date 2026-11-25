@@ -80,6 +80,8 @@ const runtimeFiles = [
   'group-author-forms.css',
   'character-illustration-gallery.css',
   'chat-composer-states.css',
+  'city-map-ui.css',
+  'city-location-panel.css',
   'memory-capture.js',
   'chat-render-lifecycle.js',
   'image-compression.js',
