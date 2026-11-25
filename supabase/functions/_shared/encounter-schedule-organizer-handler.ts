@@ -849,6 +849,7 @@ export async function handleEncounterScheduleOrganizer(
   const failedCharacterIds = new Set<string>();
   const reviewRequiredCharacterIds = new Set<string>();
   const postPublishReviewCharacterIds = new Set<string>();
+  const partialPublishReviewCharacterIds = new Set<string>();
   const publishedScheduleCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
   const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
@@ -1144,7 +1145,44 @@ export async function handleEncounterScheduleOrganizer(
     const characterPublishedCount = Number(publishRow.published_character_count || 0);
     const characterUnplacedCount = Number(publishRow.unplaced_character_count || 0);
     if (characterPublishedCount + characterUnplacedCount > 0) publishedScheduleCharacterIds.add(item.sourceId);
-    await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
+    const isPartialOutput = item.character.partial === true;
+    const partialErrors = Array.isArray(item.character.validation_errors)
+      ? item.character.validation_errors.filter((value: unknown): value is string => typeof value === "string").slice(0, 50)
+      : [];
+    if (isPartialOutput) {
+      const reviewedAt = new Date().toISOString();
+      const { error: partialReviewError } = await admin
+        .from("encounter_schedule_generation_jobs")
+        .update({
+          status: "needs_review",
+          lease_token: null,
+          lease_expires_at: null,
+          last_error_code: "schedule_partial_output_review_required",
+          updated_at: reviewedAt,
+        })
+        .eq("character_id", item.sourceId)
+        .eq("status", "completed");
+      if (partialReviewError) {
+        failedCharacterIds.add(item.sourceId);
+        characterDiagnosticsById.set(item.sourceId, {
+          partial_output: true,
+          validation_errors: partialErrors,
+          review_state_persist_failed: true,
+        });
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+          "partial", "schedule_partial_review_state_persist_failed", partialErrors);
+      } else {
+        partialPublishReviewCharacterIds.add(item.sourceId);
+        characterDiagnosticsById.set(item.sourceId, {
+          partial_output: true,
+          validation_errors: partialErrors,
+        });
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+          "partial", "schedule_partial_output_review_required", partialErrors);
+      }
+    } else {
+      await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
+    }
     publishedCharacterCount += characterPublishedCount;
     unplacedCharacterCount += characterUnplacedCount;
     skippedCharacterCount += Number(publishRow.skipped_private_character_count || 0);
@@ -1274,12 +1312,15 @@ export async function handleEncounterScheduleOrganizer(
   const partial = remaining > 0 || ambiguousPublishFailure || ambiguousProviderFailure || failedCharacterIds.size > 0;
   for (const item of providerResponses) {
     const characterDiagnostics = characterDiagnosticsById.get(item.sourceId) || {};
-    const characterFailureCode = typeof characterDiagnostics.validation_errors === "object"
-      ? "schedule_character_validation_failed"
-      : typeof characterDiagnostics.publish_error === "string" || typeof characterDiagnostics.publish_status === "string"
-        ? "schedule_character_publish_failed"
-        : partial ? "schedule_partial_character_failure" : null;
-    await recordBatchUsage(admin, batchId, item.providerResponse, partial ? "partial" : "completed",
+    const characterFailureCode = characterDiagnostics.partial_output === true
+      ? "schedule_partial_output_review_required"
+      : typeof characterDiagnostics.validation_errors === "object"
+        ? "schedule_character_validation_failed"
+        : typeof characterDiagnostics.publish_error === "string" || typeof characterDiagnostics.publish_status === "string"
+          ? "schedule_character_publish_failed"
+          : partial ? "schedule_partial_character_failure" : null;
+    const usageIsPartial = partial || characterDiagnostics.partial_output === true;
+    await recordBatchUsage(admin, batchId, item.providerResponse, usageIsPartial ? "partial" : "completed",
       characterFailureCode, item.sourceId, characterDiagnostics);
   }
   return json({
@@ -1289,7 +1330,7 @@ export async function handleEncounterScheduleOrganizer(
     published_character_count: publishedCharacterCount,
     unplaced_character_count: unplacedCharacterCount,
     skipped_private_character_count: skippedCharacterCount,
-    needs_review_character_count: reviewRequiredCharacterIds.size + postPublishReviewCount,
+    needs_review_character_count: reviewRequiredCharacterIds.size + postPublishReviewCount + partialPublishReviewCharacterIds.size,
     failed_character_count: partial ? Math.max(remaining, failedCharacterIds.size) : 0,
     validation_errors: validationErrors.slice(0, 30),
     scene_publish_status: scenePublishStatus,
