@@ -28,6 +28,11 @@ const fileBudgets = {
   'custom-tag-picker.js': 5_000,
   'memory-album.js': 27_000,
   'poyozz-ui.css': 40_000,
+  'memory-album.css': 3_000,
+  'wallet-ui.css': 2_000,
+  'group-author-forms.css': 2_000,
+  'character-illustration-gallery.css': 1_500,
+  'chat-composer-states.css': 2_000,
   // Scene presentation is feature-rich; the global 1.5 MB budget still bounds total output.
   'encounter-scene.js': 45_000,
   'encounter-scene.css': 5_000,
@@ -122,6 +127,12 @@ for (const styleBlock of html.matchAll(/<style\b[^>]*>([\s\S]*?)<\/style>/gi)) {
 }
 for (const styleAttr of html.matchAll(/\bstyle\s*=\s*["']([^"']*)["']/gi)) {
   for (const url of styleAttr[1].matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) addReference(url[1]);
+}
+
+// CSS url() references in linked external stylesheets.
+for (const stylesheet of linkedStylesheets) {
+  const css = fs.readFileSync(path.join(outputDir, stylesheet.replace(/^\.\//, '')), 'utf8');
+  for (const url of css.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) addReference(url[1]);
 }
 
 // Literal local asset paths in inline and external runtime JavaScript.

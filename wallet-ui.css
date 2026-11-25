@@ -1,0 +1,11 @@
+.wallet-cost-button{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:72px;max-width:118px;white-space:nowrap;padding:8px 10px!important;font-variant-numeric:tabular-nums}
+.wallet-cost-part{display:inline-flex;align-items:center;gap:3px;font-size:12px;font-weight:700}
+.wallet-cost-plus{display:inline-block;width:0}
+.wallet-modal-cost{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px;margin:12px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2);font-size:16px;font-weight:700}
+.wallet-modal-actions{display:flex;gap:10px;margin-top:16px}
+.wallet-remember-choice{display:flex;align-items:flex-start;gap:7px;margin:12px 0;color:var(--muted);font-size:11px;line-height:1.5}
+.wallet-remember-choice input{width:auto;flex:0 0 auto;margin:2px 0 0}
+.wallet-modal-actions button{flex:1;min-width:0}
+.wallet-resource-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
+.wallet-resource-row strong{font-variant-numeric:tabular-nums}
+@media(max-width:520px){.wallet-modal-actions{flex-direction:column}.wallet-cost-button{min-width:62px;padding:7px 8px!important}}
