@@ -17,6 +17,7 @@ assert.match(guardMigration, /SET search_path = ['"]{2}/);
 assert.match(guardMigration, /NEW\.chat_mode IS DISTINCT FROM OLD\.chat_mode/);
 
 const frontend = fs.readFileSync("index.html", "utf8");
+const linkedCss = [...frontend.matchAll(/<link[^>]+>/gi)].filter(match => /rel=["\']stylesheet["\']/i.test(match[0])).map(match => match[0].match(/href=["\']([^"\']+)["\']/i)?.[1]).filter(Boolean).map(file => fs.readFileSync(file.replace("./", ""), "utf8")).join("\n");
 const keyboardViewport = fs.readFileSync("chat-keyboard-viewport.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 assert.doesNotMatch(frontend, /data-action="start-new-story"/);
@@ -463,7 +464,7 @@ assert.match(frontend, /city-character-affinity/);
 assert.match(cityMap, /你們還不認識/);
 assert.match(cityMap, /登入後查看與角色的好感度/);
 assert.match(cityMap, /loadCityCharacterAffinity\(person.id\)/);
-assert.match(frontend, /\.city-character-affinity\{[^}]*display:flex/);
+assert.match(linkedCss, /\.city-character-affinity\{[^}]*display:flex/);
 assert.match(cityMap, /PoyozzAffinityUI\?\.render\(row\?\.affinity,row\?\.relationship_stage,'compact'\)/, 'City character affinity must use the shared compact renderer.');
 assert.match(affinityMigration, /FUNCTION public\.create_story_session_with_relationship/);
 assert.match(affinityMigration, /GRANT EXECUTE ON FUNCTION public\.create_story_session_with_relationship/);
