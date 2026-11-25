@@ -5,6 +5,7 @@ import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } fr
 import { parseGroupTurnEnvelopeDetailed, serializeGroupPhoneUpdatesForRpc } from "../_shared/group-turn-envelope.ts";
 import { buildGroupMemoryContext, getGroupHistoryLimit, isCurrentGroupMemorySummary } from "../_shared/group-memory-context.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { asRecord as asRow, asTrimmedString as asText, isUuid, jsonResponse } from "../_shared/ai-value-utils.ts";
 import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 import { processDueGroupMemorySummary } from "../_shared/story-memory-summary.ts";
@@ -14,14 +15,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
-const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), {
-  status, headers: { ...corsHeaders, "Content-Type": "application/json" },
-});
-const asRow = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
-const isUuid = (value: unknown): value is string =>
-  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const json = (body: unknown, status = 200) => jsonResponse(body, status, corsHeaders);
 const MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const TIMEOUT_MS = 55_000;
 const CLEANUP_RESERVE_MS = 12_000;
