@@ -33,6 +33,8 @@ const fileBudgets = {
   'group-author-forms.css': 2_000,
   'character-illustration-gallery.css': 1_500,
   'chat-composer-states.css': 2_000,
+  'city-map-ui.css': 16_000,
+  'city-location-panel.css': 33_000,
   // Scene presentation is feature-rich; the global 1.5 MB budget still bounds total output.
   'encounter-scene.js': 45_000,
   'encounter-scene.css': 5_000,
