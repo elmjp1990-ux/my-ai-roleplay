@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const html = fs.readFileSync('index.html', 'utf8');
+const linkedCss = [...html.matchAll(/<link\\b(?=[^>]*\\brel=[\"']stylesheet[\"'])(?=[^>]*\\bhref=[\"']([^\"']+)[\"'])[^>]*>/gi)]
+  .map(match => fs.readFileSync(match[1].replace(/^\\.\\//, ''), 'utf8')).join('\\n');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
 const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
@@ -178,7 +180,7 @@ assert.match(html, /poyozz-city-rain/);
 assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
 assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
 assert.match(html, /brightness\(\.96\) saturate\(\.94\)/, 'Rain must not heavily grayscale or darken the map artwork.');
-assert.match(html, /background-size:220px 360px,290px 440px/, 'Rain overlay must use layered irregular streak fields instead of a uniform repeating stripe.');
+assert.match(linkedCss, /background-size:220px 360px,290px 440px/, 'Rain overlay must use layered irregular streak fields instead of a uniform repeating stripe.');
 assert.match(html, /animation:poyozz-city-rain 1\.25s linear infinite/, 'Rain animation should be slower and less artificial than the previous rapid uniform loop.');
 
 
