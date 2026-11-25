@@ -152,3 +152,62 @@ No hosted Supabase migrations, data deletion, Storage object deletion, bucket po
 ## 8. Immediate next step
 
 Complete a line-level dependency map for the chat render extension points and add contract tests before changing runtime code. The first code PR should only introduce the render lifecycle registry and migrate one feature extension at a time, with no UI or business behavior changes.
+
+
+---
+
+## 9. Implementation status against current main (2026-11-25)
+
+> This section supersedes the original "current repository shape" and implementation-sequence status above. The original measurements remain as the historical baseline at `360f711d5a774c1bfac69d4704dba4a8cd9f770b`; they are not current-main measurements.
+
+Current reference:
+- Current main includes the AI shared-value-guards merge from PR #281 (merge commit `8032ddc7e61cf2516d7d2f92bccd1a70882a48a8`).
+- Current `index.html`: 842,376 bytes, 14,397 lines, 14 inline `<style>` blocks and 23 `<script>` tags.
+- The Vercel static-output test now guards a 25-file runtime allowlist, rather than the original five-file list in the baseline snapshot.
+
+### 9.1 Completed and present in main
+
+| Original plan item | Current implementation | Evidence / PR |
+| --- | --- | --- |
+| Explicit chat render lifecycle registry | Added ordered, error-isolated lifecycle hooks; memory album and encounter presentation register hooks rather than independently owning the base renderer. | #229, #230, #231 |
+| Shared image compression | Shared browser-side encoder is present as `image-compression.js`; feature adapters retain their different presets and transparency requirements. | #232 |
+| Shared signed-URL manager | `signed-url-manager.js` centralizes bounded cache / in-flight request reuse / expiry handling while callers retain bucket and authorization ownership. | #233 |
+| Low-coupling feature extraction | Memory album, encounter scene, city map, followed authors, author profile, comment renderer and custom tag picker have separate runtime files. | #234–#240 |
+| Feature ownership map | Current ownership and backend-boundary guide is maintained in `docs/architecture/FEATURE-OWNERSHIP-MAP.md`. | #241 |
+| Shared list pagination | `list-pagination.js` provides shared page-size/state/observer/merge primitives; feature-specific query and authorization rules remain with their owners. | #242 and later pagination work |
+| Shared core helpers | `core-utils.js` is part of the runtime allowlist. | #243 |
+| Additional low-coupling modules and runtime allowlist | Notification screen, chat keyboard viewport, wallet UI, character editor cloud adapter, encounter history and group opening presets are also included in the current static runtime allowlist. The test checks exact output files, per-file budgets, total budget and local asset references. | Subsequent refactor batches, including #252 |
+| Further module ownership and pagination documentation | Group AI orchestration and bounded list-read work were added without treating high-risk transaction / AI semantics as generic UI refactors. | #252 |
+
+All PRs #229–#248 except #249 are closed and merged. PR #249 was intentionally closed without merge; it is not counted as delivered work. PR #252 is also closed and merged.
+
+### 9.2 Partially completed
+
+| Original plan item | Current state | Remaining work |
+| --- | --- | --- |
+| Feature JS extraction | Multiple low-coupling modules have been extracted, but `index.html` remains the main application entry and still contains substantial feature logic. | Continue only where ownership boundaries and regression contracts are clear. Keep wallet, chat transactions, AI, deletion, affinity/phone state and authorization semantics behind their existing owners; do not mechanically split the monolith. |
+| CSS extraction | `poyozz-ui.css` and `encounter-scene.css` exist and are in the static runtime allowlist. | `index.html` still has 14 inline style blocks. Extract feature styles incrementally with desktop/mobile and day/night visual regression. |
+| Static build/runtime organization | The build and test scripts now manage a 25-file allowlist with size and reference checks. | Any future extracted JS/CSS must be added to both build and test allowlists. Browser validation is still required for dynamically constructed asset paths. |
+
+### 9.3 Not completed / still pending
+
+| Item | Verified state | Next safe action |
+| --- | --- | --- |
+| Full `supabase/drafts/` classification | `supabase/drafts/README.md` explicitly says it only classifies files already reviewed and is not a full-directory inventory. | Enumerate every draft, map references from workflows/scripts/docs/other drafts, classify with evidence, and keep migration history immutable. No bulk deletion or migration promotion. |
+| Retire duplicate brand-asset optimizer | Active workflow uses `scripts/optimize-brand-assets.mjs`; `scripts/optimize-brand-assets.py` still exists. | Search all workflow, documentation and manual references before deciding whether the Python version can be retired. Do not delete source PNG assets. |
+| CSS component-by-component migration | CSS dedup audit found no exact duplicate rule blocks safe to delete under matching condition contexts. | Continue by extracting cohesive components/features, not by deleting repeated selectors or running automatic deduplication. |
+| Full dependency map for remaining monolith | Ownership map exists, but the application is not fully decomposed into independent modules. | Maintain an explicit dependency/interface map for each next extraction; stop where shared globals or high-risk business rules make the boundary unsafe. |
+
+### 9.4 Updated implementation order
+
+1. Finish the full draft inventory and reference map; classify only, do not delete or promote SQL.
+2. Verify all references to the legacy Python asset optimizer; retire it only if no supported workflow depends on it.
+3. Continue CSS extraction by feature/component with visual regression; do not perform blind selector deduplication.
+4. Extract additional low-coupling frontend modules only when the public interface, script order, static allowlist and regression tests are explicit.
+5. Keep high-risk chat, AI, wallet, deletion, privacy, RLS and Storage authorization behavior out of generic refactor batches.
+
+### 9.5 Deployment and safety status
+
+- The latest main code and a Preview deployment are separate facts. The Preview deployment last verified during this update was built from `c4859aa839676f1061b32e2e6849442cefbba2de`, while the current main includes later commit `8032ddc7e61cf2516d7d2f92bccd1a70882a48a8`. The latest main commit did not yet have a matching Preview deployment at the time of this update.
+- This documentation update does not deploy Vercel, run hosted Supabase migrations, deploy Edge Functions, modify Storage, or change Production.
+- Any remaining work must be proposed as isolated PRs based on the then-current main and separately reviewed before merge.
