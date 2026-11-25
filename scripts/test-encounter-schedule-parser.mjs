@@ -10,6 +10,7 @@ const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
 const cityMapUiCss = fs.readFileSync("city-map-ui.css", "utf8");
+const cityLocationPanelCss = fs.readFileSync("city-location-panel.css", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
@@ -103,7 +104,7 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
-assert.match(linkedCss, /#cityCharacterCard \\.city-character-portrait-video\\{[^}]*background:transparent!important/);
+assert.match(cityLocationPanelCss, /#cityCharacterCard \\.city-character-portrait-video\\{[^}]*background:transparent!important/);
 assert.match(cityMapUiCss, /\\.city-character-portrait,\\.city-character-portrait-video\\{background:transparent!important/);
  
 // City-scene avatars must be clipped by a dedicated transparent circular frame;
