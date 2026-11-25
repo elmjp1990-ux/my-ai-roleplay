@@ -93,6 +93,11 @@ assert.match(endpoint, /sessionUpdatedAt/,
   "Encounter response must include the confirmed session version for the next client save");
 
 const frontend = fs.readFileSync("index.html", "utf8");
+const linkedCss = [...frontend.matchAll(/<link[^>]+>/gi)]
+  .filter(match => /rel=["']stylesheet["']/i.test(match[0]))
+  .map(match => match[0].match(/href=["']([^"']+)["']/i)?.[1])
+  .filter(Boolean)
+  .map(file => fs.readFileSync(file.replace('./', ''), 'utf8')).join('\n');
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 assert.match(encounterSceneCss, /encounter-dialogue-text em/);
 assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
@@ -106,10 +111,10 @@ const sharedRelationshipLabels = "hostile:'敵對',dislike:'反感',wary:'戒備
 assert.ok(frontend.includes(sharedRelationshipLabels), "All UI surfaces must use the canonical eight relationship labels");
 assert.match(frontend, /target\.innerHTML = window\.PoyozzAffinityUI\.render\(affinity,row\.relationship_stage,'story'\)/);
 assert.doesNotMatch(frontend, /好感度進度|poyozz-affinity-meter/, "Relationship chips must not expose numeric progress or a meter");
-assert.match(frontend, /poyozz-affinity-heart/ , "Relationship chips must include a recognizable heart cue");
-assert.match(frontend, /is-negative/ , "Negative affinity must use its own dark violet tone");
-assert.match(frontend, /is-positive/ , "Positive affinity must use its own pink-violet tone");
-assert.match(frontend, /--affinity-bg:linear-gradient/ , "Affinity chips must use restrained layered jewel-tone styling");
+assert.match(linkedCss, /poyozz-affinity-heart/ , "Relationship chips must include a recognizable heart cue");
+assert.match(linkedCss, /is-negative/ , "Negative affinity must use its own dark violet tone");
+assert.match(linkedCss, /is-positive/ , "Positive affinity must use its own pink-violet tone");
+assert.match(linkedCss, /--affinity-bg:linear-gradient/ , "Affinity chips must use restrained layered jewel-tone styling");
 assert.match(frontend, /Number\.isFinite\(score\)&&score<0/ , "Negative affinity tone must follow the signed affinity value");
 assert.match(frontend, /Number\.isFinite\(score\)&&score>0/ , "Positive affinity tone must follow the signed affinity value");
 assert.doesNotMatch(frontend, /progress\+'%'/, "Story relationship rendering must not reference a missing progress variable");
