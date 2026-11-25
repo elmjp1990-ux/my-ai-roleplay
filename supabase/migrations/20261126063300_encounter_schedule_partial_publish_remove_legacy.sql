@@ -32,7 +32,7 @@ BEGIN
   IF v_end < v_start THEN
     RAISE EXCEPTION 'full-clear statement terminator not found';
   END IF;
-  v_definition := pg_catalog.substring(v_definition FROM 1 FOR v_start - 1) || pg_catalog.substring(v_definition, v_end + 1);
+  v_definition := pg_catalog.substring(v_definition, 1, v_start - 1) || pg_catalog.substring(v_definition, v_end + 1);
 
   -- Replace old AI rows only for the exact day type and hour being published.
   v_old := $replace$      FOR v_variant IN SELECT value FROM jsonb_array_elements(v_item->'variants'->v_day_type)
