@@ -182,7 +182,7 @@ assert.match(linkedCss, /city-map-stage\.is-raining \.city-map-world/);
 assert.match(linkedCss, /poyozz-city-rain/);
 assert.match(linkedCss, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
 assert.match(linkedCss, /city-map-stage\.is-raining\.low-performance:after/);
-assert.match(html, /brightness\(\.96\) saturate\(\.94\)/, 'Rain must not heavily grayscale or darken the map artwork.');
+assert.match(linkedCss, /brightness\(\.96\) saturate\(\.94\)/, 'Rain must not heavily grayscale or darken the map artwork.');
 assert.match(linkedCss, /background-size:220px 360px,290px 440px/, 'Rain overlay must use layered irregular streak fields instead of a uniform repeating stripe.');
 assert.match(linkedCss, /animation:poyozz-city-rain 1\.25s linear infinite/, 'Rain animation should be slower and less artificial than the previous rapid uniform loop.');
 
