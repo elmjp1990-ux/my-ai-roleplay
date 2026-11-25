@@ -89,6 +89,28 @@ $replace$;
   v_definition := pg_catalog.replace(v_definition, v_old,
     $replace$        IF jsonb_array_length(v_variant->'options') NOT BETWEEN 1 AND 3 THEN$replace$);
 
+  -- Scope replacement of special-event slots to matching event keys and hours.
+  v_old := $replace$      FOR v_special_slot IN
+        SELECT value FROM jsonb_array_elements(v_special_event->'slots')
+      LOOP
+        INSERT INTO public.character_schedules ($replace$;
+  v_new := $replace$      FOR v_special_slot IN
+        SELECT value FROM jsonb_array_elements(v_special_event->'slots')
+      LOOP
+        UPDATE public.character_schedules
+        SET is_active = false, updated_at = pg_catalog.clock_timestamp()
+        WHERE character_id = v_character_id
+          AND source_type = 'ai'
+          AND is_active IS TRUE
+          AND special_event_key = v_special_event_key
+          AND start_time = (v_special_slot->>'start_time')::time
+          AND end_time = (v_special_slot->>'end_time')::time;
+        INSERT INTO public.character_schedules ($replace$;
+  IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
+    RAISE EXCEPTION 'special-event insert loop not found';
+  END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, v_new);
+
   EXECUTE v_definition;
 END;
 $migration$;
