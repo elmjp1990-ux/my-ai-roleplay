@@ -2,8 +2,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const html = fs.readFileSync("index.html", "utf8");
+const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
+  .filter(match => /rel=["\']stylesheet["\']/i.test(match[0]))
+  .map(match => match[0].match(/href=["\']([^"\']+)["\']/i)?.[1])
+  .filter(Boolean)
+  .map(file => fs.readFileSync(file.replace("./", ""), "utf8")).join("\n");
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const cityMap = fs.readFileSync("city-map.js", "utf8");
+const cityMapUiCss = fs.readFileSync("city-map-ui.css", "utf8");
+const cityLocationPanelCss = fs.readFileSync("city-location-panel.css", "utf8");
 const cleanupMigration = fs.readFileSync("supabase/migrations/20261031211200_character_illustration_cleanup_queue.sql", "utf8");
 const scheduleOrganizer = fs.readFileSync("supabase/functions/_shared/encounter-schedule-organizer-handler.ts", "utf8");
 const scheduleGeneration = fs.readFileSync("supabase/functions/_shared/encounter-schedule-generation.ts", "utf8");
@@ -97,8 +104,8 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_jobs_insert_own[\s\S]*?auth\.uid\(\)/);
 
 // Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
-assert.match(html, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
-assert.match(html, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
+assert.match(cityLocationPanelCss, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
+assert.match(cityLocationPanelCss, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
  
 // City-scene avatars must be clipped by a dedicated transparent circular frame;
 // the clickable button must not inherit the legacy square avatar backing.
@@ -112,10 +119,10 @@ assert.match(cityMap, /image\.dataset\.characterAvatarId\)return/,
 assert.match(html, /const loading=options\.loading==='eager'\?'eager':'lazy'/,
   "The shared avatar renderer must keep lazy loading by default and support eager detail portraits");
 assert.doesNotMatch(cityMap, /class="city-location-avatar city-location-person"/);
-assert.match(html, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
-assert.match(html, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
-assert.match(html, /#cityMapAvatarStrip > button\.city-location-person\{[^}]*all:unset!important[^}]*background:none!important[^}]*background-color:transparent!important[^}]*background-image:none!important/);
-assert.match(html, /#cityMapAvatarStrip > button\.city-location-person::before,#cityMapAvatarStrip > button\.city-location-person::after\{content:none!important/);
+assert.match(linkedCss, /\.city-location-person-avatar-frame\{[^}]*overflow:hidden[^}]*border-radius:50%[^}]*background:transparent!important/);
+assert.match(linkedCss, /\.city-location-person-image\{[^}]*clip-path:circle\(50% at 50% 50%\)!important/);
+assert.match(linkedCss, /#cityMapAvatarStrip > button\.city-location-person\{[^}]*all:unset!important[^}]*background:none!important[^}]*background-color:transparent!important[^}]*background-image:none!important/);
+assert.match(linkedCss, /#cityMapAvatarStrip > button\.city-location-person::before,#cityMapAvatarStrip > button\.city-location-person::after\{content:none!important/);
 
 // The card primary image is not reused as encounter-scene art.
 assert.match(encounterScene, /const sceneIllustration=safeImage\(selectedGalleryImage\|\|character\?\.galleryIllustrations\?\.\[0\]\?\.src\|\|\x27\x27\)/);

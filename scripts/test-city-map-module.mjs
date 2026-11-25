@@ -3,6 +3,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const html = fs.readFileSync('index.html', 'utf8');
+const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
+  .filter(match => /rel=["']stylesheet["']/i.test(match[0]))
+  .map(match => match[0].match(/href=["']([^"']+)["']/i)?.[1])
+  .filter(Boolean)
+  .map(file => fs.readFileSync(file.replace('./', ''), 'utf8')).join('\n');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
 const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
@@ -173,13 +178,13 @@ assert.match(cityMap, /cityVenueScenes\[key\]=scene;/);
 assert.doesNotMatch(cityMap, /cityPlaceNames\[key\]=name|marker\.setAttribute\('aria-label',name\)/, 'Scene catalog updates must not rename or move fixed map anchors.');
 assert.match(cityMap, /latestScene\.eventTitle,latestScene\.eventDescription/);
 
-assert.match(html, /city-map-stage\.is-raining \.city-map-world/);
-assert.match(html, /poyozz-city-rain/);
-assert.match(html, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
-assert.match(html, /city-map-stage\.is-raining\.low-performance:after/);
-assert.match(html, /brightness\(\.96\) saturate\(\.94\)/, 'Rain must not heavily grayscale or darken the map artwork.');
-assert.match(html, /background-size:220px 360px,290px 440px/, 'Rain overlay must use layered irregular streak fields instead of a uniform repeating stripe.');
-assert.match(html, /animation:poyozz-city-rain 1\.25s linear infinite/, 'Rain animation should be slower and less artificial than the previous rapid uniform loop.');
+assert.match(linkedCss, /city-map-stage\.is-raining \.city-map-world/);
+assert.match(linkedCss, /poyozz-city-rain/);
+assert.match(linkedCss, /prefers-reduced-motion:reduce\)\{\.city-map-stage\.is-raining:after/);
+assert.match(linkedCss, /city-map-stage\.is-raining\.low-performance:after/);
+assert.match(linkedCss, /brightness\(\.96\) saturate\(\.94\)/, 'Rain must not heavily grayscale or darken the map artwork.');
+assert.match(linkedCss, /background-size:220px 360px,290px 440px/, 'Rain overlay must use layered irregular streak fields instead of a uniform repeating stripe.');
+assert.match(linkedCss, /animation:poyozz-city-rain 1\.25s linear infinite/, 'Rain animation should be slower and less artificial than the previous rapid uniform loop.');
 
 
 const ageTextMigration=fs.readFileSync('supabase/migrations/20261121100000_character_age_as_text.sql','utf8');
@@ -282,7 +287,7 @@ assert.match(cityMap, /const cardPerson=\{\.\.\.live,\.\.\.person\}/,
 assert.match(cityMap, /if\(\(person\?\.\[key\]==null\|\|person\?\.\[key\]===''\)&&live\?\.\[key\]!=null\)cardPerson\[key\]=live\[key\]/,
   'Null or empty schedule profile fields must fall back to the cached character profile.');
 assert.match(cityMap, /renderCityCharacterCard\(cardPerson,0\)/);
-assert.match(html, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
+assert.match(linkedCss, /city-character-photo-column \.city-character-portrait\{[^}]*background:transparent!important/);
 const sleepingHelperSource = cityMap.slice(
   cityMap.indexOf('const isSleepingSchedule='),
   cityMap.indexOf('const isCurrentCityCharacterEligible='),
