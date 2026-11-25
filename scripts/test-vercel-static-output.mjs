@@ -32,6 +32,7 @@ const fileBudgets = {
   'diary-ui.css': 3_000,
   'wallet-ui.css': 2_000,
   'group-author-forms.css': 2_000,
+  'group-wizard.css': 3_000,
   'character-illustration-gallery.css': 1_500,
   'chat-composer-states.css': 2_000,
   'city-map-ui.css': 16_000,
