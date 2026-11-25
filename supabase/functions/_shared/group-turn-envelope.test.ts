@@ -27,21 +27,29 @@ Deno.test("parses every member phone field even when only one character speaks",
   ]);
 });
 
-Deno.test("rejects omitted phone updates when characters have configured fields", () => {
+Deno.test("omitted phone updates preserve prior states and never invalidate valid character speech", () => {
   const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
   }), roster);
-  assertEquals(result.envelope, null);
-  assertEquals(result.errorCode, "missing_phone_updates");
+  assertEquals(result.errorCode, null);
+  assertEquals(result.envelope?.speeches[0].content, "有效角色發言");
+  assertEquals(result.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "目前沒有足夠資訊" }] },
+  ]);
 });
 
-Deno.test("rejects partial phone updates instead of silently completing with empty states", () => {
+Deno.test("partial phone updates are merged with prior state instead of rejecting the turn", () => {
   const result = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
     phone_updates: [{ character_id: "b", notifications: [{ title: "工作", body: "會議延後" }] }],
   }), roster);
-  assertEquals(result.envelope, null);
-  assertEquals(result.errorCode, "incomplete_phone_updates");
+  assertEquals(result.errorCode, null);
+  assertEquals(result.envelope?.speeches[0].content, "有效角色發言");
+  assertEquals(result.envelope?.phoneUpdates, [
+    { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "保留既有狀態" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "會議延後" }] },
+  ]);
 });
 
 Deno.test("accepts omitted model titles for configured fields and rejects missing bodies", () => {
@@ -52,7 +60,9 @@ Deno.test("accepts omitted model titles for configured fields and rejects missin
       { character_id: "b", notifications: [{ title: "公司訊息", body: "正常" }] },
     ],
   }), roster);
-  assertEquals(mismatch.errorCode, "phone_notification_count_mismatch");
+  assertEquals(mismatch.errorCode, null);
+  assertEquals(mismatch.envelope?.speeches[0].content, "有效角色發言");
+  assertEquals(mismatch.envelope?.phoneUpdates[0].notifications[0].body, "保留既有狀態");
 
   const missingModelTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
     speeches: [{ speaker_id: "a", content: "有效角色發言" }],
@@ -77,7 +87,7 @@ Deno.test("accepts omitted model titles for configured fields and rejects missin
   assertEquals(missingBody.errorCode, null);
   assertEquals(missingBody.envelope?.phoneUpdates, [
     { characterId: "a", notifications: [{ title: "👔夜辰衣著/姿勢", body: "保留既有狀態" }] },
-    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "目前沒有足夠資訊。" }] },
+    { characterId: "b", notifications: [{ title: "💼公司訊息", body: "目前沒有足夠資訊" }] },
   ]);
 
   const overlongDuplicateTitle = parseGroupTurnEnvelopeDetailed(JSON.stringify({
@@ -114,13 +124,27 @@ Deno.test("keeps prior phone state only for characters without configured fields
   ]);
 });
 
-Deno.test("rejects invalid speaker identities and malformed JSON", () => {
-  assertEquals(parseGroupTurnEnvelope(JSON.stringify({
-    speeches: [{ speaker_id: "outside", content: "不屬於群組的發言" }],
-    phone_updates: [
-      { character_id: "a", notifications: [{ title: "欄位", body: "狀態" }] },
-      { character_id: "b", notifications: [{ title: "欄位", body: "狀態" }] },
+Deno.test("recovers plain-text model output as a character speech", () => {
+  const result = parseGroupTurnEnvelopeDetailed(
+    "*蘇清雅抬起眼，將手中的文件放到一旁。*我聽見了，你先坐下，我們慢慢談。",
+    [
+      { id: "a", name: "傅司辰" },
+      { id: "b", name: "蘇清雅" },
+      { id: "c", name: "顧言" },
     ],
-  }), roster), null);
+  );
+  assertEquals(result.errorCode, null);
+  assertEquals(result.envelope?.speeches, [{
+    speakerId: "b",
+    speakerName: "蘇清雅",
+    content: "*蘇清雅抬起眼，將手中的文件放到一旁。*我聽見了，你先坐下，我們慢慢談。",
+    sceneId: null,
+    sceneName: "",
+  }]);
+});
+
+Deno.test("rejects output with no recoverable character content and invalid roster identities", () => {
   assertEquals(parseGroupTurnEnvelope("{not-json}", roster), null);
+  assertEquals(parseGroupTurnEnvelope("", roster), null);
+  assertEquals(parseGroupTurnEnvelope("   ", roster), null);
 });
