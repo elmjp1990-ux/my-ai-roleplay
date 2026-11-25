@@ -1,0 +1,11 @@
+/* Extracted from index.html: poyozz-chat-keyboard-viewport; declarations preserved. */
+body.conversation main,body.group-chat-page main{
+  height:var(--poyozz-chat-viewport-height,100dvh);
+  min-height:0;
+}
+body.conversation .chat-layout,body.group-chat-page .chat-layout{
+  height:100%;
+  min-height:0;
+}
+.city-location-subtitle{display:inline-flex;align-items:center;min-width:0;margin-left:3px;color:rgba(236,228,248,.68);font-size:11px;font-weight:450;letter-spacing:.035em;white-space:nowrap}
+@media(max-width:600px){.city-location-subtitle{font-size:9px;margin-left:1px;letter-spacing:0}}
