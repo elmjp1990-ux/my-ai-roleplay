@@ -8,6 +8,7 @@ import { processDueStoryMemorySummary, recordChatModelUsage } from "../_shared/s
 import { parseStoryTurnEnvelope } from "../_shared/story-turn-envelope.ts";
 import { collectDerivedPrivateProfileValues, formatCharacterAiProfilePrompt } from "../_shared/character-ai-profile-prompt.ts";
 import { requestOpenRouterChatCompletion, POYOZZ_DEFAULT_CHAT_MODEL } from "../_shared/openrouter-chat-completions.ts";
+import { asRecord as asDbRow, asTrimmedString as asString, isUuid, jsonResponse } from "../_shared/ai-value-utils.ts";
 import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "../_shared/ai-generation-diagnostics.ts";
 import { buildRoleplayResponseGuidelines } from "../_shared/roleplay-response-guidelines.ts";
 
@@ -17,25 +18,13 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-
-const isUuid = (value: unknown): value is string =>
-  typeof value === "string" &&
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+const json = (body: unknown, status = 200) => jsonResponse(body, status, corsHeaders);
 
 
 const DEFAULT_OPENROUTER_MODEL = POYOZZ_DEFAULT_CHAT_MODEL;
 const GENERATION_TIMEOUT_MS = 55_000;
 
 type DbRow = Record<string, unknown>;
-const asDbRow = (value: unknown): DbRow =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
-const asString = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
 
 async function buildStoryMessages(
   admin: any,

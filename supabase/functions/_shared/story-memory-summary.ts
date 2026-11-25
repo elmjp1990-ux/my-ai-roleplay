@@ -1,4 +1,5 @@
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
+import { asRecord as row, asTrimmedString as str } from "./ai-value-utils.ts";
 import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "./ai-generation-diagnostics.ts";
 
 type DbRow = Record<string, unknown>;
@@ -13,9 +14,7 @@ function normalizeStoryMemorySummaryText(value: unknown): string {
   const sentenceEnd = Math.max(...["。", "！", "？", "!", "?"].map(mark => clipped.lastIndexOf(mark)));
   return (sentenceEnd >= 29 ? clipped.slice(0, sentenceEnd + 1) : clipped).trim();
 }
-const row = (value: unknown): DbRow =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as DbRow : {};
-const str = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+
 const usageSnapshot = (usage: DbRow) => {
   const numeric = (value: unknown): number | null => {
     if (value === null || value === undefined || value === "") return null;
