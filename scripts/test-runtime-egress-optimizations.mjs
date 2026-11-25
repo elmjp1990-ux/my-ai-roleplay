@@ -185,9 +185,10 @@ const sharedRoleplayGuidelines=fs.readFileSync("supabase/functions/_shared/rolep
 const groupEnvelope=fs.readFileSync("supabase/functions/_shared/group-turn-envelope.ts","utf8");
 assert.match(sharedOpenRouter,/deepseek\/deepseek-v4-flash-20260423/,"single and group chat must share the approved DeepSeek V4 Flash model");
 assert.match(groupEdge,/parseGroupTurnEnvelopeDetailed\(provider\.result\.text, speakers, asText\(group\.player_name\)/,"group output parsing must use the actual player name for configured phone-field titles");
-assert.match(groupEdge,/phone_updates 必須為群組內每一位角色各輸出且只輸出一筆/,"every group member must produce a phone state even when not selected to speak");
-assert.match(groupEnvelope,/incomplete_phone_updates/,"missing member phone updates must be rejected instead of persisted as empty arrays");
-assert.match(groupEnvelope,/phone_notification_count_mismatch/,"configured phone fields must be complete and ordered");
+assert.match(groupEdge,/phone_updates、story_world_state、suggested_replies 都是附屬資料/,"group sidecar metadata must never outrank character speeches");
+assert.match(groupEdge,/responseFormat: \{ type: "json_object" \}/,"group generation must request JSON mode from OpenRouter");
+assert.match(groupEnvelope,/fallbackNotifications/,"missing group phone fields must preserve prior state or use safe defaults");
+assert.match(groupEnvelope,/prompts\.map/,"configured phone fields must be reconstructed in their author-defined order");
 assert.match(singleEdge,/buildRoleplayResponseGuidelines\("single"\)/,"single chat must use the canonical shared roleplay response contract");
 assert.match(groupEdge,/buildRoleplayResponseGuidelines\("group"\)/,"group chat must use the same canonical roleplay response contract");
 assert.match(sharedRoleplayGuidelines,/300～600 字元/,"the shared long-reply target must remain 300–600 characters");
@@ -525,7 +526,7 @@ assert.match(groupPhoneFunction, /phone_settings/);
 assert.match(groupPhoneFunction, /serializeGroupPhoneUpdatesForRpc\(parsed\.phoneUpdates\)/);
 assert.match(groupPhoneFunction, /p_phone_updates: phoneUpdatesForRpc/);
 assert.match(groupPhoneFunction, /phone_updates: parsed\.phoneUpdates/);
-assert.match(groupPhoneParser, /incomplete_phone_updates[\s\S]*phone_notification_count_mismatch[\s\S]*speaker\.phoneNotifications/);
+assert.match(groupPhoneParser, /fallbackNotifications[\s\S]*prompts\.map[\s\S]*speaker\.phoneNotifications/);
 assert.match(groupPhoneUI, /noticeSources=isGroup[\s\S]*?character\.phoneNotifications[\s\S]*?group\.phoneNotificationsByCharacter/);
 assert.match(groupPhoneUI, /phone-device-head--group/);
 assert.match(groupPhoneUI,/loadGroupMembersWithPhoneNotifications/,
