@@ -554,7 +554,7 @@ const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*font-size:10px/);
 assert.match(encounterSceneCss, /encounter-dialogue-replay[^}]*padding:4px 9px/);
 assert.match(linkedCss, /background:rgba\(38,35,46,\.94\)/);
-assert.match(frontend, /body\.day \.encounter-memory-card,body\.day \.encounter-memory-message/);
+assert.match(linkedCss, /body\.day \.encounter-memory-card,body\.day \.encounter-memory-message/);
 assert.match(encounterSceneCss, /encounter-dialogue-text em/);
 assert.match(encounterSceneCss, /composer-bottom-row\{position:sticky/);
 assert.match(encounterPresentation, /body\.encounter-mode-active \.chat-main\.encounter-scene \.messages \.encounter-dialogue-beat/);
