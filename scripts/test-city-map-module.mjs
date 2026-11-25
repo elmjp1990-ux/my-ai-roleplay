@@ -3,8 +3,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const html = fs.readFileSync('index.html', 'utf8');
-const linkedCss = [...html.matchAll(/<link\\b(?=[^>]*\\brel=[\"']stylesheet[\"'])(?=[^>]*\\bhref=[\"']([^\"']+)[\"'])[^>]*>/gi)]
-  .map(match => fs.readFileSync(match[1].replace(/^\\.\\//, ''), 'utf8')).join('\\n');
+const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
+  .filter(match => /rel=["']stylesheet["']/i.test(match[0]))
+  .map(match => match[0].match(/href=["']([^"']+)["']/i)?.[1])
+  .filter(Boolean)
+  .map(file => fs.readFileSync(file.replace('./', ''), 'utf8')).join('\n');
 const cityMap = fs.readFileSync('city-map.js', 'utf8');
 const encounterHistory = fs.readFileSync('encounter-history.js', 'utf8');
 const fixedSceneMigration = fs.readFileSync('supabase/migrations/20261123100000_fixed_encounter_city_scene_anchors.sql', 'utf8');
