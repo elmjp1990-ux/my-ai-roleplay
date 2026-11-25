@@ -105,7 +105,7 @@ assert.match(cleanupMigration, /CREATE POLICY character_illustration_cleanup_job
 
 // Scene portrait images and videos must not reintroduce a gray placeholder backdrop.
 assert.match(cityLocationPanelCss, /#cityCharacterCard \.city-character-portrait-video\{[^}]*background:transparent!important/);
-assert.match(cityMapUiCss, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
+assert.match(cityLocationPanelCss, /\.city-character-portrait,\.city-character-portrait-video\{background:transparent!important/);
  
 // City-scene avatars must be clipped by a dedicated transparent circular frame;
 // the clickable button must not inherit the legacy square avatar backing.
