@@ -115,6 +115,8 @@ export type GeneratedCharacterSchedule = {
     holiday: ScheduleTimeBlock[];
   };
   special_events: SpecialEventSchedule[];
+  partial?: boolean;
+  validation_errors?: string[];
 };
 export type EncounterScheduleSource = RecordValue & {
   character_id: string;
@@ -416,6 +418,134 @@ function intervalsOverlap(a: { start: number; end: number }, b: { start: number;
   return false;
 }
 
+function normalizePartialOptionWeights(options: ScheduleOption[]): ScheduleOption[] {
+  if (options.length === 1) return [{ ...options[0], weight: 100 }];
+  const total = options.reduce((sum, option) => sum + option.weight, 0);
+  if (total <= 0) return [];
+  const scaled = options.map((option, index) => {
+    const exact = option.weight * 100 / total;
+    return { index, weight: Math.floor(exact), remainder: exact - Math.floor(exact) };
+  });
+  let remaining = 100 - scaled.reduce((sum, item) => sum + item.weight, 0);
+  scaled.slice().sort((a, b) => b.remainder - a.remainder || a.index - b.index)
+    .slice(0, remaining).forEach((item) => { scaled[item.index].weight += 1; });
+  return options.map((option, index) => ({ ...option, weight: scaled[index].weight }));
+}
+
+/**
+ * Salvages independently valid hourly blocks/options. Invalid fragments are
+ * recorded for post-publish review instead of discarding the whole character.
+ * A completely empty result remains a hard validation failure at the caller.
+ */
+function validateHourlySchedulePartial(
+  value: unknown,
+  label: string,
+  characterResidentialContext: string,
+): { blocks: ScheduleTimeBlock[]; errors: string[] } {
+  const errors: string[] = [];
+  if (!Array.isArray(value)) return { blocks: [], errors: [label + "_variants_not_array"] };
+  if (value.length !== 24) errors.push(label + "_hour_count_partial");
+  const blocks: ScheduleTimeBlock[] = [];
+  for (let index = 0; index < value.length; index++) {
+    const rawBlock = value[index];
+    const blockLabel = label + "_hour_" + index;
+    if (!hasExactKeys(rawBlock, ["start_time", "end_time", "options"])) {
+      errors.push(blockLabel + "_keys_invalid");
+      continue;
+    }
+    const start = parseHour(rawBlock.start_time);
+    const end = parseHour(rawBlock.end_time);
+    if (start === null || end === null || durationMinutes(start, end) !== 60 ||
+        text(rawBlock.start_time) !== String(Math.floor(start / 60)).padStart(2, "0") + ":00" ||
+        text(rawBlock.end_time) !== String(Math.floor(end / 60)).padStart(2, "0") + ":00") {
+      errors.push(blockLabel + "_must_be_exactly_one_hour");
+      continue;
+    }
+    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 1 || rawBlock.options.length > 3) {
+      errors.push(blockLabel + "_options_count_invalid");
+      continue;
+    }
+    const validOptions: ScheduleOption[] = [];
+    for (let optionIndex = 0; optionIndex < rawBlock.options.length; optionIndex++) {
+      const rawOption = rawBlock.options[optionIndex];
+      const optionLabel = blockLabel + "_option_" + optionIndex;
+      if (!hasExactKeys(rawOption, [
+        "weight", "location", "activity", "is_outdoor",
+        "rain_fallback_location", "rain_fallback_activity",
+      ])) {
+        errors.push(optionLabel + "_keys_invalid");
+        continue;
+      }
+      const weight = rawOption.weight;
+      const locationDescription = text(rawOption.location);
+      const activity = text(rawOption.activity);
+      if (!Number.isInteger(weight) || Number(weight) < 1 || Number(weight) > 100) {
+        errors.push(optionLabel + "_weight_invalid");
+        continue;
+      }
+      if (!isValidEncounterLocationLabel(locationDescription)) {
+        errors.push(optionLabel + "_location_invalid");
+        continue;
+      }
+      if (Array.from(activity).length < 8 || Array.from(activity).length > 30) {
+        errors.push(optionLabel + "_activity_length_invalid");
+        continue;
+      }
+      if (typeof rawOption.is_outdoor !== "boolean") {
+        errors.push(optionLabel + "_outdoor_flag_invalid");
+        continue;
+      }
+      const locationKey = normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext);
+      const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor);
+      const rainLocationDescription = text(rawOption.rain_fallback_location);
+      validOptions.push({
+        option_key: ("option_" + (validOptions.length + 1)) as ScheduleOption["option_key"],
+        weight: Number(weight),
+        location_key: locationKey,
+        location_description: locationDescription,
+        activity,
+        scene_description: activity,
+        is_outdoor: activitySpace === "outdoor",
+        rain_fallback_location_key: rainLocationDescription
+          ? normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext)
+          : null,
+        rain_fallback_activity: text(rawOption.rain_fallback_activity) || null,
+        rain_fallback_greeting: null,
+        encounter_greeting: null,
+      });
+    }
+    if (validOptions.length === 0) {
+      errors.push(blockLabel + "_no_valid_options");
+      continue;
+    }
+    if (validOptions.length !== rawBlock.options.length) errors.push(blockLabel + "_options_filtered");
+    const normalizedOptions = normalizePartialOptionWeights(validOptions);
+    blocks.push({
+      start_time: text(rawBlock.start_time),
+      end_time: text(rawBlock.end_time),
+      options: normalizedOptions,
+    });
+  }
+
+  blocks.sort((a, b) => (parseHour(a.start_time) ?? 0) - (parseHour(b.start_time) ?? 0));
+  const nonOverlapping: ScheduleTimeBlock[] = [];
+  for (const block of blocks) {
+    const start = parseHour(block.start_time) ?? 0;
+    const previous = nonOverlapping[nonOverlapping.length - 1];
+    const previousStart = previous ? parseHour(previous.start_time) ?? 0 : null;
+    if (previousStart !== null && (start === previousStart || intervalsOverlap(
+      { start: previousStart, end: previousStart + 60 },
+      { start, end: start + 60 },
+    ))) {
+      errors.push(label + "_hourly_blocks_overlap");
+      continue;
+    }
+    nonOverlapping.push(block);
+  }
+  if (nonOverlapping.length !== 24) errors.push(label + "_partial_hours_preserved");
+  return { blocks: nonOverlapping, errors: [...new Set(errors)] };
+}
+
 function validateHourlySchedule(
   value: unknown,
   errors: string[],
@@ -701,24 +831,31 @@ export function parseEncounterScheduleBatchOutput(
       ...[text(source.intro), text(source.schedule_description), text(source.private_info)]
         .filter((value) => /(?:居住|住在|住於|住所|住處|自宅|自己的家|家中)/.test(value) && hasExplicitLuxuryResidenceContext(value)),
     ].join(" ");
-    const weekday = validateHourlySchedule(item.variants.weekday, errors, id + "_weekday", residenceContext);
-    const holiday = validateHourlySchedule(item.variants.holiday, errors, id + "_holiday", residenceContext);
+    const weekdayResult = validateHourlySchedulePartial(item.variants.weekday, id + "_weekday", residenceContext);
+    const holidayResult = validateHourlySchedulePartial(item.variants.holiday, id + "_holiday", residenceContext);
+    const weekday = weekdayResult.blocks;
+    const holiday = holidayResult.blocks;
+    const partialErrors = [...weekdayResult.errors, ...holidayResult.errors];
     const scheduleSlots = [
-      ...(weekday ?? []).flatMap((block) => block.options),
-      ...(holiday ?? []).flatMap((block) => block.options),
+      ...weekday.flatMap((block) => block.options),
+      ...holiday.flatMap((block) => block.options),
       ...specialEvents.flatMap((event) => event.slots),
     ];
+    if (scheduleSlots.length === 0) {
+      errors.push(id + "_no_valid_schedule_blocks");
+      continue;
+    }
     if (scheduleSlots.some((slot) =>
       (slot.location_key === "airport" || slot.rain_fallback_location_key === "airport") &&
       !isAirportUseReasonable(source, slot.activity))) {
       errors.push(id + "_airport_location_without_character_context");
     }
-    if (weekday && holiday) {
-      characters.push({
-        character_id: id, placement: "modern_map", variants: { weekday, holiday },
-        special_events: specialEvents,
-      });
-    }
+    characters.push({
+      character_id: id, placement: "modern_map", variants: { weekday, holiday },
+      special_events: specialEvents,
+      partial: partialErrors.length > 0,
+      validation_errors: partialErrors.slice(0, 50),
+    });
   }
 
   // System-side exact-name matching for custom registered scenes. The catalog
