@@ -28,7 +28,7 @@ BEGIN
   IF v_start < 1 THEN
     RAISE EXCEPTION 'full-clear statement not found after modern-map guard';
   END IF;
-  v_end := pg_catalog.strpos(pg_catalog.substring(v_definition FROM v_start), ';') + v_start - 1;
+  v_end := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), ';') + v_start - 1;
   IF v_end < v_start THEN
     RAISE EXCEPTION 'full-clear statement terminator not found';
   END IF;
