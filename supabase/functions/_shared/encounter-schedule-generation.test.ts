@@ -74,6 +74,15 @@ const result = (
   [...builtInSceneCatalog, ...(sceneCatalog ?? [])],
 );
 
+Deno.test("maps named club venues and their alleys to existing scenes", () => {
+  if (normalizeEncounterSceneKey("LUCID俱樂部") !== "private-club" ||
+      normalizeEncounterSceneKey("LUCID俱樂部包廂") !== "private-club" ||
+      normalizeEncounterSceneKey("LUCID俱樂部休息室") !== "private-club" ||
+      normalizeEncounterSceneKey("LUCID俱樂部後巷") !== "shopping-street") {
+    throw new Error("named club venue aliases must resolve without creating new map scenes");
+  }
+});
+
 Deno.test("accepts full weekday and holiday days with independent weighted options", () => {
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
