@@ -518,8 +518,13 @@ function validateHourlySchedulePartial(
       errors.push(blockLabel + "_no_valid_options");
       continue;
     }
+    if (rawBlock.options.length < 2 || rawBlock.options.length > 3) errors.push(blockLabel + "_option_count_review");
     if (validOptions.length !== rawBlock.options.length) errors.push(blockLabel + "_options_filtered");
-    const normalizedOptions = normalizePartialOptionWeights(validOptions);
+    const publishableOptions = validOptions.slice(0, 3);
+    if (publishableOptions.length !== validOptions.length) errors.push(blockLabel + "_options_capped");
+    const sourceWeightTotal = publishableOptions.reduce((sum, option) => sum + option.weight, 0);
+    if (sourceWeightTotal !== 100) errors.push(blockLabel + "_weights_normalized");
+    const normalizedOptions = normalizePartialOptionWeights(publishableOptions);
     blocks.push({
       start_time: text(rawBlock.start_time),
       end_time: text(rawBlock.end_time),
