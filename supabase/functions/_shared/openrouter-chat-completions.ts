@@ -1,4 +1,5 @@
 import { normalizeAiProviderResult, type AiProviderResult } from "./ai-provider-result.ts";
+import { asRecord as asRow, asTrimmedString as asText } from "./ai-value-utils.ts";
 import {
   APPROVED_OPENROUTER_PROVIDERS,
   buildOpenRouterProviderOptions,
@@ -41,9 +42,7 @@ type RequestOptions = {
   retrySameProviderOnRateLimit?: boolean;
 };
 
-const asRow = (value: unknown): Record<string, unknown> =>
-  value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
-const asText = (value: unknown): string => typeof value === "string" ? value.trim() : "";
+
 
 function isTransientProviderFailure(response: OpenRouterCompletionResult): boolean {
   // Retry explicit rate limits immediately. Generic 5xx/timeouts are not
