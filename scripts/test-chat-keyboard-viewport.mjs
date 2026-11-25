@@ -3,6 +3,11 @@ import fs from "node:fs";
 import vm from "node:vm";
 
 const html = fs.readFileSync("index.html", "utf8");
+const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
+  .filter(match => /rel=["']stylesheet["']/i.test(match[0]))
+  .map(match => match[0].match(/href=["']([^"']+)["']/i)?.[1])
+  .filter(Boolean)
+  .map(file => fs.readFileSync(file.replace('./', ''), 'utf8')).join('\n');
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
@@ -167,7 +172,7 @@ function createHarness({ visualViewport = true, encounter = false } = {}) {
 
 console.log("Passed: single, group, and encounter chat keyboard viewport behavior.");
 
-assert.match(html, /#storyRelationshipLabel\{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important\}/);
+assert.match(linkedCss, /#storyRelationshipLabel\{display:inline-flex!important;align-items:center;margin:0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important\}/);
 assert.doesNotMatch(html, /character-status-label[^>]*>[\s\S]{0,120}公開中/);
 assert.match(encounterScene, /chat-heading>\.row\.between\{[\s\S]{0,120}flex-wrap:nowrap!important/);
 assert.match(encounterScene, /composer-bottom-row\{display:flex!important;align-items:center!important;justify-content:space-between!important/);
@@ -181,9 +186,9 @@ assert.match(encounterScene, /stack\.appendChild\(affinityChip\)/);
 assert.match(encounterScene, /\.chat-heading>\.row\.between>\.row:last-child\{[\s\S]{0,180}position:absolute!important/);
 assert.match(encounterScene, /encounter-character-sprite[\s\S]{0,220}bottom:0!important/);
 assert.match(encounterScene, /composer-bottom-row\{[\s\S]{0,120}transform:translateY\(-6px\)!important/);
-assert.match(html, /\.poyozz-affinity-ui\{box-sizing:border-box!important;width:calc\(5\.5em \+ 30px\)!important/);
+assert.match(linkedCss, /\.poyozz-affinity-ui\{box-sizing:border-box!important;width:calc\(5\.5em \+ 30px\)!important/);
 assert.match(html, /chat-identity-copy[\s\S]{0,350}storyRelationshipLabel/);
-assert.match(html, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
+assert.match(linkedCss, /poyozz-affinity-ui\.story\{padding:3px 4px!important;font-size:10px!important/);
 assert.match(encounterHistory, /hasPlayer\.has\(r\.id\)/);
 assert.match(encounterHistory, /\.not\('content','ilike','%POYOZZ_ENCOUNTER_DISCOVERY_EVENT%'\)/);
 assert.match(encounterHistory, /\.neq\('content','（請接續目前的故事。）'\)/);
