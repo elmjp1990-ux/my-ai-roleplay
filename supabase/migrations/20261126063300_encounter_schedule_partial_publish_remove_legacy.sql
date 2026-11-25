@@ -24,7 +24,7 @@ BEGIN
   -- Do not clear all existing AI schedules before a partial publish.
   -- Remove the modern-map full-clear statement by locating it after the placement guard.
   v_start := pg_catalog.strpos(v_definition, 'IF v_placement <> ''modern_map'' THEN');
-  v_start := pg_catalog.strpos(pg_catalog.substring(v_definition FROM v_start), 'UPDATE public.character_schedules') + v_start - 1;
+  v_start := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), 'UPDATE public.character_schedules') + v_start - 1;
   IF v_start < 1 THEN
     RAISE EXCEPTION 'full-clear statement not found after modern-map guard';
   END IF;
@@ -32,7 +32,7 @@ BEGIN
   IF v_end < v_start THEN
     RAISE EXCEPTION 'full-clear statement terminator not found';
   END IF;
-  v_definition := pg_catalog.substring(v_definition FROM 1 FOR v_start - 1) || pg_catalog.substring(v_definition FROM v_end + 1);
+  v_definition := pg_catalog.substring(v_definition FROM 1 FOR v_start - 1) || pg_catalog.substring(v_definition, v_end + 1);
 
   -- Replace old AI rows only for the exact day type and hour being published.
   v_old := $replace$      FOR v_variant IN SELECT value FROM jsonb_array_elements(v_item->'variants'->v_day_type)
