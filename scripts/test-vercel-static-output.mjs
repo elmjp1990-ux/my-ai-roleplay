@@ -79,6 +79,9 @@ for (const [file, maxBytes] of Object.entries(fileBudgets)) {
 assert.ok(totalBytes <= 1_500_000, 'Vercel static output exceeds the 1.5 MB deployment budget: ' + totalBytes + ' bytes.');
 
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
+const linkedStylesheets = [...html.matchAll(/<link\\b(?=[^>]*\\brel=["']stylesheet["'])(?=[^>]*\\bhref=["']([^"'?#]+)["'])[^>]*>/gi)]
+  .map(match => match[1].replace(/^\\.\\//, ''));
+assert.ok(linkedStylesheets.length >= 2, 'Linked stylesheets must be discoverable for static-output checks.');
 
 // Feature-only scripts stay in the static output but are fetched only on first use.
 const lazyRuntimeModules = ['custom-tag-picker.js', 'group-opening-presets.js'];
