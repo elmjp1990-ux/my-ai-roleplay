@@ -461,7 +461,7 @@ function validateHourlySchedulePartial(
       errors.push(blockLabel + "_must_be_exactly_one_hour");
       continue;
     }
-    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 1 || rawBlock.options.length > 3) {
+    if (!Array.isArray(rawBlock.options) || rawBlock.options.length < 1 || rawBlock.options.length > 10) {
       errors.push(blockLabel + "_options_count_invalid");
       continue;
     }
