@@ -325,7 +325,7 @@ assert.doesNotMatch(cityMap, /city-location-open-inline/,
   'Scene title must not render the redundant open-status label or green dot.');
 assert.doesNotMatch(html, /city-location-open-inline/,
   'Removed open-status CSS must not remain in the main stylesheet.');
-assert.match(html, /\.city-location-subtitle\{/,
+assert.match(linkedCss, /\.city-location-subtitle\{/,
   'Scene subtitle must use the restrained secondary-text style.');
 assert.doesNotMatch(cityMap, /cityPlaceSubtitles/,
   'Redundant hardcoded scene subtitles must be removed; the database catalog is the single scene metadata source.');

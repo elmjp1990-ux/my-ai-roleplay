@@ -1,0 +1,5 @@
+/* Extracted from index.html: poyozz-chat-full-bleed-shared; declarations preserved. */
+body.chat-page .chat-main,body.conversation .chat-main,body.group-chat-page .chat-main{box-sizing:border-box;width:100%;max-width:none;height:100%;min-height:0;margin:0;padding:0;border:0!important;border-radius:0!important;box-shadow:none!important;}
+body.chat-page .chat-heading,body.conversation .chat-heading,body.group-chat-page .chat-heading{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-top:0!important;border-radius:0!important;}
+body.chat-page .composer,body.conversation .composer,body.group-chat-page .composer{box-sizing:border-box;width:100%;margin:0;border-left:0!important;border-right:0!important;border-bottom:0!important;border-radius:0!important;}
+body.chat-page .messages,body.conversation .messages,body.group-chat-page .messages{width:100%;max-width:none;}

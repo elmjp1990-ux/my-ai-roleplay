@@ -11,7 +11,7 @@ const linkedCss = [...html.matchAll(/<link[^>]+>/gi)]
 const encounterScene = fs.readFileSync("encounter-scene.js", "utf8");
 const encounterSceneCss = fs.readFileSync("encounter-scene.css", "utf8");
 const encounterHistory = fs.readFileSync("encounter-history.js", "utf8");
-const style = html.match(/<style id="poyozz-chat-keyboard-viewport">([\s\S]*?)<\/style>/)?.[1] || "";
+const style = linkedCss; // Keyboard viewport stylesheet is linked from index.html after extraction.
 const source = fs.readFileSync("chat-keyboard-viewport.js", "utf8");
 assert.ok(style, "keyboard viewport CSS must be present");
 assert.match(html, /<script src="\.\/chat-keyboard-viewport\.js"><\/script>/,
