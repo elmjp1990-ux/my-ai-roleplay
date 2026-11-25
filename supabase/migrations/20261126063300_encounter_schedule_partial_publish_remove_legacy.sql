@@ -20,15 +20,13 @@ BEGIN
   v_definition := pg_catalog.replace(v_definition, v_old, $replace$source_type = 'ai'$replace$);
 
   -- Do not clear all existing AI schedules before a partial publish.
-  v_definition := pg_catalog.regexp_replace(
-    v_definition,
-    E'\\n[ ]*UPDATE public\\.character_schedules\\n[ ]*SET is_active = false, updated_at = pg_catalog\\.clock_timestamp\\(\\)\\n[ ]*WHERE character_id = v_character_id AND source_type = \\'ai\\' AND is_active IS TRUE;\\n',
-    E'\\n',
-    'g'
-  );
-  IF pg_catalog.strpos(v_definition, 'WHERE character_id = v_character_id AND source_type = \\'ai\\' AND is_active IS TRUE;') > 0 THEN
-    RAISE EXCEPTION 'full-schedule deactivation block still present';
+  v_old := $replace$UPDATE public.character_schedules
+      SET is_active = false, updated_at = pg_catalog.clock_timestamp()
+      WHERE character_id = v_character_id AND source_type = 'ai' AND is_active IS TRUE;$replace$;
+  IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
+    RAISE EXCEPTION 'full-schedule deactivation block not found';
   END IF;
+  v_definition := pg_catalog.replace(v_definition, v_old, '');
 
   -- Replace old AI rows only for the exact day type and hour being published.
   v_old := $replace$      FOR v_variant IN SELECT value FROM jsonb_array_elements(v_item->'variants'->v_day_type)
