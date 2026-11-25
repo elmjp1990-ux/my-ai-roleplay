@@ -415,9 +415,10 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
 
   const tooLong = hourlyBlocks();
   tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
-  const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
-  if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
-    throw new Error("location label longer than twenty characters accepted");
+  const salvaged = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
+  if (!salvaged.ok || !salvaged.characters[0].partial ||
+      salvaged.characters[0].variants.weekday[8].options.some((item) => item.location_description === "超級長的地點名稱超級長的地點名稱超級長的地點名稱超級長的地點名稱")) {
+    throw new Error("overlong location should be excluded while the valid option is salvaged");
   }
 });
 
