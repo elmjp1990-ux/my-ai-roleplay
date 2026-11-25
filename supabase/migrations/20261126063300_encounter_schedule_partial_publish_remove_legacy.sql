@@ -42,7 +42,7 @@ $replace$;
           AND is_active IS TRUE
           AND day_type = v_day_type
           AND start_time = (v_variant->>'start_time')::time
-          AND end_time = (v_variant->>'end_time')::time;$replace$;
+          AND end_time = (v_variant->>'end_time')::time;\n      LOOP$replace$;
   IF pg_catalog.strpos(v_definition, v_old) = 0 THEN
     RAISE EXCEPTION 'hour loop insertion point not found';
   END IF;
