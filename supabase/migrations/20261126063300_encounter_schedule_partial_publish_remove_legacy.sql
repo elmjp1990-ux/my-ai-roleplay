@@ -21,6 +21,32 @@ BEGIN
   END IF;
   v_definition := pg_catalog.replace(v_definition, v_old, $replace$source_type = 'ai'$replace$);
 
+  -- A no-matching-location result must not erase previously published schedules or greetings.
+  v_start := pg_catalog.strpos(v_definition, 'IF v_placement = ''no_matching_location'' THEN');
+  IF v_start < 1 THEN
+    RAISE EXCEPTION 'no-matching-location branch not found';
+  END IF;
+  v_start := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), 'UPDATE public.character_schedules') + v_start - 1;
+  IF v_start < 1 THEN
+    RAISE EXCEPTION 'no-matching-location schedule update not found';
+  END IF;
+  v_end := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), ';') + v_start - 1;
+  IF v_end < v_start THEN
+    RAISE EXCEPTION 'no-matching-location schedule update terminator not found';
+  END IF;
+  v_definition := pg_catalog.substring(v_definition, 1, v_start - 1) || pg_catalog.substring(v_definition, v_end + 1);
+
+  v_start := pg_catalog.strpos(v_definition, 'IF v_placement = ''no_matching_location'' THEN');
+  v_start := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), 'DELETE FROM public.encounter_character_greeting_pools') + v_start - 1;
+  IF v_start < 1 THEN
+    RAISE EXCEPTION 'no-matching-location greeting deletion not found';
+  END IF;
+  v_end := pg_catalog.strpos(pg_catalog.substring(v_definition, v_start), ';') + v_start - 1;
+  IF v_end < v_start THEN
+    RAISE EXCEPTION 'no-matching-location greeting deletion terminator not found';
+  END IF;
+  v_definition := pg_catalog.substring(v_definition, 1, v_start - 1) || pg_catalog.substring(v_definition, v_end + 1);
+
   -- Do not clear all existing AI schedules before a partial publish.
   -- Remove the modern-map full-clear statement by locating it after the placement guard.
   v_start := pg_catalog.strpos(v_definition, 'IF v_placement <> ''modern_map'' THEN');
