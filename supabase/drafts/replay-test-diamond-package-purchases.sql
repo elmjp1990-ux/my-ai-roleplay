@@ -27,7 +27,7 @@ begin
 
   -- The RPC must refuse grants until an operator enables the TEST-only switch.
   begin
-    perform public.test_purchase_diamond_package('twd_60');
+    perform public.test_purchase_diamond_package('twd_60', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     raise exception 'TEST package purchase should be blocked while the feature flag is disabled';
   exception when sqlstate '55000' then
     null;
@@ -45,16 +45,25 @@ begin
     raise exception 'First NT$60 package grant mismatch: %', v_result;
   end if;
 
-  -- Repeating the same tier grants the base package only.
-  v_result := public.test_purchase_diamond_package('twd_60');
+  -- Retrying the same request ID must not credit either row twice.
+  v_result := public.test_purchase_diamond_package('twd_60', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+  if (v_result->>'base_diamonds')::integer <> 200
+     or (v_result->>'bonus_diamonds')::integer <> 60
+     or (v_result->>'diamonds')::integer <> 260
+     or (v_result->>'replayed')::boolean is not true then
+    raise exception 'Repeated request ID must return the original result without a second grant: %', v_result;
+  end if;
+
+  -- A new purchase request for the same tier grants the base package only.
+  v_result := public.test_purchase_diamond_package('twd_60', 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb');
   if (v_result->>'base_diamonds')::integer <> 200
      or (v_result->>'bonus_diamonds')::integer <> 0
      or (v_result->>'diamonds')::integer <> 460 then
-    raise exception 'Repeated NT$60 package must not repeat the bonus: %', v_result;
+    raise exception 'Repeated NT$60 tier must not repeat the bonus: %', v_result;
   end if;
 
   -- A different tier has its own first-purchase entitlement; 30% of 525 rounds to 158.
-  v_result := public.test_purchase_diamond_package('twd_150');
+  v_result := public.test_purchase_diamond_package('twd_150', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
   if (v_result->>'base_diamonds')::integer <> 525
      or (v_result->>'bonus_diamonds')::integer <> 158
      or (v_result->>'diamonds')::integer <> 1143 then
@@ -67,7 +76,7 @@ begin
       membership_expires_at = now() + interval '30 days'
   where id = v_uid;
 
-  v_result := public.test_purchase_diamond_package('twd_290');
+  v_result := public.test_purchase_diamond_package('twd_290', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
   if (v_result->>'base_diamonds')::integer <> 1050
      or (v_result->>'bonus_diamonds')::integer <> 0
      or (v_result->>'diamonds')::integer <> 2193 then
@@ -107,7 +116,7 @@ begin
 
   -- Invalid package codes must be rejected.
   begin
-    perform public.test_purchase_diamond_package('twd_999');
+    perform public.test_purchase_diamond_package('twd_999', 'ffffffff-ffff-4fff-8fff-ffffffffffff');
     raise exception 'Invalid package code should have been rejected';
   exception when sqlstate '22023' then
     null;
