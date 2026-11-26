@@ -10497,7 +10497,7 @@ function renderShop() {
         </div>
         <div class="row" style="gap:12px;flex-wrap:wrap">
           <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
-            <span aria-hidden="true" style="font-size:18px">💎</span><span class="muted" style="font-size:12px;white-space:nowrap">鑽石</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${diamonds}</strong>
+            <span aria-hidden="true" style="font-size:18px">✧</span><span class="muted" style="font-size:12px;white-space:nowrap">鑽石</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${diamonds}</strong>
           </article>
           <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
             <span aria-hidden="true" style="font-size:18px">◉</span><span class="muted" style="font-size:12px;white-space:nowrap">銀幣</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${silver}</strong>
@@ -10518,7 +10518,7 @@ function renderShop() {
               <article class="store-package-row">
                 <div class="store-package-copy">
                   <div class="store-package-main">
-                    <strong class="store-package-amount">💎 ${item.amount.toLocaleString()}${hasFirstPurchaseBonus ? ` <span class="store-package-bonus">＋ 💎${bonus.toLocaleString()}</span>` : ''}</strong>
+                    <strong class="store-package-amount"><span class="store-gem-mark">✧</span> ${item.amount.toLocaleString()}${hasFirstPurchaseBonus ? ` <span class="store-package-bonus">＋ ${bonus.toLocaleString()}</span>` : ''}</strong>
                     <div class="store-package-purchase">
                       <strong class="store-package-price">NT${item.price.toLocaleString()}</strong>
                       <button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="${item.code}">購買</button>
