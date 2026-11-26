@@ -238,12 +238,9 @@ export function normalizeEncounterSceneKey(
   // Explicit fixed destinations take precedence over incidental activity keywords.
   if (/(夜間酒吧|酒吧|酒館|夜店|歸途)/i.test(compact)) return "night-bar";
   if (/(高級會所|私人會所|高級俱樂部|私人俱樂部)/i.test(compact)) return "private-club";
-  // Named modern clubs (including LUCID) are aliases of the existing private-club scene.
-  // Their back alleys remain street locations rather than being swallowed by the club alias.
-  if (/(?:lucid\\s*俱樂部|lucid\\s*club|俱樂部|club)/i.test(compact)) {
-    if (/(後巷|巷弄|巷口|街角)/i.test(compact)) return "shopping-street";
-    return "private-club";
-  }
+  // Every part of the LUCID venue belongs to the existing private-club scene,
+  // including its rooms, lounges, entrances, and back alley.
+  if (/(?:lucid\\s*俱樂部|lucid\\s*club|俱樂部|club)/i.test(compact)) return "private-club";
   if (/(便利商店|超商)/i.test(compact)) return "convenience-store";
   if (/(江邊堤防|河堤|河岸|水岸|海港|港區)/i.test(compact)) return "waterfront";
   if (/(中央醫院|醫院|診所)/i.test(compact)) return "hospital";
