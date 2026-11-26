@@ -87,7 +87,7 @@ BEGIN
   v_activity_date := (NEW.created_at AT TIME ZONE 'Asia/Taipei')::date;
 
   INSERT INTO public.character_turn_daily_stats(character_id, activity_date, turn_count)
-  VALUES (v_character_id, v_activity_date, v_delta)
+  VALUES (v_character_id, v_activity_date, GREATEST(v_delta, 0))
   ON CONFLICT (character_id, activity_date) DO UPDATE
   SET turn_count = GREATEST(
         0,
