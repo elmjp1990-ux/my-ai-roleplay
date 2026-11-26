@@ -663,7 +663,7 @@ jobs:
           SQL
           node scripts/test-encounter-schedule-worker.mjs
 
-      - name: Apply and verify Explore daily leaderboards in disposable schema
+      - name: Apply and verify Explore daily leaderboards, JSONB tags, and RLS in disposable schema
         shell: bash
         run: |
           set -euo pipefail
