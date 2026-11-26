@@ -26,6 +26,8 @@
     const prev = existingPrivateProfile?.personality_profile || {};
     const next = character.personalityProfile || {};
     compare(nonAi, 'name', existingCharacter?.name, String(character.name || '').trim());
+    compare(runtime, 'gender', existingCharacter?.gender, character.gender);
+    compare(runtime, 'age', existingCharacter?.age, character.age);
     compareSource('intro', existingCharacter?.intro || '', character.intro || '');
     compareSource('race', existingCharacter?.race || '', character.race || '');
     compareSource('style', existingCharacter?.style || '', character.style || '');
