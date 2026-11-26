@@ -663,6 +663,50 @@ jobs:
           SQL
           node scripts/test-encounter-schedule-worker.mjs
 
+      - name: Apply and verify Explore daily leaderboards in disposable schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261126072000_explore_character_leaderboards.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $explore_leaderboard_contract$
+          DECLARE
+            v_function text;
+          BEGIN
+            IF pg_catalog.to_regclass('public.character_turn_daily_stats') IS NULL THEN
+              RAISE EXCEPTION 'daily character turn aggregate table missing';
+            END IF;
+            IF pg_catalog.to_regprocedure('public.get_public_character_leaderboard(text,integer,integer,text[],text[])') IS NULL THEN
+              RAISE EXCEPTION 'public leaderboard RPC missing';
+            END IF;
+            IF NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_trigger
+              WHERE tgrelid='public.chat_messages'::regclass
+                AND tgname='chat_messages_character_turn_daily_stat'
+                AND NOT tgisinternal
+            ) OR NOT EXISTS (
+              SELECT 1 FROM pg_catalog.pg_trigger
+              WHERE tgrelid='public.chat_group_messages'::regclass
+                AND tgname='chat_group_messages_character_turn_daily_stat'
+                AND NOT tgisinternal
+            ) THEN
+              RAISE EXCEPTION 'single/group daily aggregate triggers missing';
+            END IF;
+            v_function := pg_catalog.pg_get_functiondef(
+              'public.get_public_character_leaderboard(text,integer,integer,text[],text[])'::regprocedure
+            );
+            IF pg_catalog.strpos(v_function, 'Asia/Taipei') = 0
+               OR pg_catalog.strpos(v_function, 'isodow') = 0
+               OR pg_catalog.strpos(v_function, 'character_turn_daily_stats') = 0 THEN
+              RAISE EXCEPTION 'leaderboard must use Taiwan-local daily buckets and Monday week boundaries';
+            END IF;
+            IF pg_catalog.row_security_active('public.character_turn_daily_stats'::regclass) IS NOT FALSE THEN
+              RAISE EXCEPTION 'daily aggregate table must not expose rows through client RLS';
+            END IF;
+          END
+          $explore_leaderboard_contract$;
+          SQL
+
       - name: Upload Encounter SQL replay diagnostics
         if: always()
         uses: actions/upload-artifact@v4
