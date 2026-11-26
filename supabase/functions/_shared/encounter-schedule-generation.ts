@@ -235,6 +235,9 @@ export function normalizeEncounterSceneKey(
     return "apartment";
   }
 
+  // The user's world rule is that every LUCID-related place is inside the high-end club.
+  if (/lucid/i.test(compact)) return "private-club";
+
   // Explicit fixed destinations take precedence over incidental activity keywords.
   if (/(夜間酒吧|酒吧|酒館|夜店|歸途)/i.test(compact)) return "night-bar";
   if (/(高級會所|私人會所|高級俱樂部|私人俱樂部)/i.test(compact)) return "private-club";
