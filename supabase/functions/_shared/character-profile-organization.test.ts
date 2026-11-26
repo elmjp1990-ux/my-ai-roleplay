@@ -6,6 +6,9 @@ import {
 } from "./character-profile-organization.ts";
 
 const sourcePayload: CharacterProfileSourcePayload = {
+  "characters.name": "角色甲",
+  "characters.gender": "男性",
+  "characters.age": "23",
   "characters.intro": "在台北工作的咖啡師，重視承諾。",
   "characters.race": "",
   "characters.style": "外冷內熱，說話直接。",
@@ -68,7 +71,10 @@ Deno.test("accepts a complete profile with evidence-backed three-rule OOC", () =
   });
   profile.identity_background = {
     status: "populated",
-    items: [item("在台北工作的咖啡師。", "characters.intro")],
+    items: [
+      { content: "角色甲，男性，23 歲。", source_type: "author_explicit", source_refs: ["characters.name", "characters.gender", "characters.age"], confidence: "high" },
+      item("在台北工作的咖啡師。", "characters.intro"),
+    ],
   };
   profile.core_personality = {
     status: "populated",
@@ -114,6 +120,23 @@ Deno.test("accepts a complete profile with evidence-backed three-rule OOC", () =
   };
   const result = validateCharacterAiProfile(profile, sourcePayload);
   if (!result.ok) throw new Error(result.errors.join(","));
+});
+
+Deno.test("basic identity facts are allowed only in identity background", () => {
+  const profile = makeProfile();
+  profile.core_personality = {
+    status: "populated",
+    items: [{
+      content: "因為 23 歲所以個性成熟。",
+      source_type: "ai_inference",
+      source_refs: ["characters.age"],
+      confidence: "low",
+    }],
+  };
+  const result = validateCharacterAiProfile(profile, sourcePayload);
+  if (result.ok || !result.errors.includes("core_personality_basic_identity_source_not_allowed")) {
+    throw new Error("basic identity facts must not be used to infer personality");
+  }
 });
 
 Deno.test("rejects source references invented by the model", () => {
