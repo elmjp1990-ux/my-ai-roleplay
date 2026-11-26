@@ -162,14 +162,14 @@ AS $function$
       )
       AND (
         COALESCE(pg_catalog.cardinality(p_tags), 0) = 0
-        OR c.tags @> p_tags
+        OR c.tags @> pg_catalog.to_jsonb(p_tags)
       )
       AND (
         NULLIF(pg_catalog.btrim(p_search), '') IS NULL
         OR c.name ILIKE '%' || pg_catalog.btrim(p_search) || '%'
         OR EXISTS (
           SELECT 1
-          FROM pg_catalog.unnest(COALESCE(c.tags, ARRAY[]::text[])) AS tag(value)
+          FROM pg_catalog.jsonb_array_elements_text(COALESCE(c.tags, '[]'::jsonb)) AS tag(value)
           WHERE tag.value ILIKE '%' || pg_catalog.btrim(p_search) || '%'
         )
       )
