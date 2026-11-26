@@ -884,7 +884,7 @@ export function parseEncounterScheduleBatchOutput(
   );
   for (const character of characters) {
     const source = sourceById.get(character.character_id);
-    const isJiangChenyuan = text(source?.name).replace(/\\s+/g, "") === "江辰遠";
+    const isJiangChenyuan = text(source?.name).replace(/\s+/g, "") === "江辰遠";
     for (const dayType of ["weekday", "holiday"] as const) {
       for (const block of character.variants[dayType]) {
         block.options.forEach((slot, optionIndex) => {
