@@ -10033,13 +10033,17 @@ async function loadEncounterScheduleTestTools(){
         const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing';
         profileButton.dataset.aiEnabled=enabled?'true':'false';
         profileButton.dataset.profileRetry=profileJobStatus==='failed'?'true':'false';
-        profileButton.textContent=profileJobStatus==='failed'
-          ?'手動重試下一位：'+profileTargetName
-          :'AI 整理下一位角色資料：'+profileTargetName;
+        profileButton.textContent=!profileTargetAvailable
+          ?'目前沒有待生成角色'
+          :profileJobStatus==='failed'
+            ?'手動重試下一位：'+profileTargetName
+            :'AI 整理下一位角色資料：'+profileTargetName;
         profileButton.disabled=!enabled;
       }
       const scheduleButton=document.querySelector('[data-action="organize-encounter-schedules"]');
-      if(scheduleButton)scheduleButton.textContent='AI 生成下一位角色行程與場景：'+(profileTargetName||'未指定');
+      if(scheduleButton)scheduleButton.textContent=profileTargetAvailable
+        ?'AI 生成下一位角色行程與場景：'+profileTargetName
+        :'目前沒有待生成角色';
       
     }catch(profileError){
       profileStatusError=true;
