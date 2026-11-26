@@ -358,15 +358,15 @@ for (const path of ["characters.name", "characters.gender", "characters.age"]) {
   assert.equal(runtimeFact?.provided_to_profile_organizer, true,
     path + " must be provided to the organizer without becoming a refresh trigger");
 }
-assert.match(workerCore, /characters\\.age[\\s\\S]*identity_background[\\s\\S]*不可改成約略年齡/,
+assert.match(workerCore, /characters\.age[\s\S]*identity_background[\s\S]*不可改成約略年齡/,
   "Organizer prompt must preserve the exact author-set age in identity_background");
-assert.match(workerCore, /"characters\\.name",[\\s\\S]*"characters\\.gender",[\\s\\S]*"characters\\.age"/,
+assert.match(workerCore, /"characters\.name",[\s\S]*"characters\.gender",[\s\S]*"characters\.age"/,
   "Organizer source validator must allow authoritative basic identity facts");
-assert.match(coreUtils, /compare\\(runtime, 'gender'[\\s\\S]*compare\\(runtime, 'age'/,
+assert.match(coreUtils, /compare\(runtime, 'gender'[\s\S]*compare\(runtime, 'age'/,
   "Changing gender or age alone must remain runtime-only and not enqueue profile regeneration");
 
-assert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\\s\\S]*characters\\.age/,
+assert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\s\S]*characters\.age/,
   "Runtime identity facts must be excluded from the refresh hash");
-assert.match(runtimeIdentityMigration, /characters\\.age[\\s\\S]*character_profile_source_payload/,
+assert.match(runtimeIdentityMigration, /characters\.age[\s\S]*character_profile_source_payload/,
   "The organizer source payload must include the author-set age");
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
