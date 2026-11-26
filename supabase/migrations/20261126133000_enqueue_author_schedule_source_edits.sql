@@ -70,11 +70,6 @@ DROP TRIGGER IF EXISTS character_schedules_enqueue_encounter_schedule_ai
 CREATE TRIGGER character_schedules_enqueue_encounter_schedule_ai
 AFTER INSERT OR UPDATE OR DELETE ON public.character_schedules
 FOR EACH ROW
-WHEN (
-  (TG_OP = 'INSERT' AND NEW.source_type = 'manual')
-  OR (TG_OP = 'DELETE' AND OLD.source_type = 'manual')
-  OR (TG_OP = 'UPDATE' AND (OLD.source_type = 'manual' OR NEW.source_type = 'manual'))
-)
 EXECUTE FUNCTION public.on_encounter_manual_schedule_changed();
 
 COMMIT;
