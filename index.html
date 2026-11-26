@@ -10466,81 +10466,13 @@ document.addEventListener('click',async event=>{
 
 /* Account */
 function renderShop() {
-  const u = currentUser();
-  if (u?.uid && window.mySupabase && window.__poyozzShopBonusLedgerUid !== u.uid) {
-    window.__poyozzShopBonusLedgerUid = u.uid;
-    void loadWalletLedger('diamond').then(ok => {
-      if (ok && state.account?.uid === u.uid && route.page === 'shop') renderShop();
-      else if (!ok) window.__poyozzShopBonusLedgerUid = null;
-    });
-  }
-  const silver = Number(u?.silver || 0).toLocaleString();
-  const diamonds = Number(u?.diamonds || 0).toLocaleString();
-  const diamondPackages = [
-    { code: 'twd_60', amount: 200, price: 60 },
-    { code: 'twd_150', amount: 525, price: 150 },
-    { code: 'twd_290', amount: 1050, price: 290 },
-    { code: 'twd_850', amount: 3200, price: 850 },
-    { code: 'twd_1390', amount: 5400, price: 1390 },
-    { code: 'twd_2690', amount: 11000, price: 2690 }
-  ];
-  $('view').innerHTML = `
-    <div class="stack store-page" style="gap:22px">
-      <section class="store-heading" style="display:block;height:auto;padding:0;background:transparent;border:0;box-shadow:none">
-        <div class="explore-eyebrow" style="letter-spacing:.14em">STORE</div>
-        <h1 style="margin:5px 0 0">商店</h1>
-      </section>
-      <section class="stack" style="gap:10px">
-        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
-          <h2 style="margin:0">我的資源</h2>
-          <button data-action="ledger">儲值紀錄</button>
-        </div>
-        <div class="row" style="gap:12px;flex-wrap:wrap">
-          <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
-            <span aria-hidden="true" style="font-size:18px">💎</span><span class="muted" style="font-size:12px;white-space:nowrap">鑽石</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${diamonds}</strong>
-          </article>
-          <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
-            <span aria-hidden="true" style="font-size:18px">◉</span><span class="muted" style="font-size:12px;white-space:nowrap">銀幣</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${silver}</strong>
-          </article>
-        </div>
-      </section>
-      <section class="stack" style="gap:12px">
-        <div><h2 style="margin:0">鑽石儲值</h2><p class="small muted" style="margin:5px 0 0">選擇適合你的鑽石方案</p></div>
-        <div class="store-package-list">
-          ${diamondPackages.map((item) => {
-            const hasFirstPurchaseBonus = !state.ledger.some(entry =>
-              entry.currency === 'diamond' &&
-              entry.reason === '首儲優惠贈鑽' &&
-              entry.referenceId === item.code
-            );
-            const bonus = Math.round(item.amount * 0.30);
-            return `
-              <article class="store-package-row">
-                <div class="store-package-copy">
-                  <div class="store-package-main">
-                    <strong class="store-package-amount">💎 ${item.amount.toLocaleString()}${hasFirstPurchaseBonus ? ` <span class="store-package-bonus">＋ 💎${bonus.toLocaleString()}</span>` : ''}</strong>
-                    <div class="store-package-purchase">
-                      <strong class="store-package-price">NT${item.price.toLocaleString()}</strong>
-                      <button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="${item.code}">購買</button>
-                    </div>
-                  </div>
-                  ${hasFirstPurchaseBonus ? '<span class="store-package-promo">首儲優惠</span>' : ''}
-                </div>
-              </article>`;
-          }).join('')}
-        </div>
-
-      </section>
-      <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
-        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
-          <div><h2 style="margin:0 0 5px">月費方案</h2><p class="small muted" style="margin:0;line-height:1.7">會員方案內容與權益將於未來公布。</p></div>
-          <span class="badge">敬請期待</span>
-        </div>
-        <div style="min-height:42px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:10px;color:var(--muted)">會員方案即將推出</div>
-      </section>
-    </div>`;
+  const u=currentUser();
+  if(u?.uid&&window.mySupabase&&window.__poyozzShopBonusLedgerUid!==u.uid){window.__poyozzShopBonusLedgerUid=u.uid;void loadWalletLedger('diamond').then(ok=>{if(ok&&state.account?.uid===u.uid&&route.page==='shop')renderShop();else if(!ok)window.__poyozzShopBonusLedgerUid=null;});}
+  const silver=Number(u?.silver||0).toLocaleString(),diamonds=Number(u?.diamonds||0).toLocaleString();
+  const packs=[{code:'twd_60',amount:200,price:60},{code:'twd_150',amount:525,price:150},{code:'twd_290',amount:1050,price:290},{code:'twd_850',amount:3200,price:850},{code:'twd_1390',amount:5400,price:1390},{code:'twd_2690',amount:11000,price:2690}];
+  const gem='<svg class="store-crystal-svg" viewBox="0 0 180 180" role="img" aria-label="紫色夢幻水晶"><defs><linearGradient id="storeGemA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f2eaff"/><stop offset=".32" stop-color="#bda0ff"/><stop offset=".72" stop-color="#8056d9"/><stop offset="1" stop-color="#38245f"/></linearGradient><linearGradient id="storeGemB" x1="0" y1="0" x2=".9" y2="1"><stop offset="0" stop-color="#e9dcff"/><stop offset="1" stop-color="#7650c4"/></linearGradient></defs><path d="M90 8 139 39 166 91 129 148 90 172 48 148 13 91 40 39Z" fill="url(#storeGemA)" stroke="#e8d9ff" stroke-opacity=".8" stroke-width="2"/><path d="M90 8 90 91 40 39Z" fill="#f5edff" fill-opacity=".76"/><path d="M90 8 139 39 90 91Z" fill="url(#storeGemB)"/><path d="M40 39 90 91 13 91Z" fill="#b99cff"/><path d="M139 39 166 91 90 91Z" fill="#6846a8"/><path d="M13 91 90 91 48 148Z" fill="#8f6bd2"/><path d="M90 91 166 91 129 148Z" fill="#493078"/><path d="M48 148 90 91 90 172Z" fill="#68449f"/><path d="M90 91 129 148 90 172Z" fill="#39265f"/><path d="M48 31 72 20" stroke="white" stroke-width="3" stroke-linecap="round" opacity=".8"/></svg>';
+  $('view').innerHTML='<div class="stack store-page store-night-page" style="gap:22px">'+'<section class="store-night-hero"><div class="store-night-hero-copy"><div class="store-eyebrow">POYOZZ · CRYSTAL VAULT</div><h1>夢幻水晶商店</h1><p>為每一次相遇，收藏更多閃耀時刻。</p><div class="store-hero-note"><i></i> 水晶補給站</div></div><div class="store-night-gem">'+gem+'<span class="store-gem-orbit"></span><span class="store-gem-orbit store-gem-orbit-two"></span><b>✦</b></div></section>'+'<section><div class="store-section-heading"><div><small>YOUR TREASURES</small><h2>我的資源</h2></div><button class="store-history-link" data-action="ledger">儲值紀錄　↗</button></div><div class="store-resource-grid"><article class="store-resource-card"><i>◆</i><div><span>鑽石餘額</span><strong>'+diamonds+'</strong></div><small>DIAMONDS</small></article><article class="store-resource-card store-resource-silver"><i>◈</i><div><span>銀幣餘額</span><strong>'+silver+'</strong></div><small>SILVER COINS</small></article></div></section>'+'<section><div class="store-section-heading store-package-heading"><div><small>CHOOSE YOUR CRYSTALS</small><h2>鑽石儲值</h2><p>每個級距首次購買，額外贈送 30% 鑽石</p></div><span class="store-bonus-seal">FIRST<br>+30%</span></div><div class="store-package-grid">'+packs.map((item,i)=>{const first=!state.ledger.some(x=>x.currency==='diamond'&&x.reason==='首儲優惠贈鑽'&&x.referenceId===item.code);const bonus=Math.round(item.amount*.3);return '<article class="store-crystal-package'+(i===5?' store-package-featured':'')+'"><div class="store-package-topline"><span>CRYSTAL '+String(i+1).padStart(2,'0')+'</span><b class="'+(first?'store-package-first-badge':'store-package-used-badge')+'">'+(first?'首儲 +30%':'首儲已領取')+'</b></div><div class="store-package-gem-mark">◆</div><div class="store-package-diamond-count"><strong>'+item.amount.toLocaleString()+'</strong><span>鑽石</span></div>'+(first?'<div class="store-package-bonus-line">首儲加贈 <strong>+'+bonus.toLocaleString()+'</strong> · 共 '+(item.amount+bonus).toLocaleString()+' 鑽</div>':'<div class="store-package-bonus-line store-package-bonus-muted">再次購買仍可獲得基本鑽石</div>')+'<div class="store-package-bottom"><strong>NT$'+item.price.toLocaleString()+'</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="'+item.code+'">選擇方案　›</button></div></article>';}).join('')+'</div><p class="store-package-footnote">首儲優惠依每個儲值級距分別計算；月費會員同樣享有符合資格的首儲贈鑽。</p></section></div>';
 }
-
 function renderProfile() {
   const u = currentUser();
   $('view').innerHTML = `<div class="stack form-width profile-page" style="gap:16px">
