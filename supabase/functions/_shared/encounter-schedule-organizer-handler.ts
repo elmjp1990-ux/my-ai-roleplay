@@ -911,20 +911,21 @@ export async function handleEncounterScheduleOrganizer(
       const [{ data: savedOutputs, error: savedOutputError }, { data: currentJob, error: currentJobError }] =
         await Promise.all([
           admin.from("encounter_schedule_generation_outputs")
-            .select("id,source_hash,raw_response_text,raw_output_truncated,created_at")
+            .select("id,source_hash,actor_user_id,raw_response_text,raw_output_truncated,created_at")
             .eq("character_id", source.character_id)
             .eq("status", "failed")
             .is("removed_at", null)
             .order("created_at", { ascending: false })
             .limit(1),
           admin.from("encounter_schedule_generation_jobs")
-            .select("source_hash")
+            .select("source_hash,author_id")
             .eq("character_id", source.character_id)
             .maybeSingle(),
         ]);
       const savedOutput = Array.isArray(savedOutputs) ? savedOutputs[0] : null;
       if (!savedOutputError && !currentJobError && savedOutput &&
           savedOutput.source_hash === currentJob?.source_hash &&
+          savedOutput.actor_user_id === currentJob?.author_id &&
           savedOutput.raw_output_truncated !== true &&
           typeof savedOutput.raw_response_text === "string" &&
           savedOutput.raw_response_text.length > 0) {
@@ -934,7 +935,7 @@ export async function handleEncounterScheduleOrganizer(
           const savedScenes = asRow(savedPayload).scenes;
           if (Array.isArray(savedCharacters) && savedCharacters.length === 1 &&
               asText(asRow(savedCharacters[0]).character_id) === source.character_id &&
-              (savedScenes === undefined || Array.isArray(savedScenes))) {
+              (savedScenes == null || Array.isArray(savedScenes))) {
             return {
               sourceId: source.character_id,
               rawOutputId: asText(savedOutput.id),
