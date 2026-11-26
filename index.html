@@ -11973,7 +11973,7 @@ document.addEventListener('click',async event => {
           throw new Error('找不到這個鑽石方案，請重新整理商店。');
         }
         button.disabled = true;
-        button.textContent = '處理測試入帳…';
+        button.textContent = '處理中…';
         try {
           const requestStorageKey = 'poyozz:test-diamond-purchase:' + user.uid + ':' + packageCode;
           let requestId = localStorage.getItem(requestStorageKey);
@@ -11987,7 +11987,7 @@ document.addEventListener('click',async event => {
           });
           if (error) throw new Error('目前無法完成購買，請稍後再試。');
           const result=Array.isArray(data)?data[0]:data;
-          if (!result || result.status !== 'granted') throw new Error('資料庫未回傳有效的測試入帳結果。');
+          if (!result || result.status !== 'granted') throw new Error('目前無法確認入帳結果，請稍後查看錢包紀錄。');
           state.account.diamonds=Number(result.diamonds ?? state.account.diamonds ?? 0);
           localStorage.removeItem(requestStorageKey);
           await loadWalletLedger('diamond');
@@ -11995,8 +11995,8 @@ document.addEventListener('click',async event => {
           render();
           const bonus=Number(result.bonus_diamonds||0);
           toast(bonus>0
-            ? `測試入帳完成：基本 ${Number(result.base_diamonds||0)} 鑽石，首購贈送 ${bonus} 鑽石。`
-            : `測試入帳完成：基本 ${Number(result.base_diamonds||0)} 鑽石；本次沒有首購贈鑽。`);
+            ? `已入帳：基本 ${Number(result.base_diamonds||0)} 鑽石，首儲贈送 ${bonus} 鑽石。`
+            : `已入帳：基本 ${Number(result.base_diamonds||0)} 鑽石。`);
         } catch(error) {
           button.disabled = false;
           button.textContent = '購買';
