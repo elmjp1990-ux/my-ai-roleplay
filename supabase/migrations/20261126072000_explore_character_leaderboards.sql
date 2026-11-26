@@ -47,7 +47,10 @@ SELECT character_id, activity_date, pg_catalog.sum(turn_count)::bigint
 FROM daily_events
 GROUP BY character_id, activity_date
 ON CONFLICT (character_id, activity_date) DO UPDATE
-SET turn_count = EXCLUDED.turn_count,
+SET turn_count = GREATEST(
+      public.character_turn_daily_stats.turn_count,
+      EXCLUDED.turn_count
+    ),
     updated_at = pg_catalog.now();
 
 CREATE OR REPLACE FUNCTION private.record_character_turn_daily_stat()
