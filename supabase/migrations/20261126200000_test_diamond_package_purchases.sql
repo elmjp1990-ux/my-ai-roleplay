@@ -69,8 +69,6 @@ declare
   v_price_twd integer;
   v_bonus_diamonds integer := 0;
   v_balance integer;
-  v_membership_tier text;
-  v_membership_expires_at timestamptz;
   v_test_enabled boolean;
   v_existing public.diamond_test_purchase_requests%rowtype;
 begin
@@ -97,8 +95,7 @@ begin
     raise exception 'TEST diamond package purchases are not enabled for this project' using errcode = '55000';
   end if;
 
-  select p.membership_tier, p.membership_expires_at
-    into v_membership_tier, v_membership_expires_at
+  perform 1
   from public.profiles p
   where p.id = v_user_id;
 
@@ -145,12 +142,9 @@ begin
     );
   end if;
 
-  -- Active monthly members do not receive the first-purchase bonus.
-  -- A monthly member who later expires may still claim an unused tier bonus.
-  if not (
-    v_membership_tier = 'monthly'
-    and (v_membership_expires_at is null or v_membership_expires_at > now())
-  ) and not exists (
+  -- Membership is independent of diamond package promotions.
+  -- Every account may claim the 30% first-purchase bonus once per package tier.
+  if not exists (
     select 1
     from public.wallet_transactions wt
     where wt.user_id = v_user_id
