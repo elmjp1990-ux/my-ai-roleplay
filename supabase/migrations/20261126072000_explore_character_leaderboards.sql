@@ -56,14 +56,19 @@ AS $function$
 DECLARE
   v_character_id uuid;
   v_activity_date date;
+  v_parent_deleted_at timestamptz;
   v_delta bigint := 0;
 BEGIN
   IF TG_TABLE_NAME = 'chat_messages' THEN
-    SELECT s.character_id INTO v_character_id
+    SELECT s.character_id, s.deleted_at
+      INTO v_character_id, v_parent_deleted_at
     FROM public.chat_sessions AS s
     WHERE s.id = NEW.session_id;
   ELSE
     v_character_id := NEW.character_id;
+    SELECT g.deleted_at INTO v_parent_deleted_at
+    FROM public.chat_groups AS g
+    WHERE g.id = NEW.group_id;
   END IF;
 
   IF v_character_id IS NULL THEN
@@ -71,11 +76,11 @@ BEGIN
   END IF;
 
   IF TG_OP = 'INSERT' THEN
-    IF NEW.deleted_at IS NULL THEN v_delta := 1; END IF;
+    IF NEW.deleted_at IS NULL AND v_parent_deleted_at IS NULL THEN v_delta := 1; END IF;
   ELSIF TG_OP = 'UPDATE' THEN
-    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
+    IF v_parent_deleted_at IS NULL AND OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
       v_delta := -1;
-    ELSIF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
+    ELSIF v_parent_deleted_at IS NULL AND OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
       v_delta := 1;
     END IF;
   END IF;
@@ -91,7 +96,7 @@ BEGIN
   ON CONFLICT (character_id, activity_date) DO UPDATE
   SET turn_count = GREATEST(
         0,
-        public.character_turn_daily_stats.turn_count + EXCLUDED.turn_count
+        public.character_turn_daily_stats.turn_count + v_delta
       ),
       updated_at = pg_catalog.now();
 
