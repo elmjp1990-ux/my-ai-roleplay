@@ -364,7 +364,9 @@ for (const path of ["characters.name", "characters.gender", "characters.age"]) {
 }
 assert.match(workerCore, /characters\.age[\s\S]*identity_background[\s\S]*不可改成約略年齡/,
   "Organizer prompt must preserve the exact author-set age in identity_background");
-assert.match(workerCore, /BASIC_IDENTITY_SOURCE_KEYS[\s\S]*identity_background[\s\S]*basic_identity_source_not_allowed/,\n  "Basic identity facts may support identity_background only, never personality or life-context inference");\nassert.match(workerCore, /"characters\.name",[\s\S]*"characters\.gender",[\s\S]*"characters\.age"/,
+assert.match(workerCore, /BASIC_IDENTITY_SOURCE_KEYS[\s\S]*identity_background[\s\S]*basic_identity_source_not_allowed/,
+  "Basic identity facts may support identity_background only, never personality or life-context inference");
+assert.match(workerCore, /"characters\.name",[\s\S]*"characters\.gender",[\s\S]*"characters\.age"/,
   "Organizer source validator must allow authoritative basic identity facts");
 assert.match(coreUtils, /compare\(runtime, 'gender'[\s\S]*compare\(runtime, 'age'/,
   "Changing gender or age alone must remain runtime-only and not enqueue profile regeneration");
