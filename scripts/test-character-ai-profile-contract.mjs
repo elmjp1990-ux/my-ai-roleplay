@@ -371,7 +371,7 @@ assert.match(workerCore, /"characters\.name",[\s\S]*"characters\.gender",[\s\S]*
 assert.match(coreUtils, /compare\(runtime, 'gender'[\s\S]*compare\(runtime, 'age'/,
   "Changing gender or age alone must remain runtime-only and not enqueue profile regeneration");
 
-assert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\s\S]*characters\.age/,
+assert.match(runtimeIdentityMigration, /p_source_changed IS NOT TRUE[\s\S]*not_enqueued/,\n  "A runtime-only save with no existing profile job must not create a pending job");\nassert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\s\S]*characters\.age/,
   "Runtime identity facts must be excluded from the refresh hash");
 assert.match(runtimeIdentityMigration, /characters\.age[\s\S]*character_profile_source_payload/,
   "The organizer source payload must include the author-set age");
