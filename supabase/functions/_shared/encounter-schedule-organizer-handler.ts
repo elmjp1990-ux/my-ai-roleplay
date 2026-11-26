@@ -596,10 +596,9 @@ export async function handleEncounterScheduleOrganizer(
         .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at")
         .eq("actor_user_id", actorUserId)
         .is("removed_at", null)
-        .in("status", ["failed", "partial", "received", "dismissed"])
-        .gt("expires_at", new Date().toISOString())
+        .in("status", ["failed", "partial", "received", "dismissed", "completed"])
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(40);
       if (outputsError) return json({ error: "schedule_repair_list_unavailable" }, 503);
       const outputIds = (outputs || []).map((item: any) => item.id).filter(Boolean);
       const { data: revisions, error: revisionsError } = outputIds.length
@@ -627,17 +626,25 @@ export async function handleEncounterScheduleOrganizer(
         .filter((job: any) => ["failed", "needs_reconciliation"].includes(job.status))
         .map((job: any) => [job.character_id, job]));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
+      const outputItems = (outputs || []).map((item: any) => ({
+        ...item,
+        character_name: names.get(item.character_id) || "角色",
+        job_status: (jobs || []).find((job: any) => job.character_id === item.character_id)?.status || item.status,
+        raw_response_text: item.raw_response_text || item.raw_response_body || "",
+        latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
+        latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
+        latest_revision_at: latestRevisionByOutput.get(item.id)?.created_at || null,
+      }));
+      const repairable = outputItems.filter((item: any) =>
+        repairableJobByCharacter.has(item.character_id) && new Date(item.expires_at || 0).getTime() > Date.now()
+      );
+      const publishedHistory = outputItems.filter((item: any) =>
+        item.job_status === "completed" || item.status === "completed"
+      );
       return json({
         status: "available",
-        outputs: (outputs || []).filter((item: any) => repairableJobByCharacter.has(item.character_id)).map((item: any) => ({
-          ...item,
-          character_name: names.get(item.character_id) || "角色",
-          job_status: repairableJobByCharacter.get(item.character_id)?.status || "failed",
-          raw_response_text: item.raw_response_text || item.raw_response_body || "",
-          latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
-          latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
-          latest_revision_at: latestRevisionByOutput.get(item.id)?.created_at || null,
-        })),
+        outputs: repairable,
+        published_history: publishedHistory,
       });
     }
     if (mode === "repair_hide") return await handleScheduleRepairHide(admin, authData.user.id, body);
