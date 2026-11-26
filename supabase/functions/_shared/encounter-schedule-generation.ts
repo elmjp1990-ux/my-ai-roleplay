@@ -891,15 +891,15 @@ export function parseEncounterScheduleBatchOutput(
     for (const dayType of ["weekday", "holiday"] as const) {
       for (const block of character.variants[dayType]) {
         block.options.forEach((slot, optionIndex) => {
-          const isGenericWorksite = /(工地|施工現場|工程現場|工區|案場)/i.test(slot.location_description);
-          const isConstructionActivity = /(施工|裝修|修繕|監工|工班|工程|工地|拆除|水電|木作|油漆|鋪設|整修|翻修|驗收)/i.test(slot.activity);
-          if (isJiangChenyuan && isGenericWorksite && isConstructionActivity) {
-            // Jiang's generic worksite is a movable project location, not a
-            // separate map marker. Distribute it across the existing scene
-            // anchors with a stable per-hour/per-option pseudo-random choice.
+          const isConstructionActivity = /(施工|裝修|修繕|監工|工班|工程|工地|拆除|水電|木作|油漆|鋪設|整修|翻修|驗收|木工進場|施工細節)/i.test(slot.activity);
+          if (isJiangChenyuan && isConstructionActivity) {
+            // Jiang's active construction project is a movable worksite, not
+            // a fixed building. Place it inside an existing scene anchor and
+            // keep the visible location label consistent with the activity.
             slot.location_key = pickStableWorksiteSceneKey(
               [character.character_id, dayType, block.start_time, optionIndex].join("|"),
             );
+            slot.location_description = "工地";
           }
         });
       }
