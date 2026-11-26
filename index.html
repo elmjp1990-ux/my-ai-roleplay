@@ -10502,7 +10502,7 @@ function renderShop() {
                 <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
                 <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">$${item.price.toLocaleString()}</strong>
               </div>
-              ${item.amount === 200 ? '<button type="button" data-action="test-purchase-200" style="width:100%;background:linear-gradient(135deg,#e7e9ef28,#8d95a722);border:1px solid #ffffff45;color:var(--text);backdrop-filter:blur(14px)">測試領取 200 鑽石</button>' : '<button type="button" disabled aria-disabled="true" style="width:100%;opacity:.65;cursor:not-allowed">尚未開放</button>'}
+              <button type="button" disabled aria-disabled="true" style="width:100%;opacity:.65;cursor:not-allowed">測試儲值功能準備中</button>
             </article>`).join('')}
         </div>
         <p class="small muted" style="margin:0;line-height:1.7">測試環境：200 鑽石按鈕為一次性測試入帳，不會收取款項；其他方案尚未開放。</p>
@@ -10666,7 +10666,6 @@ async function loadWalletLedger(currency) {
           daily_checkin: '每日簽到',
           reward_ad: '觀看獎勵廣告',
           purchase: '購買',
-          test_purchase_200: '測試領取 200 鑽石',
           admin_adjustment: '餘額調整'
         })[row.biz_type] || row.biz_type || '錢包交易';
         const characterName = roleNames.get(row.reference_id);
@@ -11930,26 +11929,6 @@ document.addEventListener('click',async event => {
         // verify the character's active schedule and snapshot its end time.
         go({page:'citymap'});
         toast('請在城市地圖選擇角色目前所在的地標，再開始相遇。');
-        break;
-      }
-      case 'test-purchase-200': {
-        if (!requireLogin({page:route.page,id:route.id})) break;
-        if (window.mySupabase && state.account?.uid && state.account.uid !== 'demo-local-account') {
-          const { data, error } = await window.mySupabase.rpc('test_grant_diamonds_200');
-          if (error) throw new Error('測試鑽石入帳失敗：' + error.message);
-          const row = Array.isArray(data) ? data[0] : data;
-          if (!row) throw new Error('資料庫未回傳入帳結果。');
-          state.account.diamonds = Number(row.diamonds ?? state.account.diamonds ?? 0);
-          await loadWalletLedger('diamond');
-          persist();render();
-          toast(row.granted ? '已測試入帳 200 鑽石。' : '此帳號已領取過測試鑽石，餘額未變更。');
-        } else {
-          const alreadyGranted = state.ledger.some(entry => entry.currency === 'diamond' && entry.reason === '測試領取 200 鑽石');
-          if (alreadyGranted) return toast('此帳號已領取過測試鑽石，餘額未變更。');
-          state.account.diamonds = Number(state.account.diamonds || 0) + 200;
-          state.ledger.push({id:id(),currency:'diamond',change:200,balance:state.account.diamonds,reason:'測試領取 200 鑽石',at:Date.now()});
-          persist();render();toast('已測試入帳 200 鑽石。');
-        }
         break;
       }
       case 'favorite': {
