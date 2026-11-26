@@ -89,7 +89,7 @@ BEGIN
   INSERT INTO public.character_turn_daily_stats(character_id, activity_date, turn_count)
   VALUES (v_character_id, v_activity_date, v_delta)
   ON CONFLICT (character_id, activity_date) DO UPDATE
-  SET turn_count = pg_catalog.greatest(
+  SET turn_count = GREATEST(
         0,
         public.character_turn_daily_stats.turn_count + EXCLUDED.turn_count
       ),
@@ -141,7 +141,7 @@ AS $function$
           THEN pg_catalog.date_trunc('month', pg_catalog.now() AT TIME ZONE 'Asia/Taipei')::date
         WHEN p_period = 'week'
           THEN ((pg_catalog.now() AT TIME ZONE 'Asia/Taipei')::date
-            - (pg_catalog.extract(isodow FROM (pg_catalog.now() AT TIME ZONE 'Asia/Taipei'))::integer - 1))
+            - (EXTRACT(isodow FROM (pg_catalog.now() AT TIME ZONE 'Asia/Taipei'))::integer - 1))
         ELSE (pg_catalog.now() AT TIME ZONE 'Asia/Taipei')::date
       END AS period_start
   ),
