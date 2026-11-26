@@ -1120,7 +1120,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         previous.silver ??
         0
       ),
-      member: metadata.member || previous.member || 'free'
+      // Membership is server-authoritative; never trust OAuth/user metadata.
+      member: 'free'
     };
     state.signedIn = true;
 
