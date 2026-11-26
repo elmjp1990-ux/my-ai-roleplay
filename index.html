@@ -445,6 +445,7 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .explore-utility-row{display:flex;justify-content:flex-end;gap:7px;margin:0 0 7px}
 .explore-utility{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel);color:var(--muted);font-size:10px;line-height:1.2}
 .explore-utility:active{transform:scale(.97)}
+.explore-utility.active{background:var(--soft);border-color:#a78bfa;color:var(--text)}
 .explore-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
 .popular-period-tabs{display:flex;align-items:center;gap:7px;margin-top:9px;overflow-x:auto}
 .popular-period-tabs button{flex:1;min-width:max-content;padding:7px 12px;border:1px solid var(--border);border-radius:999px;background:var(--panel);color:var(--muted);font-size:11px}
@@ -1347,6 +1348,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
     const request=(async()=>{
       const columns='id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible';
+      let rows=[];
       if(filter==='popular'){
         const {data:ranked,error:rankingError}=await client.rpc('get_public_character_leaderboard',{
           p_period:popularPeriod,
@@ -1370,7 +1372,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
           .in('id',ids).eq('visibility','public').is('deleted_at',null);
         if(error)throw new Error(error.message);
         const byId=new Map((Array.isArray(data)?data:[]).map(row=>[row.id,row]));
-        return ids.map(id=>byId.get(id)).filter(Boolean);
+        rows=ids.map(id=>byId.get(id)).filter(Boolean);
       }
       let query=client.from('characters').select(columns)
         .eq('visibility','public').is('deleted_at',null);
@@ -1385,7 +1387,13 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         .order('id',{ascending:false})
         .range(offset,offset+publicCharacterPageSize-1);
       if(error)throw new Error(error.message);
-      return Array.isArray(data)?data:[];
+      rows=Array.isArray(data)?data:[];
+      }
+      if(version===publicCharacterRowsCacheVersion){
+        publicCharacterRowsCache.set(cacheKey,rows);
+        publicCharacterRowsCacheAt=Date.now();
+      }
+      return rows;
     })();
     publicCharacterRowsInflight.set(cacheKey,request);
     try{return await request;}
@@ -5046,7 +5054,6 @@ function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
     : ['citymap','home','detail','session-detail'].includes(route.page) ? 'citymap'
     : ['editor','ai'].includes(route.page) ? 'create'
-    : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
   // 五大主入口固定順序：探索、創建、聊天、商店、我的。
   // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
@@ -5403,8 +5410,8 @@ function renderGrid({append=false}={}) {
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button=>{
     button.classList.toggle('active',button.dataset.filter===filter);
   });
-  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
-  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
+  document.querySelector('.explore-utility[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
+  document.querySelector('.explore-utility[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
   $('selectedTags').innerHTML=exploreTags.map(selectedExploreTagButton).join('');
   const popularTabs=$('popularPeriodTabs');
   if(popularTabs){
