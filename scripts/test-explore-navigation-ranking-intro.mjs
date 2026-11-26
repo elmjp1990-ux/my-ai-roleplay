@@ -33,6 +33,12 @@ assert.match(html, /function renderCharacterIntroHtml/);
 assert.match(html, /const dangerous=new Set\(\['SCRIPT','STYLE','IFRAME'/);
 assert.match(html, /url\.protocol==='https:'/);
 assert.match(html, /image\.referrerPolicy='no-referrer'/);
+assert.match(html, /const maxIntroImages=3/);
+assert.match(html, /const maxIntroImageUrlLength=2048/);
+assert.match(html, /if\(renderedIntroImages>=maxIntroImages\)continue/);
+assert.match(html, /rawSrc\.length>maxIntroImageUrlLength/);
+assert.match(html, /renderedIntroImages\+\+/,
+  'Only valid HTTPS images within the URL limit count toward the three-image allowance.');
 assert.doesNotMatch(html, /\$\{e\(replaceRoleplayVariables\(c\.intro/,
   'Full public introduction should render through the safe HTML renderer, not be escaped as plain text.');
 assert.match(html, /data-action="remove-explore-tag"/,
