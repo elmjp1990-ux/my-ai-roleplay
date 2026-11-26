@@ -169,7 +169,12 @@ AS $function$
         OR c.name ILIKE '%' || pg_catalog.btrim(p_search) || '%'
         OR EXISTS (
           SELECT 1
-          FROM pg_catalog.jsonb_array_elements_text(COALESCE(c.tags, '[]'::jsonb)) AS tag(value)
+          FROM pg_catalog.jsonb_array_elements_text(
+            CASE
+              WHEN pg_catalog.jsonb_typeof(c.tags) = 'array' THEN c.tags
+              ELSE '[]'::jsonb
+            END
+          ) AS tag(value)
           WHERE tag.value ILIKE '%' || pg_catalog.btrim(p_search) || '%'
         )
       )
