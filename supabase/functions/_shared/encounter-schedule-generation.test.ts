@@ -1,5 +1,6 @@
 import {
   type EncounterSceneCatalogEntry,
+  ENCOUNTER_SCENE_KEYS,
   buildEncounterScheduleBatchMessages,
   classifyEncounterWorldview,
   getEncounterWorldviewScheduleDisposition,
@@ -82,6 +83,41 @@ Deno.test("maps every LUCID venue area, including its back alley, to the private
     if (normalizeEncounterSceneKey(label) !== "private-club") {
       throw new Error("all LUCID venue areas must map to private-club: " + label);
     }
+  }
+});
+
+Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map scenes", () => {
+  const worksiteBlocks = Array.from({ length: 24 }, (_, hour) => block(hour, [
+    option({ weight: 60, location: "工地", activity: "前往工地監工並確認施工進度" }),
+    option({ weight: 40, location: "工地", activity: "巡視工地並與施工工班確認進度" }),
+  ]));
+  const jiang = source(id1, {
+    name: "江辰遠",
+    intro: "現代城市中的室內設計師，負責不同地點的工程監工。",
+    schedule_description: "依工程進度前往不同案場，監工並確認施工品質。",
+  });
+  const parsed = result([{
+    character_id: id1, placement: "modern_map", variants: variants(worksiteBlocks),
+  }], [jiang]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const allKeys = [
+    ...parsed.characters[0].variants.weekday.flatMap((hour) => hour.options.map((slot) => slot.location_key)),
+    ...parsed.characters[0].variants.holiday.flatMap((hour) => hour.options.map((slot) => slot.location_key)),
+  ];
+  const mapped = new Set(allKeys);
+  if (mapped.size !== ENCOUNTER_SCENE_KEYS.length ||
+      ENCOUNTER_SCENE_KEYS.some((key) => !mapped.has(key))) {
+    throw new Error("Jiang's worksite should be distributed across every existing scene anchor");
+  }
+  if (parsed.characters[0].variants.weekday[0].options[0].location_description !== "工地") {
+    throw new Error("the original worksite description should be preserved");
+  }
+
+  const other = result([{
+    character_id: id1, placement: "modern_map", variants: variants(worksiteBlocks),
+  }], [source(id1, { name: "其他角色" })]);
+  if (!other.ok || other.characters[0].variants.weekday[0].options[0].location_key !== null) {
+    throw new Error("generic worksite auto-distribution must remain scoped to Jiang Chenyuan");
   }
 });
 
