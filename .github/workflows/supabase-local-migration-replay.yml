@@ -676,7 +676,7 @@ jobs:
             IF pg_catalog.to_regclass('public.character_turn_daily_stats') IS NULL THEN
               RAISE EXCEPTION 'daily character turn aggregate table missing';
             END IF;
-            IF pg_catalog.to_regprocedure('public.get_public_character_leaderboard(text,integer,integer,text[],text[])') IS NULL THEN
+            IF pg_catalog.to_regprocedure('public.get_public_character_leaderboard(text,integer,integer,text[],text)') IS NULL THEN
               RAISE EXCEPTION 'public leaderboard RPC missing';
             END IF;
             IF NOT EXISTS (
@@ -693,7 +693,7 @@ jobs:
               RAISE EXCEPTION 'single/group daily aggregate triggers missing';
             END IF;
             v_function := pg_catalog.pg_get_functiondef(
-              'public.get_public_character_leaderboard(text,integer,integer,text[],text[])'::regprocedure
+              'public.get_public_character_leaderboard(text,integer,integer,text[],text)'::regprocedure
             );
             IF pg_catalog.strpos(v_function, 'Asia/Taipei') = 0
                OR pg_catalog.strpos(v_function, 'isodow') = 0
@@ -716,7 +716,7 @@ jobs:
             END IF;
             IF NOT pg_catalog.has_function_privilege(
               'anon',
-              'public.get_public_character_leaderboard(text,integer,integer,text[],text[])',
+              'public.get_public_character_leaderboard(text,integer,integer,text[],text)',
               'EXECUTE'
             ) THEN
               RAISE EXCEPTION 'anonymous public leaderboard RPC grant missing';
