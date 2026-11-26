@@ -38,12 +38,26 @@ on conflict (singleton) do nothing;
 alter table public.diamond_test_purchase_settings enable row level security;
 revoke all on table public.diamond_test_purchase_settings from public, anon, authenticated;
 
+create table if not exists public.diamond_test_purchase_requests (
+  user_id uuid not null references public.profiles(id) on delete cascade,
+  request_id uuid not null,
+  package_code text not null,
+  price_twd integer not null,
+  base_diamonds integer not null,
+  bonus_diamonds integer not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, request_id)
+);
+
+alter table public.diamond_test_purchase_requests enable row level security;
+revoke all on table public.diamond_test_purchase_requests from public, anon, authenticated;
+
 create unique index if not exists wallet_transactions_first_package_bonus_uidx
   on public.wallet_transactions(user_id, reference_id)
   where currency_type = 'diamonds'
     and biz_type = 'diamond_first_purchase_bonus';
 
-create or replace function public.test_purchase_diamond_package(p_package_code text)
+create or replace function public.test_purchase_diamond_package(p_package_code text, p_request_id uuid)
 returns jsonb
 language plpgsql
 security definer
@@ -57,11 +71,15 @@ declare
   v_balance integer;
   v_membership_tier text;
   v_membership_expires_at timestamptz;
-  v_order_id uuid := gen_random_uuid();
   v_test_enabled boolean;
+  v_existing public.diamond_test_purchase_requests%rowtype;
 begin
   if v_user_id is null then
     raise exception 'authentication required' using errcode = '42501';
+  end if;
+
+  if p_request_id is null then
+    raise exception 'purchase request ID is required' using errcode = '22023';
   end if;
 
   if exists (
@@ -108,6 +126,25 @@ begin
     raise exception 'wallet account not found' using errcode = 'P0002';
   end if;
 
+  -- A retried client request returns its original result without crediting twice.
+  select r.* into v_existing
+  from public.diamond_test_purchase_requests r
+  where r.user_id = v_user_id
+    and r.request_id = p_request_id;
+
+  if found then
+    return jsonb_build_object(
+      'status', 'granted',
+      'test_only', true,
+      'replayed', true,
+      'package_code', v_existing.package_code,
+      'price_twd', v_existing.price_twd,
+      'base_diamonds', v_existing.base_diamonds,
+      'bonus_diamonds', v_existing.bonus_diamonds,
+      'diamonds', v_balance
+    );
+  end if;
+
   -- Active monthly members do not receive the first-purchase bonus.
   -- A monthly member who later expires may still claim an unused tier bonus.
   if not (
@@ -124,6 +161,11 @@ begin
     v_bonus_diamonds := round(v_base_diamonds * 0.30)::integer;
   end if;
 
+  insert into public.diamond_test_purchase_requests
+    (user_id, request_id, package_code, price_twd, base_diamonds, bonus_diamonds)
+  values
+    (v_user_id, p_request_id, p_package_code, v_price_twd, v_base_diamonds, v_bonus_diamonds);
+
   update public.wallet_accounts
   set diamonds = diamonds + v_base_diamonds + v_bonus_diamonds,
       updated_at = now()
@@ -134,7 +176,7 @@ begin
   insert into public.wallet_transactions
     (user_id, currency_type, amount, biz_type, reference_id)
   values
-    (v_user_id, 'diamonds', v_base_diamonds, 'test_diamond_purchase', v_order_id::text);
+    (v_user_id, 'diamonds', v_base_diamonds, 'test_diamond_purchase', p_request_id::text);
 
   if v_bonus_diamonds > 0 then
     insert into public.wallet_transactions
@@ -155,8 +197,8 @@ begin
 end;
 $function$;
 
-revoke all on function public.test_purchase_diamond_package(text) from public, anon;
-grant execute on function public.test_purchase_diamond_package(text) to authenticated;
+revoke all on function public.test_purchase_diamond_package(text, uuid) from public, anon;
+grant execute on function public.test_purchase_diamond_package(text, uuid) to authenticated;
 
-comment on function public.test_purchase_diamond_package(text) is
+comment on function public.test_purchase_diamond_package(text, uuid) is
   'TEST-only simulated diamond package grant. Requires explicit project-local enablement; creates no payment or provider transaction.';
