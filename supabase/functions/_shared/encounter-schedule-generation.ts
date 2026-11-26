@@ -233,7 +233,7 @@ export function normalizeEncounterSceneKey(
   // "live-house" labels cannot override the schedule's time-based venue rule.
   const isActiveMusicPerformance = /(正式演出|正在演出|演出中|演出進入高潮|演出接近尾聲|登台演出|上台演出|現場演出|表演中|現場表演|演唱會演出|舞台上演出|彈奏.{0,12}(?:帶動|炒熱|感染).{0,8}(?:觀眾|全場|氣氛)|performing live|live performance|on.?stage)/i.test(activity);
   const startTime = text(startTimeValue);
-  const startHour = /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/.test(startTime)
+  const startHour = /^(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?$/.test(startTime)
     ? Number(startTime.slice(0, 2))
     : null;
   if (isActiveMusicPerformance && startHour !== null) {
