@@ -10506,11 +10506,11 @@ function renderShop() {
                 <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
                 <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">NT${item.price.toLocaleString()}</strong>
               </div>
-              <span class="small" style="color:var(--accent,#b99a69)">${u?.member === 'monthly' ? '月費會員不適用首儲贈鑽' : '非月費會員每級距首購加贈 30%'}</span>
+              <span class="small" style="color:var(--accent,#b99a69)">每個鑽石級距首次購買加贈 30%（所有會員皆適用）</span>
               <button type="button" data-action="test-diamond-package" data-id="${item.code}" style="width:100%">TEST 測試入帳（不收款）</button>
             </article>`).join('')}
         </div>
-        <p class="small muted" style="margin:0;line-height:1.7">測試環境：不會產生真實付款。每個級距僅首次購買加贈 30%；月費會員不適用，資格由資料庫判斷。</p>
+        <p class="small muted" style="margin:0;line-height:1.7">測試環境：不會產生真實付款。每個級距僅首次購買加贈 30%；月費會員與一般會員皆適用，各級距分開計算。</p>
 
       </section>
       <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
