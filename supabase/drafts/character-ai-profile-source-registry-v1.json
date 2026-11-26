@@ -198,8 +198,8 @@
   ],
   "rules": [
     "Worker may read only exact paths listed above and must enforce author ownership before reading server_only data.",
-    "source_refs emitted by the model must be a subset of profile_refresh_sources paths actually included in that job's input; the model cannot invent paths.",
-    "Runtime-only and excluded sources must never be used as evidence for derived OOC or personality rules.",
+    "source_refs may reference only non-empty paths actually included in the job input: profile_refresh_sources plus runtime_only_sources explicitly marked provided_to_profile_organizer; the model cannot invent paths.",
+    "Runtime-only identity facts name, gender, and age may be used only as explicit evidence in identity_background; they must never support personality, OOC rules, motivations, or life-context inference. Other runtime-only and excluded sources must never be used as evidence for derived profile sections.",
     "phone_settings and schedule records must be fetched fresh by the conversation runtime when needed; never trust a stale copy from the derived profile.",
     "A change to any profile_refresh_sources path invalidates the prior derived profile by source hash. A change to runtime-only or excluded sources does not."
   ]
