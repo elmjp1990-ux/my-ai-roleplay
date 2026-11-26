@@ -219,12 +219,26 @@ export function normalizeEncounterSceneKey(
   value: unknown,
   activityValue: unknown = "",
   characterResidentialContext: unknown = "",
+  startTimeValue: unknown = "",
 ): string | null {
   const original = text(value).normalize("NFKC");
   const raw = original.toLocaleLowerCase();
   const compact = raw.replace(/\s+/g, "");
   const activity = text(activityValue).normalize("NFKC");
   const context = (original + " " + activity).toLocaleLowerCase().replace(/\s+/g, "");
+
+  // Active music performances switch venues at 21:00 Taiwan local schedule time:
+  // before 21:00 they use the exhibition space; from 21:00 onward they use the bar.
+  // This must run before canonical-key and explicit venue aliases so legacy
+  // "live-house" labels cannot override the schedule's time-based venue rule.
+  const isActiveMusicPerformance = /(正式演出|正在演出|演出中|演出進入高潮|演出接近尾聲|登台演出|上台演出|現場演出|表演中|現場表演|演唱會演出|舞台上演出|彈奏.{0,12}(?:帶動|炒熱|感染).{0,8}(?:觀眾|全場|氣氛)|performing live|live performance|on.?stage)/i.test(activity);
+  const startTime = text(startTimeValue);
+  const startHour = /^(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d)?$/.test(startTime)
+    ? Number(startTime.slice(0, 2))
+    : null;
+  if (isActiveMusicPerformance && startHour !== null) {
+    return startHour >= 21 ? "night-bar" : "live-house";
+  }
 
   // Customer-home classification depends on the customer's explicit home
   // description, not on the character's own residence profile.
@@ -516,7 +530,7 @@ function validateHourlySchedulePartial(
         errors.push(optionLabel + "_outdoor_flag_invalid");
         continue;
       }
-      const locationKey = toSqlPublishLocationKey(normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext));
+      const locationKey = toSqlPublishLocationKey(normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext, rawBlock.start_time));
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor);
       const rainLocationDescription = text(rawOption.rain_fallback_location);
       validOptions.push({
@@ -621,7 +635,7 @@ function validateHourlySchedule(
       weightTotal += Number(weight);
       const locationDescription = text(rawOption.location);
       const activity = text(rawOption.activity);
-      const locationKey = normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext);
+      const locationKey = normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext, rawBlock.start_time);
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor === true);
       const isOutdoor = activitySpace === "outdoor";
       if (!isValidEncounterLocationLabel(locationDescription)) {
