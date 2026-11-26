@@ -765,6 +765,15 @@ export function buildEncounterScheduleBatchMessages(
   };
 }
 
+function pickStableWorksiteSceneKey(seed: string): typeof ENCOUNTER_SCENE_KEYS[number] {
+  let hash = 2166136261;
+  for (let index = 0; index < seed.length; index += 1) {
+    hash ^= seed.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return ENCOUNTER_SCENE_KEYS[(hash >>> 0) % ENCOUNTER_SCENE_KEYS.length];
+}
+
 export function parseEncounterScheduleBatchOutput(
   raw: string,
   sources: EncounterScheduleSource[],
@@ -874,6 +883,25 @@ export function parseEncounterScheduleBatchOutput(
       .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
   );
   for (const character of characters) {
+    const source = sourceById.get(character.character_id);
+    const isJiangChenyuan = text(source?.name).replace(/\\s+/g, "") === "江辰遠";
+    for (const dayType of ["weekday", "holiday"] as const) {
+      for (const block of character.variants[dayType]) {
+        block.options.forEach((slot, optionIndex) => {
+          const isGenericWorksite = /(工地|施工現場|工程現場|工區|案場)/i.test(slot.location_description);
+          const isConstructionActivity = /(施工|裝修|修繕|監工|工班|工程|工地|拆除|水電|木作|油漆|鋪設|整修|翻修|驗收)/i.test(slot.activity);
+          if (isJiangChenyuan && isGenericWorksite && isConstructionActivity) {
+            // Jiang's generic worksite is a movable project location, not a
+            // separate map marker. Distribute it across the existing scene
+            // anchors with a stable per-hour/per-option pseudo-random choice.
+            slot.location_key = pickStableWorksiteSceneKey(
+              [character.character_id, dayType, block.start_time, optionIndex].join("|"),
+            );
+          }
+        });
+      }
+    }
+
     const allSlots = [
       ...character.variants.weekday.flatMap((block) => block.options),
       ...character.variants.holiday.flatMap((block) => block.options),
