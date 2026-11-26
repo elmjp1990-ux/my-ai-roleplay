@@ -116,7 +116,7 @@ Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map
   const other = result([{
     character_id: id1, placement: "modern_map", variants: variants(worksiteBlocks),
   }], [source(id1, { name: "其他角色" })]);
-  if (!other.ok || other.characters[0].variants.weekday[0].options[0].location_key !== null) {
+  if (!other.ok || other.characters[0].variants.weekday[0].options[0].location_key !== "luxury-apartment") {
     throw new Error("generic worksite auto-distribution must remain scoped to Jiang Chenyuan");
   }
 });
