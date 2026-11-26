@@ -27,13 +27,16 @@ WITH daily_events AS (
          pg_catalog.count(*)::bigint AS turn_count
   FROM public.chat_messages AS m
   JOIN public.chat_sessions AS s ON s.id = m.session_id
-  WHERE m.role = 'assistant' AND m.deleted_at IS NULL
+  JOIN public.characters AS c ON c.id = s.character_id
+  WHERE s.character_id IS NOT NULL
+    AND m.role = 'assistant' AND m.deleted_at IS NULL
   GROUP BY s.character_id, (m.created_at AT TIME ZONE 'Asia/Taipei')::date
   UNION ALL
   SELECT gm.character_id,
          (gm.created_at AT TIME ZONE 'Asia/Taipei')::date AS activity_date,
          pg_catalog.count(*)::bigint AS turn_count
   FROM public.chat_group_messages AS gm
+  JOIN public.characters AS c ON c.id = gm.character_id
   WHERE gm.speaker_type = 'character'
     AND gm.character_id IS NOT NULL
     AND gm.deleted_at IS NULL
@@ -71,7 +74,9 @@ BEGIN
     WHERE g.id = NEW.group_id;
   END IF;
 
-  IF v_character_id IS NULL THEN
+  IF v_character_id IS NULL OR NOT EXISTS (
+    SELECT 1 FROM public.characters AS c WHERE c.id = v_character_id
+  ) THEN
     RETURN NEW;
   END IF;
 
