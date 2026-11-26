@@ -2,6 +2,23 @@
 -- Batch reconciliation must never requeue a character that already has active schedules.
 BEGIN;
 
+-- Clear stale pending entries for characters whose existing schedules are already usable.
+-- Preserve every schedule row; a later author source edit will enqueue a fresh job.
+UPDATE public.encounter_schedule_generation_jobs j
+SET status = 'cancelled',
+    lease_token = NULL,
+    lease_expires_at = NULL,
+    last_error_code = 'existing_active_schedules_preserved',
+    completed_at = NULL,
+    updated_at = pg_catalog.clock_timestamp()
+WHERE j.status = 'pending'
+  AND EXISTS (
+    SELECT 1
+    FROM public.character_schedules s
+    WHERE s.character_id = j.character_id
+      AND s.is_active IS TRUE
+  );
+
 CREATE OR REPLACE FUNCTION public.enqueue_encounter_schedule_generation_internal(
   p_character_id uuid
 )
