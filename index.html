@@ -11933,6 +11933,43 @@ document.addEventListener('click',async event => {
         toast('請在城市地圖選擇角色目前所在的地標，再開始相遇。');
         break;
       }
+      case 'test-diamond-package': {
+        if (!requireLogin({page:route.page,id:route.id})) break;
+        const user = currentUser();
+        const client = window.mySupabase;
+        if (!client || !isUuid(user?.uid)) {
+          throw new Error('測試儲值需要使用已登入的 TEST 雲端帳號。');
+        }
+        const {data:authData,error:authError}=await client.auth.getUser();
+        if (authError || authData?.user?.id !== user.uid) {
+          throw new Error('目前登入狀態與雲端帳號不一致，請重新登入後再試。');
+        }
+        const packageCode = String(key || '');
+        if (!/^twd_(60|150|290|850|1390|2690)$/.test(packageCode)) {
+          throw new Error('找不到這個鑽石方案，請重新整理商店。');
+        }
+        button.disabled = true;
+        button.textContent = '處理測試入帳…';
+        try {
+          const {data,error}=await client.rpc('test_purchase_diamond_package',{p_package_code:packageCode});
+          if (error) throw new Error('測試入帳失敗：'+error.message);
+          const result=Array.isArray(data)?data[0]:data;
+          if (!result || result.status !== 'granted') throw new Error('資料庫未回傳有效的測試入帳結果。');
+          state.account.diamonds=Number(result.diamonds ?? state.account.diamonds ?? 0);
+          await loadWalletLedger('diamond');
+          persist();
+          render();
+          const bonus=Number(result.bonus_diamonds||0);
+          toast(bonus>0
+            ? `測試入帳完成：基本 ${Number(result.base_diamonds||0)} 鑽石，首購贈送 ${bonus} 鑽石。`
+            : `測試入帳完成：基本 ${Number(result.base_diamonds||0)} 鑽石；本次沒有首購贈鑽。`);
+        } catch(error) {
+          button.disabled = false;
+          button.textContent = 'TEST 測試入帳（不收款）';
+          throw error;
+        }
+        break;
+      }
       case 'favorite': {
         if (!requireLogin({page:route.page,id:route.id})) break;
         const i = state.favorites.indexOf(key);
