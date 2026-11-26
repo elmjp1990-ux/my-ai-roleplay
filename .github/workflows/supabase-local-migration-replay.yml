@@ -320,6 +320,46 @@ jobs:
           # in this disposable local Supabase database.
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261119160000_character_profile_life_context_version.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261126100000_character_profile_runtime_identity_context.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 <<'SQL'
+          DO $identity_context_check$
+          DECLARE
+            v_payload jsonb;
+            v_hash_payload jsonb;
+            v_definition text;
+          BEGIN
+            v_payload := jsonb_build_object(
+              'characters.name', 'Test',
+              'characters.gender', 'male',
+              'characters.age', '23',
+              'characters.intro', 'A character'
+            );
+            v_hash_payload := public.character_profile_source_hash_payload(v_payload);
+            IF v_hash_payload IS DISTINCT FROM jsonb_build_object('characters.intro', 'A character') THEN
+              RAISE EXCEPTION 'Runtime identity facts must be excluded from the profile refresh hash';
+            END IF;
+            v_definition := pg_catalog.pg_get_functiondef(
+              'public.character_profile_source_payload(uuid,uuid)'::regprocedure
+            );
+            IF pg_catalog.strpos(v_definition, 'characters.age') = 0
+               OR pg_catalog.strpos(v_definition, 'characters.gender') = 0
+               OR pg_catalog.strpos(v_definition, 'characters.name') = 0 THEN
+              RAISE EXCEPTION 'Organizer payload is missing authoritative identity facts';
+            END IF;
+            IF pg_catalog.strpos(pg_catalog.pg_get_functiondef(
+              'public.enqueue_character_profile_organization(uuid,boolean)'::regprocedure
+            ), 'character_profile_source_hash_payload') = 0
+               OR pg_catalog.strpos(pg_catalog.pg_get_functiondef(
+                 'public.complete_character_profile_organization_job(uuid,uuid,bigint,text,jsonb)'::regprocedure
+               ), 'character_profile_source_hash_payload') = 0
+               OR pg_catalog.strpos(pg_catalog.pg_get_functiondef(
+                 'public.get_character_ai_profile_for_chat(uuid,uuid)'::regprocedure
+               ), 'character_profile_source_hash_payload') = 0 THEN
+              RAISE EXCEPTION 'All profile hash paths must exclude runtime identity facts consistently';
+            END IF;
+          END
+          $identity_context_check$;
+          SQL
 
       - name: Apply formal Encounter schedule pipeline migration
         shell: bash
