@@ -12004,11 +12004,14 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'clear-search':
-        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
+        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();
+        if(filter==='popular')refreshExploreListing();
+        break;
       case 'clear-filter':
         search='';exploreTags=[];limit=window.PoyozzListPagination.pageSize('explore');
         go({page:'home'},true);
         renderHome();
+        refreshExploreListing();
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
