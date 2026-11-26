@@ -57,3 +57,10 @@
 .store-package-diamond-icon{width:35px;height:35px;}
 .wallet-cost-part .poyozz-diamond-icon,.wallet-modal-cost .poyozz-diamond-icon,.wallet-resource-row .poyozz-diamond-icon{width:18px;height:18px;}
 .wallet-diamond .poyozz-diamond-icon{width:16px;height:16px;}
+
+
+/* Shared silver coin artwork, cached from one lightweight CDN source. */
+.poyozz-silver-icon{display:inline-block;width:1.15em;height:1.15em;object-fit:contain;vertical-align:-.22em;flex:0 0 auto;}
+.wallet-cost-part .poyozz-silver-icon,.wallet-modal-cost .poyozz-silver-icon,.wallet-resource-row .poyozz-silver-icon{width:18px;height:18px;}
+.wallet-silver .poyozz-silver-icon{width:16px;height:16px;}
+.store-resource-silver .poyozz-silver-icon{width:22px;height:22px;}
