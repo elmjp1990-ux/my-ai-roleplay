@@ -169,6 +169,13 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/current-state-schema.sql"
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/verify-current-state-schema-fixture.sql
 
+      - name: Apply and behavior-test TEST diamond package purchase migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/migrations/20261126200000_test_diamond_package_purchases.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/drafts/replay-test-diamond-package-purchases.sql
+
       - name: Replay and verify descriptive character age migration
         shell: bash
         run: |
