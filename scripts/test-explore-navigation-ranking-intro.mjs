@@ -39,6 +39,17 @@ assert.match(html, /if\(renderedIntroImages>=maxIntroImages\)continue/);
 assert.match(html, /rawSrc\.length>maxIntroImageUrlLength/);
 assert.match(html, /renderedIntroImages\+\+/,
   'Only valid HTTPS images within the URL limit count toward the three-image allowance.');
+assert.match(html, /\.character-public-intro img\{[^}]*margin:0 auto/);
+assert.match(html, /\.character-public-intro p:has\(> img\)\{margin:0\}/,
+  'Consecutive intro images must not inherit paragraph spacing.');
+assert.match(html, /\.explore-utility-row\{[^}]*margin:18px 0 10px\}/,
+  'Explore utility buttons need breathing room below the latest-activity panel.');
+assert.match(html, /\.explore-shortcuts \{ grid-template-columns:repeat\(4,minmax\(0,1fr\)\); gap:6px; \}/,
+  'Mobile Explore category buttons must stay in one four-column row.');
+assert.match(html, /\.popular-period-tabs button\{[^}]*border:1px solid rgba\(155,123,208,\.62\)/,
+  'Popular period tabs should use the site purple border.');
+assert.match(html, /\.popular-period-tabs button\.active\{[^}]*border-color:var\(--primary\)/,
+  'The selected popular period should retain the site purple border.');
 assert.doesNotMatch(html, /\$\{e\(replaceRoleplayVariables\(c\.intro/,
   'Full public introduction should render through the safe HTML renderer, not be escaped as plain text.');
 assert.match(html, /data-action="remove-explore-tag"/,
