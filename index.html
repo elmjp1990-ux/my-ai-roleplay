@@ -4728,8 +4728,11 @@ function safeImage(value) {
   return '';
 }
 function characterIntroPlainText(value,userName='你',characterName='角色') {
-  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
-  return replaceRoleplayVariables(parsed.body.textContent||'',userName,characterName).replace(/\s+/g,' ').trim();
+  const parsed=new DOMParser().parseFromString(renderCharacterIntroHtml(value,userName,characterName),'text/html');
+  parsed.body.querySelectorAll('img').forEach(image=>{
+    image.replaceWith(document.createTextNode(image.alt||''));
+  });
+  return (parsed.body.textContent||'').replace(/\s+/g,' ').trim();
 }
 function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
   const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
@@ -5257,7 +5260,7 @@ function renderHome() {
   renderGrid();
 }
 function refreshExploreListing() {
-  limit=window.PoyozzListPagination.pageSize('explore');
+  limit=window.PoyozzListPagination?.pageSize('explore')||20;
   invalidatePublicCharacterRowsCache();
   if(!window.mySupabase){renderGrid();return;}
   void loadPublicSupabaseCharacters().then(()=>{
