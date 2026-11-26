@@ -9937,6 +9937,34 @@ function renderCharacterProfilePreview(profile, characterName, model) {
   return '<article class="panel stack" style="padding:12px;gap:8px"><div><strong>'+e(characterName||"角色")+'｜AI 角色資料整理結果</strong><p class="small muted" style="margin:4px 0 0">'+e(model||"DeepSeek V4 Flash 0423")+' · 已保存，可先檢查</p></div>'+summaries+unknownMarkup+conflictMarkup+(insufficientReason?'<p class="small muted">角色一致性規則資料不足：'+e(insufficientReason)+'</p>':'')+'<details><summary class="small">查看完整 JSON（含來源依據與待釐清項目）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:11px">'+raw+'</pre></details></article>';
 }
 
+function renderExistingEncounterSchedules(rows, characterName) {
+  const schedules = Array.isArray(rows) ? rows : [];
+  if (!schedules.length) {
+    return '<p class="small muted">這位角色目前沒有可檢視的有效行程。</p>';
+  }
+  const dayLabel = value => value === 'weekday' ? '平日' : value === 'weekend' ? '週末' : value === 'holiday' ? '假日' : String(value || '未分類');
+  return '<section class="panel stack" style="padding:12px;gap:10px">' +
+    '<strong>既有行程｜' + e(characterName || '角色') + '（唯讀，不呼叫 AI）</strong>' +
+    '<p class="small muted" style="margin:0">共 ' + schedules.length + ' 筆有效行程；以下顯示已保存的時段、地點、活動、場景與選項權重。此區只供檢查，不會修改或標記審核完成。</p>' +
+    schedules.map(row => {
+      const weekday = dayLabel(row.day_type);
+      const time = e(String(row.start_time || '').slice(0,5)) + '–' + e(String(row.end_time || '').slice(0,5));
+      const location = e(row.location_description || row.location_key || '未指定地點');
+      const activity = e(row.activity || '未提供活動');
+      const scene = e(row.scene_description || '');
+      const variant = e(row.variant_key || '預設選項');
+      const weight = Number.isFinite(Number(row.variant_weight)) ? Number(row.variant_weight) + '%' : '';
+      const greeting = row.encounter_greeting ? '<p class="small muted" style="margin:4px 0 0">相遇描述：' + e(row.encounter_greeting) + '</p>' : '';
+      const rain = row.rain_fallback_location_key ? '<p class="small muted" style="margin:4px 0 0">雨天備案：' + e(row.rain_fallback_location_key) + (row.rain_fallback_activity ? '｜' + e(row.rain_fallback_activity) : '') + '</p>' : '';
+      return '<article style="padding:9px;border:1px solid var(--border);border-radius:10px">' +
+        '<div class="row wrap" style="justify-content:space-between"><strong>' + weekday + '｜' + time + '</strong><span class="small muted">' + variant + (weight ? ' · ' + weight : '') + '</span></div>' +
+        '<p class="small" style="margin:5px 0 0"><strong>' + location + '</strong>｜' + activity + '</p>' +
+        (scene ? '<p class="small muted" style="margin:4px 0 0">場景：' + scene + '</p>' : '') + greeting + rain +
+      '</article>';
+    }).join('') +
+  '</section>';
+}
+
 async function loadEncounterScheduleTestTools(){
   const section=document.getElementById('encounterScheduleTestTools');
   if(!section)return;
@@ -9985,27 +10013,34 @@ async function loadEncounterScheduleTestTools(){
       profileTargetName=String(profileData.next_character_name||'角色');
       profileAvailableAt=profileData.profile_available_at?new Date(profileData.profile_available_at).getTime():0;
       const profileWaiting=profileAvailableAt>Date.now();
-      if(profileStatus)profileStatus.textContent=!profileTargetAvailable
-        ?'目前沒有待生成行程的公開角色。'
-        :profileReady
-          ?'下一位：'+profileTargetName+'｜角色資料已整理完成，請檢查下方結果後再執行第二步。'
-          :profileJobStatus==='processing'
-            ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
-            :profileJobStatus==='failed'
-              ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。失敗紀錄已保留；可手動重試（若前次 AI 實際完成，可能產生重複服務成本）。'
-              :profileWaiting
-                ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
-                :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
-      if(profilePreview)profilePreview.innerHTML=profileReady
-        ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
+      const inspectionName=String(profileData.inspection_character_name||'');
+      if(profileStatus)profileStatus.textContent=
+        (inspectionName?'目前檢視：'+inspectionName+' 的既有角色資料（唯讀）。':'目前沒有已保存的角色資料可供檢視。')+
+        (profileTargetAvailable?'｜下一位待生成：'+profileTargetName+'。':'｜目前沒有待生成行程的公開角色。')+
+        (profileReady?' 下一位角色的資料也已整理完成，可檢查後進行第二步。':
+          profileJobStatus==='processing'?' 下一位角色正在整理中。':
+          profileJobStatus==='failed'?' 下一位角色上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。':
+          profileWaiting?' 下一位角色稍後才可重試：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):
+          profileTargetAvailable?' 下一位角色尚未完成資料整理。':'');
+      if(profilePreview)profilePreview.innerHTML=profileData.inspection_profile
+        ?renderCharacterProfilePreview(profileData.inspection_profile,inspectionName,profileData.inspection_model)
         :'';
+      const schedulePreview=document.getElementById('encounterScheduleExistingPreview');
+      if(schedulePreview)schedulePreview.innerHTML=renderExistingEncounterSchedules(
+        profileData.inspection_schedules, inspectionName
+      );
       if(profileButton){
         const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing';
         profileButton.dataset.aiEnabled=enabled?'true':'false';
         profileButton.dataset.profileRetry=profileJobStatus==='failed'?'true':'false';
-        profileButton.textContent=profileJobStatus==='failed'?'手動重試 AI 整理':'AI 整理下一位角色資料';
+        profileButton.textContent=profileJobStatus==='failed'
+          ?'手動重試下一位：'+profileTargetName
+          :'AI 整理下一位角色資料：'+profileTargetName;
         profileButton.disabled=!enabled;
       }
+      const scheduleButton=document.querySelector('[data-action="organize-encounter-schedules"]');
+      if(scheduleButton)scheduleButton.textContent='AI 生成下一位角色行程與場景：'+(profileTargetName||'未指定');
+      
     }catch(profileError){
       profileStatusError=true;
       if(profileStatus)profileStatus.textContent='角色資料狀態讀取失敗；為避免未整理就呼叫行程 AI，第二步已暫停。';
@@ -10573,15 +10608,16 @@ function renderModal(o) {
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
           <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
             <strong>第一步｜角色資料整理</strong>
-            <p class="small muted" style="margin:0">先整理下一位待生成行程角色的背景、個性、動機、行為與生活脈絡。每次只處理一位；完成後會顯示完整整理結果供作者檢查。</p>
+            <p class="small muted" style="margin:0">上方顯示最近一次已保存的角色資料供檢查；下一位待生成角色另行標示。檢視既有資料不會呼叫 AI，也不會改動任何內容。</p>
             <p class="small muted" id="characterProfileTestStatus" style="margin:0">正在確認角色資料狀態…</p>
             <div id="characterProfilePreview" class="stack"></div>
             <button type="button" data-action="organize-character-profile" disabled>AI 整理下一位角色資料</button>
           </div>
           <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
             <strong>第二步｜行程與場景生成</strong>
-            <p class="small muted" style="margin:0">只有第一步成功保存且資料檢查完成後，才可生成同一位角色的行程與共同行程場景。</p>
-            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
+            <p class="small muted" style="margin:0">以下先顯示最近一次已保存角色的行程供檢查。生成按鈕只會處理佇列中下一位角色，且需先完成該角色的第一步；不會重生上方已完成角色。</p>
+            <div id="encounterScheduleExistingPreview" class="stack"></div>
+            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成下一位角色行程與場景</button>
           </div>
           <div class="stack" style="margin:10px 0">
             <strong>待核對工作</strong>
