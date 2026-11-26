@@ -21,6 +21,8 @@ on:
       - "scripts/test-author-profile-module.mjs"
       - "scripts/test-followed-authors-module.mjs"
       - "scripts/test-city-map-module.mjs"
+      - "scripts/test-explore-navigation-ranking-intro.mjs"
+      - "supabase/migrations/20261126072000_explore_character_leaderboards.sql"
       - "memory-album.js"
       - "encounter-scene.js"
       - "scripts/test-media-asset-optimization.mjs"
@@ -78,6 +80,8 @@ jobs:
         run: node scripts/test-followed-authors-module.mjs
       - name: Verify extracted city map module contract
         run: node scripts/test-city-map-module.mjs
+      - name: Verify Explore navigation, leaderboard, and intro HTML safety
+        run: node scripts/test-explore-navigation-ranking-intro.mjs
       - name: Parse extracted notifications screen module
         run: node --check notifications-screen.js
       - name: Verify extracted notifications screen contract
