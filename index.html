@@ -4739,6 +4739,9 @@ function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
   const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','BLOCKQUOTE','H1','H2','H3','PRE','CODE','HR','DIV','SPAN','A','IMG']);
   const dangerous=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE','FORM','INPUT','BUTTON','VIDEO','AUDIO','SOURCE']);
   const root=document.createElement('div');
+  const maxIntroImages=3;
+  const maxIntroImageUrlLength=2048;
+  let renderedIntroImages=0;
   const copy=(sourceNode,target)=>{
     for(const child of [...sourceNode.childNodes]){
       if(child.nodeType===Node.TEXT_NODE){
@@ -4752,9 +4755,13 @@ function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
       if(dangerous.has(tag))continue;
       if(!allowed.has(tag)){copy(child,target);continue;}
       if(tag==='IMG'){
+        if(renderedIntroImages>=maxIntroImages)continue;
+        const rawSrc=String(child.getAttribute('src')||'').trim();
+        if(!rawSrc||rawSrc.length>maxIntroImageUrlLength)continue;
         let src='';
-        try{const url=new URL(child.getAttribute('src')||'');if(url.protocol==='https:'&&!url.username&&!url.password)src=url.href;}catch{}
+        try{const url=new URL(rawSrc);if(url.protocol==='https:'&&!url.username&&!url.password)src=url.href;}catch{}
         if(!src)continue;
+        renderedIntroImages++;
         const image=document.createElement('img');
         image.src=src;
         image.alt=String(child.getAttribute('alt')||'').slice(0,200);
