@@ -9,3 +9,23 @@
 .wallet-resource-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;margin:8px 0;border:1px solid var(--border);border-radius:12px;background:var(--panel2)}
 .wallet-resource-row strong{font-variant-numeric:tabular-nums}
 @media(max-width:520px){.wallet-modal-actions{flex-direction:column}.wallet-cost-button{min-width:62px;padding:7px 8px!important}}
+
+/* Compact diamond package rows */
+.store-package-list{display:grid;gap:9px}
+.store-package-row{min-width:0;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--panel)}
+.store-package-copy{display:grid;gap:3px;min-width:0}
+.store-package-main{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0}
+.store-package-amount{display:inline-flex;align-items:center;gap:7px;min-width:0;font-size:clamp(17px,2.4vw,21px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.store-package-bonus{color:var(--accent,#c6a66b);font-size:.88em}
+.store-package-purchase{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex:0 0 auto}
+.store-package-price{font-size:clamp(15px,2vw,18px);font-variant-numeric:tabular-nums;white-space:nowrap}
+.store-package-buy{min-width:76px;padding:7px 15px;border:1px solid var(--border);border-radius:9px;background:var(--panel2);font-weight:650;white-space:nowrap}
+.store-package-promo{padding-left:2px;color:var(--muted);font-size:11px;line-height:1.35}
+@media(max-width:420px){
+  .store-package-row{padding:11px 10px}
+  .store-package-main{gap:6px}
+  .store-package-amount{gap:4px;font-size:16px}
+  .store-package-purchase{gap:7px}
+  .store-package-price{font-size:14px}
+  .store-package-buy{min-width:62px;padding:7px 10px}
+}
