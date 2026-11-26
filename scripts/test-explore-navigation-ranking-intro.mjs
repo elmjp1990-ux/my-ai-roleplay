@@ -18,7 +18,7 @@ assert.match(html, /data-action="popular-period" data-period="week"/);
 assert.match(html, /get_public_character_leaderboard/);
 assert.match(html, /p_period:popularPeriod/);
 assert.match(migration, /activity_date >= p\.period_start/);
-assert.match(migration, /c\\.tags @> pg_catalog\\.to_jsonb\\(p_tags\\)/);
+assert.match(migration, /c\.tags @> pg_catalog\.to_jsonb\(p_tags\)/);
 assert.match(migration, /jsonb_array_elements_text/);
 assert.match(migration, /EXTRACT\(isodow FROM/);
 assert.match(migration, /Asia\/Taipei/);
