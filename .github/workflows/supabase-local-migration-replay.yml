@@ -26,6 +26,7 @@ on:
       - "supabase/drafts/encounter-session-manual-end.sql"
       - "supabase/drafts/current-state-structure.json"
       - "supabase/drafts/verify-current-state-schema-fixture.sql"
+      - "supabase/drafts/replay-test-diamond-package-purchases.sql"
       - "scripts/build-disposable-schema-fixture.mjs"
       - ".github/workflows/supabase-local-migration-replay.yml"
   push:
