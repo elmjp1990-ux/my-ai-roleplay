@@ -211,7 +211,6 @@ body.city-map-mode .city-map-bottom .nav-btn:focus-visible{
           <div id="cityMapDate">台灣時間</div>
           <div class="city-map-weather"><span>🌤️</span><span id="cityMapWeather">天氣資料待串接</span><span id="cityMapTemp">溫度待串接</span></div>
           <p>這座城市充滿各種可能，也許今天你會在某個角落遇見特別的那個人。</p>
-          <button class="city-map-traditional" data-action="city-traditional">⌖ 傳統探索模式</button>
         </aside>
         <div class="city-map-zoom"><button type="button" data-action="city-zoom-in" aria-label="放大地圖">＋</button><button type="button" data-action="city-zoom-out" aria-label="縮小地圖">−</button></div>
         <div class="city-map-bottom" aria-label="主要導覽">

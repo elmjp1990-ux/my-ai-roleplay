@@ -442,7 +442,14 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .whisper-option small{color:var(--muted);font-size:10px}
 .comment-whisper-label{display:inline-flex;align-items:center;gap:4px;margin-left:7px;padding:2px 6px;border:1px solid #a78bfa55;border-radius:999px;color:#c4b5fd;font-size:10px}
 .explore-eyebrow{color:var(--muted);font-size:10px;letter-spacing:.16em;text-transform:uppercase;margin-bottom:7px}
-.explore-shortcuts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+.explore-utility-row{display:flex;justify-content:flex-end;gap:7px;margin:18px 0 10px}
+.explore-utility{padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--panel);color:var(--muted);font-size:10px;line-height:1.2}
+.explore-utility:active{transform:scale(.97)}
+.explore-utility.active{background:var(--soft);border-color:#818cf8a8;color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
+.explore-shortcuts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.popular-period-tabs{display:flex;align-items:center;gap:7px;margin-top:9px;overflow-x:auto}
+.popular-period-tabs button{flex:1;min-width:max-content;padding:7px 12px;border:1px solid rgba(155,123,208,.62);border-radius:999px;background:var(--panel);color:var(--muted);font-size:11px}
+.popular-period-tabs button.active{background:var(--soft);border-color:var(--primary);color:var(--text);box-shadow:inset 0 0 0 1px rgba(155,123,208,.28)}
 .explore-shortcut{min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:13px 4px 11px;border-radius:15px;background:linear-gradient(155deg,var(--panel2),var(--panel));border:1px solid var(--border);color:var(--muted);font-size:11px;transition:transform .18s ease,border-color .18s ease,background .18s ease}
 .explore-shortcut .icon{width:19px;height:19px;color:var(--text)}
 .explore-shortcut.active{border-color:#818cf8a8;background:var(--soft);color:var(--text);box-shadow:inset 0 0 0 1px #818cf822}
@@ -458,6 +465,11 @@ main { max-width:1500px; margin:auto; padding:25px; }
 .card-image::after{content:"";position:absolute;inset:45% 0 0;pointer-events:none;background:linear-gradient(transparent,#080b12a8)}
 .card-image .image-button{display:block}
 .card-body h3{letter-spacing:-.02em}
+.character-public-intro img{display:block;max-width:100%;height:auto;max-height:520px;margin:0 auto;border-radius:0;object-fit:contain}\n.character-public-intro p:has(img){margin:0}
+.character-public-intro a{color:var(--primary);text-decoration:underline}
+.character-public-intro p{margin:8px 0}
+.character-public-intro ul,.character-public-intro ol{padding-left:1.5em}
+.selected-explore-tag{cursor:pointer}
 .card-image .heart,.card-image .card-chat-count{position:absolute;z-index:4;top:9px;height:29px;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:transparent;color:#fff;font-size:16px;text-shadow:0 1px 4px #000b;backdrop-filter:none;box-shadow:none}
 .card-image .heart{right:9px;width:29px;font-size:19px}
 .card-image .heart.on{color:#fb7185;background:transparent}
@@ -783,9 +795,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   .hero p { font-size:12px; line-height:1.8; margin-bottom:14px; }
   .hero .primary { font-size:12px; padding:9px 12px; }
   .explore-eyebrow { font-size:9px; }
-  .explore-shortcuts { grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
-  .explore-shortcut { flex-direction:row; justify-content:flex-start; padding:12px 13px; gap:9px; font-size:12px; border-radius:13px; }
-  .explore-shortcut .icon { width:17px;height:17px; }
+  .explore-shortcuts { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+  .explore-shortcut { flex-direction:column; justify-content:center; padding:10px 2px; gap:5px; font-size:10px; white-space:nowrap; border-radius:13px; }
+  .explore-shortcut .icon { width:16px;height:16px; }
   .explore-search-row { margin-top:7px; }
   .explore-section-heading { margin:20px 1px 10px; }
   .explore-section-heading h2 { font-size:18px; }
@@ -1326,7 +1338,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (!client) return [];
     const version = publicCharacterRowsCacheVersion;
     const querySignature=JSON.stringify({
-      filter,exploreTags:[...exploreTags].sort(),
+      filter,popularPeriod,search:search.trim(),exploreTags:[...exploreTags].sort(),
       ownerUid:state.account?.uid||null
     });
     const cacheKey=querySignature+':'+String(offset);
@@ -1335,21 +1347,49 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
     if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
     const request=(async()=>{
-      let query=client.from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
-        .eq('visibility','public').is('deleted_at',null);
-      if(filter==='male'||filter==='female')query=query.eq('gender',filter);
-      if(filter==='latest'){
-        const latestSince=new Date(Date.now()-DAY).toISOString();
-        query=query.gte('first_published_at',latestSince);
+      const columns='id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible';
+      let rows=[];
+      if(filter==='popular'){
+        const {data:ranked,error:rankingError}=await client.rpc('get_public_character_leaderboard',{
+          p_period:popularPeriod,
+          p_limit:publicCharacterPageSize,
+          p_offset:offset,
+          p_tags:exploreTags.length?exploreTags:null,
+          p_search:search.trim()||null
+        });
+        if(rankingError)throw new Error('讀取熱門排行失敗：'+rankingError.message);
+        const ranking=Array.isArray(ranked)?ranked:[];
+        const ids=ranking.map(row=>row.character_id).filter(isUuid);
+        for(const row of ranking){
+          if(!isUuid(row.character_id))continue;
+          const count=Number(row.turn_count);
+          if(!Number.isSafeInteger(count)||count<0)continue;
+          if(popularPeriod==='all')characterTurnCountCache.set(row.character_id,count);
+          else characterPeriodTurnCountCache.set(popularPeriod+':'+row.character_id,count);
+        }
+        if(ids.length){
+          const {data,error}=await client.from('characters').select(columns)
+            .in('id',ids).eq('visibility','public').is('deleted_at',null);
+          if(error)throw new Error(error.message);
+          const byId=new Map((Array.isArray(data)?data:[]).map(row=>[row.id,row]));
+          rows=ids.map(id=>byId.get(id)).filter(Boolean);
+        }
+      } else {
+        let query=client.from('characters').select(columns)
+          .eq('visibility','public').is('deleted_at',null);
+        if(filter==='male'||filter==='female')query=query.eq('gender',filter);
+        if(filter==='latest'){
+          const latestSince=new Date(Date.now()-DAY).toISOString();
+          query=query.gte('first_published_at',latestSince);
+        }
+        if(exploreTags.length)query=query.contains('tags',exploreTags);
+        const {data,error}=await query
+          .order('first_published_at',{ascending:false,nullsFirst:false})
+          .order('id',{ascending:false})
+          .range(offset,offset+publicCharacterPageSize-1);
+        if(error)throw new Error(error.message);
+        rows=Array.isArray(data)?data:[];
       }
-      if(exploreTags.length)query=query.contains('tags',exploreTags);
-      const {data,error}=await query
-        .order('first_published_at',{ascending:false,nullsFirst:false})
-        .order('id',{ascending:false})
-        .range(offset,offset+publicCharacterPageSize-1);
-      if(error)throw new Error(error.message);
-      const rows=Array.isArray(data)?data:[];
       if(version===publicCharacterRowsCacheVersion){
         publicCharacterRowsCache.set(cacheKey,rows);
         publicCharacterRowsCacheAt=Date.now();
@@ -3298,6 +3338,8 @@ let chatSessionListPager = {...window.PoyozzListPagination.createState('chatSess
 let chatListPaginationObserver=null;
 let search = '';
 let filter = 'recommended';
+let popularPeriod = 'all';
+let exploreSearchTimer = null;
 let exploreTags = [];
 let limit = window.PoyozzListPagination?.pageSize('explore')||20;
 let batch = 0;
@@ -4685,6 +4727,64 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function characterIntroPlainText(value,userName='你',characterName='角色') {
+  const parsed=new DOMParser().parseFromString(renderCharacterIntroHtml(value,userName,characterName),'text/html');
+  parsed.body.querySelectorAll('img').forEach(image=>{
+    image.replaceWith(document.createTextNode(image.alt||''));
+  });
+  return (parsed.body.textContent||'').replace(/\s+/g,' ').trim();
+}
+function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
+  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
+  const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','BLOCKQUOTE','H1','H2','H3','PRE','CODE','HR','DIV','SPAN','A','IMG']);
+  const dangerous=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE','FORM','INPUT','BUTTON','VIDEO','AUDIO','SOURCE']);
+  const root=document.createElement('div');
+  const maxIntroImages=3;
+  const maxIntroImageUrlLength=2048;
+  let renderedIntroImages=0;
+  const copy=(sourceNode,target)=>{
+    for(const child of [...sourceNode.childNodes]){
+      if(child.nodeType===Node.TEXT_NODE){
+        target.appendChild(document.createTextNode(
+          replaceRoleplayVariables(child.nodeValue||'',userName,characterName)
+        ));
+        continue;
+      }
+      if(child.nodeType!==Node.ELEMENT_NODE)continue;
+      const tag=child.tagName;
+      if(dangerous.has(tag))continue;
+      if(!allowed.has(tag)){copy(child,target);continue;}
+      if(tag==='IMG'){
+        if(renderedIntroImages>=maxIntroImages)continue;
+        const rawSrc=String(child.getAttribute('src')||'').trim();
+        if(!rawSrc||rawSrc.length>maxIntroImageUrlLength)continue;
+        let src='';
+        try{const url=new URL(rawSrc);if(url.protocol==='https:'&&!url.username&&!url.password)src=url.href;}catch{}
+        if(!src)continue;
+        renderedIntroImages++;
+        const image=document.createElement('img');
+        image.src=src;
+        image.alt=String(child.getAttribute('alt')||'').slice(0,200);
+        image.loading='lazy';image.decoding='async';image.referrerPolicy='no-referrer';
+        target.appendChild(image);
+        continue;
+      }
+      const element=document.createElement(tag.toLowerCase());
+      if(tag==='A'){
+        try{
+          const url=new URL(child.getAttribute('href')||'');
+          if(url.protocol==='https:'&&!url.username&&!url.password){
+            element.href=url.href;element.target='_blank';element.rel='noopener noreferrer';
+          }
+        }catch{}
+      }
+      copy(child,element);
+      target.appendChild(element);
+    }
+  };
+  copy(parsed.body,root);
+  return root.innerHTML;
+}
 function characterAvatarMarkup(character,options={}) {
   const imageClass=options.imageClass||'avatar';
   const fallbackClass=options.fallbackClass||'avatar avatar-fallback';
@@ -4717,6 +4817,10 @@ function normalizeCharacterTag(value) {
 function tagButton(tag) {
   const normalized=normalizeCharacterTag(tag);
   return `<button class="tag" data-action="tag" data-tag="${e(normalized)}">#${e(normalized)}</button>`;
+}
+function selectedExploreTagButton(tag) {
+  const normalized=normalizeCharacterTag(tag);
+  return `<button type="button" class="tag selected-explore-tag" data-action="remove-explore-tag" data-tag="${e(normalized)}" aria-label="移除篩選標籤 ${e(normalized)}">#${e(normalized)} ×</button>`;
 }
 function draftTagButton(tag) {
   const normalized=normalizeCharacterTag(tag);
@@ -4959,9 +5063,8 @@ function chatNavUnreadBadge(){
 }
 function renderShell() {
   const navPage = route.page === 'conversation' ? 'chat'
-    : route.page === 'citymap' ? 'home'
+    : ['citymap','home','detail','session-detail'].includes(route.page) ? 'citymap'
     : ['editor','ai'].includes(route.page) ? 'create'
-    : ['detail','session-detail'].includes(route.page) ? 'home'
     : route.page === 'group' ? 'chat' : route.page;
   // 五大主入口固定順序：探索、創建、聊天、商店、我的。
   // 通知、收藏、群組仍保留既有次級頁面路徑，不再占用主導覽位置。
@@ -5137,13 +5240,20 @@ function renderHome() {
           <button class="primary" data-action="pending-show-deletion-modal">查看狀態／取消刪除</button>
         </section>` : ''}
       <section class="hero" id="hero"></section>
+      <div class="explore-utility-row" aria-label="探索工具">
+        <button class="explore-utility" data-action="tags" data-mode="explore"># 標籤</button>
+        <button class="explore-utility" data-action="toggle-search">⌕ 搜尋</button>
+      </div>
       <div class="explore-shortcuts" aria-label="角色探索分類">
         <button class="explore-shortcut" data-action="filter" data-filter="recommended"><span class="shortcut-icon">✧</span><span>推薦</span></button>
         <button class="explore-shortcut" data-action="filter" data-filter="popular"><span class="shortcut-icon">↗</span><span>熱門</span></button>
         <button class="explore-shortcut" data-action="filter" data-filter="latest"><span class="shortcut-icon">◷</span><span>新登場</span></button>
         <button class="explore-shortcut" data-action="filter" data-filter="favorites"><span class="shortcut-icon">♡</span><span>喜愛</span></button>
-        <button class="explore-shortcut" data-action="tags" data-mode="explore"><span class="shortcut-icon">#</span><span>標籤</span></button>
-        <button class="explore-shortcut" data-action="toggle-search"><span class="shortcut-icon">⌕</span><span>搜尋</span></button>
+      </div>
+      <div class="popular-period-tabs hidden" id="popularPeriodTabs" aria-label="熱門排行期間">
+        <button type="button" data-action="popular-period" data-period="all">一直以來</button>
+        <button type="button" data-action="popular-period" data-period="month">本月最佳</button>
+        <button type="button" data-action="popular-period" data-period="week">本週最佳</button>
       </div>
       <div class="toolbar explore-search-row hidden" id="exploreSearch">
         <input id="searchInput" placeholder="搜尋角色名稱或標籤…" value="${e(search)}" aria-label="搜尋角色名稱或標籤">
@@ -5155,6 +5265,14 @@ function renderHome() {
     </div>`;
   renderBanner();
   renderGrid();
+}
+function refreshExploreListing() {
+  limit=window.PoyozzListPagination?.pageSize('explore')||20;
+  invalidatePublicCharacterRowsCache();
+  if(!window.mySupabase){renderGrid();return;}
+  void loadPublicSupabaseCharacters().then(()=>{
+    if(route?.page==='home')renderGrid();
+  }).catch(error=>console.warn('探索清單更新失敗：',error?.message||error));
 }
 function renderBanner() {
   if (!$('hero')) return;
@@ -5195,7 +5313,10 @@ function exploreList() {
   } else if (filter === 'favorites') {
     list = list.filter(c => state.favorites.includes(c.id));
   } else if (filter === 'popular') {
-    list.sort((a,b) => (characterTurnCountCache.get(b.id) ?? Number(b.chats || 0))-(characterTurnCountCache.get(a.id) ?? Number(a.chats || 0)));
+    const count = character => popularPeriod === 'all'
+      ? (characterTurnCountCache.get(character.id) ?? Number(character.chats || 0))
+      : (characterPeriodTurnCountCache.get(popularPeriod + ':' + character.id) ?? 0);
+    list.sort((a,b) => count(b)-count(a));
   } else if (['male','female'].includes(filter)) {
     list = list.filter(c => c.gender === filter);
   } else {
@@ -5235,7 +5356,7 @@ function card(c,owner = false) {
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
-        <p class="card-intro">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</p>
+        <p class="card-intro">${e(characterIntroPlainText(c.intro,currentUser()?.nickname||'你',c.name))}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
          ${c.isNSFW === true ? '<div class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
         ${owner ? `
@@ -5300,9 +5421,18 @@ function renderGrid({append=false}={}) {
   document.querySelectorAll('.explore-shortcut[data-filter]').forEach(button=>{
     button.classList.toggle('active',button.dataset.filter===filter);
   });
-  document.querySelector('.explore-shortcut[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
-  document.querySelector('.explore-shortcut[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
-  $('selectedTags').innerHTML=exploreTags.map(tagButton).join('');
+  document.querySelector('.explore-utility[data-action="tags"]')?.classList.toggle('active',exploreTags.length>0);
+  document.querySelector('.explore-utility[data-action="toggle-search"]')?.classList.toggle('active',!!search||!!($('exploreSearch')&&!$('exploreSearch').classList.contains('hidden')));
+  $('selectedTags').innerHTML=exploreTags.map(selectedExploreTagButton).join('');
+  const popularTabs=$('popularPeriodTabs');
+  if(popularTabs){
+    popularTabs.classList.toggle('hidden',filter!=='popular');
+    popularTabs.querySelectorAll('[data-action="popular-period"]').forEach(button=>{
+      const active=button.dataset.period===popularPeriod;
+      button.classList.toggle('active',active);
+      button.setAttribute('aria-pressed',String(active));
+    });
+  }
   const sectionTitle=document.querySelector('.explore-section-heading h2');
   if(sectionTitle)sectionTitle.textContent=filter==='popular'?'熱門角色':filter==='favorites'?'喜愛的角色':filter==='latest'?'新登場角色':'為你推薦';
 
@@ -5558,7 +5688,7 @@ ${c.avatarVideoPath ? `<video class="detail-image ${offline ? 'character-offline
         <section class="panel stack">
           <p class="muted">${c.gender === 'male' ? '男' : c.gender === 'female' ? '女' : '模糊'}
             · ${e(c.age || '未設定')} 歲 · ${e(c.race || '未設定種族')}</p>
-          <div><h3>角色介紹</h3><div class="prose">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</div></div>
+          <div><h3>角色介紹</h3><div class="prose character-public-intro">${renderCharacterIntroHtml(c.intro,currentUser()?.nickname||'你',c.name)}</div></div>
           <div class="row wrap">${(c.tags || []).map(tagButton).join('')}</div>
 ${offline
             ? '<div class="character-status-label"><span class="character-status-dot" style="position:static;background:#8993a4"></span>離線／已下架</div>'
@@ -5956,6 +6086,7 @@ let ownedCharacterPager=window.PoyozzListPagination.createState('ownedCharacters
 let ownedCharacterListObserver=null;
 let createVisibilityFilter = 'all';
 const characterTurnCountCache = new Map();
+const characterPeriodTurnCountCache = new Map();
 const characterTurnCountRequests = new Map();
 const characterTurnCountAttempted = new Set();
 function creationTabs() {
@@ -6217,7 +6348,8 @@ function renderEditor() {
         </div>
         <label class="field"><span>種族</span><input name="race" maxlength="50" value="${e(c.race || '')}"></label>
         ${window.PoyozzCityMap.renderWorldviewField(c)}
-        <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000">${e(c.intro || '')}</textarea>
+        <label class="field"><span>公開介紹 *</span><textarea name="intro" required maxlength="2000" placeholder="可使用基本 HTML 排版，例如 <p>段落</p>、<strong>粗體</strong>、<a href=&quot;https://...&quot;>連結</a>、<img src=&quot;https://...&quot; alt=&quot;圖片說明&quot;>">${e(c.intro || '')}</textarea>
+          <small>支援安全清理後的基本 HTML 與 HTTPS 外部圖片；不支援 JavaScript、iframe、內嵌樣式或外部影音。</small>
           <small class="char-counter" data-count-for="intro">0/2000</small></label>
         <label class="field"><span>開場白 * <details class="inline-help"><summary aria-label="開場白填寫說明" title="開場白填寫說明">?</summary><span>用 *動作* 表示場景描述；用 {USER} 帶入玩家名稱、{CHAR} 帶入角色名稱。</span></details></span><textarea name="opening" required maxlength="3000">${e(c.opening || '')}</textarea>
           <small class="char-counter" data-count-for="opening">0/3000</small></label>
@@ -11686,7 +11818,14 @@ document.addEventListener('click',async event => {
       }
       case 'group-toggle-member':groupExpandedMemberId=groupExpandedMemberId===key?null:key;render();break;
       case 'group-restart':groupRestart();break;
-      case 'nav':visit(button.dataset.page);break;
+      case 'nav': {
+        if(button.dataset.page==='citymap'){
+          go({page:route.page==='citymap'?'home':'citymap'});
+          break;
+        }
+        visit(button.dataset.page);
+        break;
+      }
       case 'create-visibility':
         createVisibilityFilter = ['all','public','private'].includes(button.dataset.value) ? button.dataset.value : 'all';
         renderCreate();
@@ -11862,6 +12001,19 @@ document.addEventListener('click',async event => {
         persist();
         go({page:'home',tag:button.dataset.tag});
         break;
+      case 'remove-explore-tag':
+        exploreTags=exploreTags.filter(tag=>tag!==button.dataset.tag);
+        if(route.tag){const next={...route};delete next.tag;go(next,true);}
+        renderGrid();
+        refreshExploreListing();
+        break;
+      case 'popular-period':
+        if(!['all','month','week'].includes(button.dataset.period))break;
+        popularPeriod=button.dataset.period;
+        characterPeriodTurnCountCache.clear();
+        renderGrid();
+        refreshExploreListing();
+        break;
       case 'filter':
         filter = button.dataset.filter;limit = 20;
         exploreTags = [];
@@ -11869,6 +12021,7 @@ document.addEventListener('click',async event => {
           const next = {...route};delete next.tag;
           go(next,true);
         } else renderHome();
+        refreshExploreListing();
         break;
       case 'toggle-search': {
         const searchRow = $('exploreSearch');
@@ -11877,11 +12030,14 @@ document.addEventListener('click',async event => {
         break;
       }
       case 'clear-search':
-        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();break;
+        search='';renderHome();$('exploreSearch')?.classList.remove('hidden');$('searchInput')?.focus();
+        if(filter==='popular')refreshExploreListing();
+        break;
       case 'clear-filter':
         search='';exploreTags=[];limit=window.PoyozzListPagination.pageSize('explore');
         go({page:'home'},true);
         renderHome();
+        refreshExploreListing();
         break;
       case 'banner':banner=Number(button.dataset.index);renderBanner();break;
       case 'scroll-grid':$('characterGrid')?.scrollIntoView({behavior:'smooth'});break;
@@ -12827,7 +12983,8 @@ document.addEventListener('submit',async event => {
           }
         }
         // Close picker deterministically so the old draft cannot overwrite selected tags.
-        { const returnRoute={...route}; delete returnRoute.overlay; go(returnRoute,true); render(); }
+        { const returnRoute={...route}; delete returnRoute.overlay; if(o.mode==='explore')delete returnRoute.tag; go(returnRoute,true); render(); }
+        if(o.mode==='explore')refreshExploreListing();
         break;
       }
       case 'delete-character': {
@@ -13385,7 +13542,13 @@ window.addEventListener('blur', saveEditorDraft);
 document.addEventListener('input',event => {
   const target=event.target;
   if (target.closest('form[data-form="character"]')) saveEditorDraft();
-  if (target.id==='searchInput') {search=target.value;limit=20;renderGrid();}
+  if (target.id==='searchInput') {
+    search=target.value;limit=20;
+    if(filter==='popular'){
+      if(exploreSearchTimer)clearTimeout(exploreSearchTimer);
+      exploreSearchTimer=setTimeout(()=>refreshExploreListing(),250);
+    }else renderGrid();
+  }
   if(target.id==='groupWorldBackground')groupPrototype.draft.world=target.value;
   if (target.id==='chatSearch') {
     chatSearch=target.value;
