@@ -7,9 +7,9 @@ function walletCostPreviewHTML(cost) {
   const fromSilver=Math.min(silver,price);
   const fromDiamonds=Math.max(0,price-fromSilver);
   const parts=[];
-  if(fromSilver>0) parts.push('<span class="wallet-cost-part" aria-label="銀幣扣除 '+fromSilver+'">🪙 −'+fromSilver+'</span>');
-  if(fromDiamonds>0) parts.push('<span class="wallet-cost-part" aria-label="鑽石扣除 '+fromDiamonds+'">💎 −'+fromDiamonds+'</span>');
-  if(!parts.length) parts.push('<span class="wallet-cost-part">🪙 −'+price+'</span>');
+  if(fromSilver>0) parts.push('<span class="wallet-cost-part" aria-label="銀幣扣除 '+fromSilver+'"><img class="poyozz-silver-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/silver.png" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async"> −'+fromSilver+'</span>');
+  if(fromDiamonds>0) parts.push('<span class="wallet-cost-part" aria-label="鑽石扣除 '+fromDiamonds+'"><img class="poyozz-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="18" height="18" loading="lazy" decoding="async"> −'+fromDiamonds+'</span>');
+  if(!parts.length) parts.push('<span class="wallet-cost-part"><img class="poyozz-silver-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/silver.png" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async"> −'+price+'</span>');
   return parts.join('<span class="wallet-cost-plus" aria-hidden="true"> </span>');
 }
 let walletDiamondConsentOnce = '';
@@ -68,8 +68,8 @@ function openInsufficientFundsDialog(mode) {
   const enoughTotal=silver+diamonds>=cost;
   const remembered=getTodayWalletChoice(mode);
   const remember=remembered==='diamonds' || (mode==='single' && remembered==='ad');
-  const chargePreview=(fromSilver>0?'<span>🪙 −'+fromSilver+' <small>(持有 '+silver+')</small></span>':'')+
-    (fromDiamonds>0?'<span>💎 −'+fromDiamonds+' <small>(持有 '+diamonds+')</small></span>':'');
+  const chargePreview=(fromSilver>0?'<span><img class="poyozz-silver-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/silver.png" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async"> −'+fromSilver+' <small>(持有 '+silver+')</small></span>':'')+
+    (fromDiamonds>0?'<span><img class="poyozz-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="18" height="18" loading="lazy" decoding="async"> −'+fromDiamonds+' <small>(持有 '+diamonds+')</small></span>':'');
   const adOption=mode==='single'
     ? '<button type="button" class="primary" data-action="wallet-watch-ad">看廣告繼續聊</button>'
     : '';
@@ -82,7 +82,7 @@ function openInsufficientFundsDialog(mode) {
   const body='你的銀幣或鑽石不足，繼續對話將花費以下：';
   showDialog('銀幣或鑽石不足',`
     <p>${body}</p>
-    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'💎 −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
+    <div class="wallet-modal-cost" aria-label="預計扣款">${chargePreview||'<img class="poyozz-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="18" height="18" loading="lazy" decoding="async"> −'+cost+' <small>(持有 '+diamonds+')</small>'}</div>
     ${mode==='single'?'<p>你也可以選擇觀看廣告，繼續對話。</p>':''}
     <div class="wallet-modal-actions">${adOption}${diamondOption}</div>
     ${rememberOption}
@@ -103,8 +103,8 @@ document.addEventListener('click',async event=>{
     const silver=Math.max(0,Number(u.silver||0)),diamonds=Math.max(0,Number(u.diamonds||0));
     const cost=route.page==='group'?Math.max(1,(groupPrototype.active?.members||[]).length)*3:2;
     showDialog('我的資源',`
-      <div class="wallet-resource-row"><span>🪙 銀幣</span><strong>持有 ${silver.toLocaleString()}</strong></div>
-      <div class="wallet-resource-row"><span>💎 鑽石</span><strong>持有 ${diamonds.toLocaleString()}</strong></div>
+      <div class="wallet-resource-row"><span><img class="poyozz-silver-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/silver.png" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async"> 銀幣</span><strong>持有 ${silver.toLocaleString()}</strong></div>
+      <div class="wallet-resource-row"><span><img class="poyozz-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="18" height="18" loading="lazy" decoding="async"> 鑽石</span><strong>持有 ${diamonds.toLocaleString()}</strong></div>
       <p class="small muted">本次預計扣除：${walletCostPreviewHTML(cost)}</p>
     `);
     return;
