@@ -1337,7 +1337,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     if (!client) return [];
     const version = publicCharacterRowsCacheVersion;
     const querySignature=JSON.stringify({
-      filter,exploreTags:[...exploreTags].sort(),
+      filter,popularPeriod,search:search.trim(),exploreTags:[...exploreTags].sort(),
       ownerUid:state.account?.uid||null
     });
     const cacheKey=querySignature+':'+String(offset);
@@ -1346,8 +1346,33 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
     }
     if(publicCharacterRowsInflight.has(cacheKey))return publicCharacterRowsInflight.get(cacheKey);
     const request=(async()=>{
-      let query=client.from('characters')
-        .select('id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible')
+      const columns='id, author_id, name, gender, age, avatar_url, avatar_video_path, is_nsfw, visibility, review_status, intro, race, style, tags, created_at, first_published_at, latest_eligible';
+      if(filter==='popular'){
+        const {data:ranked,error:rankingError}=await client.rpc('get_public_character_leaderboard',{
+          p_period:popularPeriod,
+          p_limit:publicCharacterPageSize,
+          p_offset:offset,
+          p_tags:exploreTags.length?exploreTags:null,
+          p_search:search.trim()||null
+        });
+        if(rankingError)throw new Error('讀取熱門排行失敗：'+rankingError.message);
+        const ranking=Array.isArray(ranked)?ranked:[];
+        const ids=ranking.map(row=>row.character_id).filter(isUuid);
+        for(const row of ranking){
+          if(!isUuid(row.character_id))continue;
+          const count=Number(row.turn_count);
+          if(!Number.isSafeInteger(count)||count<0)continue;
+          if(popularPeriod==='all')characterTurnCountCache.set(row.character_id,count);
+          else characterPeriodTurnCountCache.set(popularPeriod+':'+row.character_id,count);
+        }
+        if(!ids.length)return [];
+        const {data,error}=await client.from('characters').select(columns)
+          .in('id',ids).eq('visibility','public').is('deleted_at',null);
+        if(error)throw new Error(error.message);
+        const byId=new Map((Array.isArray(data)?data:[]).map(row=>[row.id,row]));
+        return ids.map(id=>byId.get(id)).filter(Boolean);
+      }
+      let query=client.from('characters').select(columns)
         .eq('visibility','public').is('deleted_at',null);
       if(filter==='male'||filter==='female')query=query.eq('gender',filter);
       if(filter==='latest'){
@@ -1360,12 +1385,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         .order('id',{ascending:false})
         .range(offset,offset+publicCharacterPageSize-1);
       if(error)throw new Error(error.message);
-      const rows=Array.isArray(data)?data:[];
-      if(version===publicCharacterRowsCacheVersion){
-        publicCharacterRowsCache.set(cacheKey,rows);
-        publicCharacterRowsCacheAt=Date.now();
-      }
-      return rows;
+      return Array.isArray(data)?data:[];
     })();
     publicCharacterRowsInflight.set(cacheKey,request);
     try{return await request;}
