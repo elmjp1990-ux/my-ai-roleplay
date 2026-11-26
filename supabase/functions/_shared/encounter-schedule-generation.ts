@@ -18,6 +18,21 @@ export const ENCOUNTER_SCENE_KEYS = [
   "luxury-apartment", "apartment", "convenience-store", "private-club",
 ] as const;
 
+// Keep normalized and custom scene mappings inside the exact allowlist accepted by
+// publish_encounter_schedule_batch. Unmapped descriptions remain publishable with
+// a NULL scene key, so an unknown/custom marker cannot reject an otherwise valid hour.
+const SQL_PUBLISH_LOCATION_KEYS = new Set([
+  "airport", "commercial", "night-bar", "live-house", "apartment", "department-store",
+  "bookstore", "cafe", "park", "shopping-street", "night-market", "restaurant",
+  "university", "hospital", "gym", "cinema", "museum", "hotel", "train-station",
+  "library", "theater", "art-gallery", "community-center", "music-studio", "bakery",
+  "coworking-space", "waterfront", "luxury-apartment", "convenience-store", "private-club",
+]);
+const toSqlPublishLocationKey = (value: unknown): string | null => {
+  const key = text(value);
+  return SQL_PUBLISH_LOCATION_KEYS.has(key) ? key : null;
+};
+
 // Scene anchors are fixed A–N map locations. Dynamic content belongs inside
 // these locations and must never create additional map markers.
 export const ENCOUNTER_DYNAMIC_SCENE_KEYS = [] as const;
@@ -501,7 +516,7 @@ function validateHourlySchedulePartial(
         errors.push(optionLabel + "_outdoor_flag_invalid");
         continue;
       }
-      const locationKey = normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext);
+      const locationKey = toSqlPublishLocationKey(normalizeEncounterSceneKey(locationDescription, activity, characterResidentialContext));
       const activitySpace = classifyEncounterActivitySpace(activity, locationDescription, rawOption.is_outdoor);
       const rainLocationDescription = text(rawOption.rain_fallback_location);
       validOptions.push({
@@ -513,7 +528,7 @@ function validateHourlySchedulePartial(
         scene_description: activity,
         is_outdoor: activitySpace === "outdoor",
         rain_fallback_location_key: rainLocationDescription
-          ? normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext)
+          ? toSqlPublishLocationKey(normalizeEncounterSceneKey(rainLocationDescription, rawOption.rain_fallback_activity, characterResidentialContext))
           : null,
         rain_fallback_activity: text(rawOption.rain_fallback_activity) || null,
         rain_fallback_greeting: null,
@@ -883,7 +898,7 @@ export function parseEncounterScheduleBatchOutput(
   const catalogByDisplayName = new Map(
     sceneCatalog
       .map((scene) => [text(scene.display_name).toLocaleLowerCase(), normalizeEncounterSceneKey(scene.location_key)] as const)
-      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && SQL_PUBLISH_LOCATION_KEYS.has(entry[1])),
   );
   for (const character of characters) {
     const source = sourceById.get(character.character_id);
