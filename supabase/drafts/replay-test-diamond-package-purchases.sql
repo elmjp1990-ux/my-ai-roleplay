@@ -18,10 +18,10 @@ begin
   -- disposable local database only; all rows are rolled back below.
   set local session_replication_role = replica;
   insert into public.profiles
-    (id, handle, nickname, persona_presets, follower_count)
+    (id, handle, nickname, persona_presets, follower_count, membership_tier, membership_expires_at)
   values
-    (v_free_uid, 'diamond_test_free_user', 'Diamond Free Test', '[]'::jsonb, 0),
-    (v_member_uid, 'diamond_test_monthly_user', 'Diamond Monthly Test', '[]'::jsonb, 0);
+    (v_free_uid, 'diamond_test_free_user', 'Diamond Free Test', '[]'::jsonb, 0, 'free', null),
+    (v_member_uid, 'diamond_test_monthly_user', 'Diamond Monthly Test', '[]'::jsonb, 0, 'monthly', now() + interval '30 days');
   insert into public.wallet_accounts(user_id, diamonds, silver_coins)
   values (v_free_uid, 0, 100), (v_member_uid, 0, 100);
   set local session_replication_role = origin;
@@ -127,11 +127,6 @@ begin
   end if;
 
   -- Active monthly membership suppresses the bonus, but not the base package.
-  update public.profiles
-  set membership_tier = 'monthly',
-      membership_expires_at = now() + interval '30 days'
-  where id = v_member_uid;
-
   perform set_config('request.jwt.claim.sub', v_member_uid::text, true);
   v_result := public.test_purchase_diamond_package('twd_60', '33333333-4444-4555-8666-777777777777');
   if (v_result->>'base_diamonds')::integer <> 200
