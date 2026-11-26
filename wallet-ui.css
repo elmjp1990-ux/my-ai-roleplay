@@ -50,3 +50,10 @@
 @media(max-width:560px){.store-night-hero{min-height:160px;padding:20px 17px;border-radius:18px}.store-night-hero-copy{max-width:70%}.store-night-hero h1{font-size:24px}.store-night-hero p{font-size:11px}.store-night-gem{width:115px;height:130px;flex-basis:115px;margin-right:0}.store-crystal-svg{width:112px;height:112px}.store-gem-orbit{width:120px;height:42px}.store-gem-orbit-two{width:110px;height:34px}.store-resource-grid{gap:8px}.store-resource-card{gap:8px;padding:11px 9px;min-height:70px}.store-resource-card>i{width:30px;height:30px;flex-basis:30px;font-size:16px}.store-resource-card strong{font-size:18px}.store-resource-card small{display:none}.store-package-grid{gap:9px}.store-crystal-package{padding:11px}.store-package-diamond-count strong{font-size:21px}.store-package-bottom>strong{font-size:15px}.store-package-buy{padding:6px 8px;font-size:10px}}
 @media(max-width:380px){.store-night-hero-copy{max-width:74%}.store-night-gem{width:86px;flex-basis:86px;margin-left:-8px}.store-crystal-svg{width:92px;height:92px}.store-package-grid{grid-template-columns:1fr}.store-crystal-package{padding:13px}}
 
+
+/* Shared low-footprint diamond artwork: one cached source, size-specific rendering. */
+.poyozz-diamond-icon{display:inline-block;width:1.15em;height:1.15em;object-fit:contain;vertical-align:-.22em;flex:0 0 auto;}
+.store-crystal-svg{display:block;width:145px;height:145px;object-fit:contain;filter:drop-shadow(0 0 18px #b08bff3d);}
+.store-package-diamond-icon{width:35px;height:35px;}
+.wallet-cost-part .poyozz-diamond-icon,.wallet-modal-cost .poyozz-diamond-icon,.wallet-resource-row .poyozz-diamond-icon{width:18px;height:18px;}
+.wallet-diamond .poyozz-diamond-icon{width:16px;height:16px;}
