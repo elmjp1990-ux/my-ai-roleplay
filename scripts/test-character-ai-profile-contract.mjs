@@ -79,7 +79,7 @@ const classifierSandbox = { window: {} };
 vm.runInNewContext(coreUtils, classifierSandbox);
 const classifyProfileChange = classifierSandbox.window.PoyozzCoreUtils.classifyCharacterProfileChanges;
 const baseCharacter = {
-  name: "角色甲", intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
+  name: "角色甲", gender: "male", age: 23, intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
   phone_settings: {}, phoneSettings: {}, privateInfo: "住在城市", tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
 };
 const basePrivate = { private_info: "住在城市", personality_profile: baseCharacter.personalityProfile };
@@ -90,6 +90,10 @@ const classify = (characterPatch = {}, privatePatch = {}, existingPatch = {}) =>
   normalizePersonalityProfile: value => value || {},
   rowPhoneSettingsForDiff: value => value || {},
 });
+assert.equal(classify({ age: 24 }).requiresDerivedRefresh, false,
+  "Changing the author-set age must not trigger paid AI profile regeneration");
+assert.equal(classify({ gender: "female" }).requiresDerivedRefresh, false,
+  "Changing the author-set gender must not trigger paid AI profile regeneration");
 assert.equal(classify({ name: "角色乙" }).requiresDerivedRefresh, false,
   "Renaming a character must not trigger AI profile generation");
 assert.equal(classify({ opening: "優化後的開場白" }).requiresDerivedRefresh, false,
