@@ -898,7 +898,7 @@ export function parseEncounterScheduleBatchOutput(
   const catalogByDisplayName = new Map(
     sceneCatalog
       .map((scene) => [text(scene.display_name).toLocaleLowerCase(), normalizeEncounterSceneKey(scene.location_key)] as const)
-      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && SQL_PUBLISH_LOCATION_KEYS.has(entry[1]))),
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1] !== null && SQL_PUBLISH_LOCATION_KEYS.has(entry[1]))),
   );
   for (const character of characters) {
     const source = sourceById.get(character.character_id);
