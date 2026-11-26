@@ -1069,7 +1069,7 @@ export async function handleEncounterScheduleOrganizer(
       ambiguousProviderFailure ||= result.ambiguous === true;
       continue;
     }
-    if (result.providerResponse) {
+    if ("providerResponse" in result && result.providerResponse) {
       providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
     }
     rawOutputIdByCharacter.set(result.sourceId, result.rawOutputId);
