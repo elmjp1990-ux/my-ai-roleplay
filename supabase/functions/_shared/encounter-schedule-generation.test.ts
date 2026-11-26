@@ -88,8 +88,8 @@ Deno.test("maps every LUCID venue area, including its back alley, to the private
 
 Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map scenes", () => {
   const worksiteBlocks = Array.from({ length: 24 }, (_, hour) => block(hour, [
-    option({ weight: 60, location: "工地", activity: "前往工地監工並確認施工進度" }),
-    option({ weight: 40, location: "工地", activity: "巡視工地並與施工工班確認進度" }),
+    option({ weight: 60, location: "高級公寓", activity: "前往裝修工地監工並確認施工進度" }),
+    option({ weight: 40, location: "高級公寓", activity: "巡視工地並與施工工班確認進度" }),
   ]));
   const jiang = source(id1, {
     name: "江辰遠",
@@ -110,7 +110,7 @@ Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map
     throw new Error("Jiang's worksite should be distributed across every existing scene anchor");
   }
   if (parsed.characters[0].variants.weekday[0].options[0].location_description !== "工地") {
-    throw new Error("the original worksite description should be preserved");
+    throw new Error("construction activity should be represented as a movable worksite");
   }
 
   const other = result([{
