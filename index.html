@@ -10467,6 +10467,13 @@ document.addEventListener('click',async event=>{
 /* Account */
 function renderShop() {
   const u = currentUser();
+  if (u?.uid && window.mySupabase && window.__poyozzShopBonusLedgerUid !== u.uid) {
+    window.__poyozzShopBonusLedgerUid = u.uid;
+    void loadWalletLedger('diamond').then(ok => {
+      if (ok && state.account?.uid === u.uid && route.page === 'shop') renderShop();
+      else if (!ok) window.__poyozzShopBonusLedgerUid = null;
+    });
+  }
   const silver = Number(u?.silver || 0).toLocaleString();
   const diamonds = Number(u?.diamonds || 0).toLocaleString();
   const diamondPackages = [
@@ -10499,18 +10506,29 @@ function renderShop() {
       </section>
       <section class="stack" style="gap:12px">
         <div><h2 style="margin:0">鑽石儲值</h2><p class="small muted" style="margin:5px 0 0">選擇適合你的鑽石方案</p></div>
-        <div class="two-col" style="gap:12px">
-          ${diamondPackages.map((item) => `
-            <article class="panel stack" style="padding:15px;gap:12px;justify-content:space-between">
-              <div class="row between" style="align-items:center;gap:8px">
-                <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
-                <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">NT${item.price.toLocaleString()}</strong>
-              </div>
-              <span class="small" style="color:var(--accent,#b99a69)">每個鑽石級距首次購買加贈 30%（所有會員皆適用）</span>
-              <button type="button" data-action="test-diamond-package" data-id="${item.code}" style="width:100%">TEST 測試入帳（不收款）</button>
-            </article>`).join('')}
+        <div class="store-package-list">
+          ${diamondPackages.map((item) => {
+            const hasFirstPurchaseBonus = !state.ledger.some(entry =>
+              entry.currency === 'diamond' &&
+              entry.reason === '首儲優惠贈鑽' &&
+              entry.referenceId === item.code
+            );
+            const bonus = Math.round(item.amount * 0.30);
+            return `
+              <article class="store-package-row">
+                <div class="store-package-copy">
+                  <div class="store-package-main">
+                    <strong class="store-package-amount">💎 ${item.amount.toLocaleString()}${hasFirstPurchaseBonus ? ` <span class="store-package-bonus">＋ 💎${bonus.toLocaleString()}</span>` : ''}</strong>
+                    <div class="store-package-purchase">
+                      <strong class="store-package-price">NT${item.price.toLocaleString()}</strong>
+                      <button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="${item.code}">購買</button>
+                    </div>
+                  </div>
+                  ${hasFirstPurchaseBonus ? '<span class="store-package-promo">首儲優惠</span>' : ''}
+                </div>
+              </article>`;
+          }).join('')}
         </div>
-        <p class="small muted" style="margin:0;line-height:1.7">測試環境：不會產生真實付款。每個級距僅首次購買加贈 30%；月費會員與一般會員皆適用，各級距分開計算。</p>
 
       </section>
       <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
@@ -11944,7 +11962,7 @@ document.addEventListener('click',async event => {
         const user = currentUser();
         const client = window.mySupabase;
         if (!client || !isUuid(user?.uid)) {
-          throw new Error('測試儲值需要使用已登入的 TEST 雲端帳號。');
+          throw new Error('請先登入帳號，再進行購買。');
         }
         const {data:authData,error:authError}=await client.auth.getUser();
         if (authError || authData?.user?.id !== user.uid) {
@@ -11967,7 +11985,7 @@ document.addEventListener('click',async event => {
             p_package_code:packageCode,
             p_request_id:requestId
           });
-          if (error) throw new Error('測試入帳失敗：'+error.message);
+          if (error) throw new Error('目前無法完成購買，請稍後再試。');
           const result=Array.isArray(data)?data[0]:data;
           if (!result || result.status !== 'granted') throw new Error('資料庫未回傳有效的測試入帳結果。');
           state.account.diamonds=Number(result.diamonds ?? state.account.diamonds ?? 0);
@@ -11981,7 +11999,7 @@ document.addEventListener('click',async event => {
             : `測試入帳完成：基本 ${Number(result.base_diamonds||0)} 鑽石；本次沒有首購贈鑽。`);
         } catch(error) {
           button.disabled = false;
-          button.textContent = 'TEST 測試入帳（不收款）';
+          button.textContent = '購買';
           throw error;
         }
         break;
