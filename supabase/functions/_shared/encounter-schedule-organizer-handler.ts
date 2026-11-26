@@ -593,7 +593,7 @@ export async function handleEncounterScheduleOrganizer(
     if (mode === "repair_list") {
       // Expired originals remain stored for audit/history; expiry only removes edit eligibility.
       const { data: outputs, error: outputsError } = await admin.from("encounter_schedule_generation_outputs")
-        .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at")
+        .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at,expires_at")
         .eq("actor_user_id", actorUserId)
         .is("removed_at", null)
         .in("status", ["failed", "partial", "received", "dismissed", "completed"])
