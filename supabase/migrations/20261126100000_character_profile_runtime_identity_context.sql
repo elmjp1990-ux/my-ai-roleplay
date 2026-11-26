@@ -81,6 +81,35 @@ BEGIN
 
   v_hash := encode(extensions.digest(convert_to(public.character_profile_source_hash_payload(v_payload)::text, 'UTF8'), 'sha256'), 'hex');
 
+  -- A save that changed only runtime identity facts must not create a new job.
+  -- Preserve any already-existing job unchanged; only a changed profile source
+  -- or a changed owner may proceed to the upsert below.
+  IF p_source_changed IS NOT TRUE THEN
+    SELECT * INTO v_job
+    FROM public.character_profile_organization_jobs
+    WHERE character_id = p_character_id
+    FOR UPDATE;
+
+    IF NOT FOUND THEN
+      RETURN jsonb_build_object(
+        'status', 'not_enqueued',
+        'source_hash', v_hash,
+        'lease_generation', NULL,
+        'reused_existing_job', false
+      );
+    END IF;
+
+    IF v_job.author_id = v_author_id THEN
+      RETURN jsonb_build_object(
+        'status', v_job.status,
+        'source_hash', v_job.source_hash,
+        'lease_generation', v_job.lease_generation,
+        'reused_existing_job', v_job.source_hash = v_hash
+          AND v_job.status IN ('pending', 'processing', 'completed')
+      );
+    END IF;
+  END IF;
+
   INSERT INTO public.character_profile_organization_jobs (
     character_id, author_id, source_hash, status, attempt_count,
     available_at, lease_token, lease_expires_at, last_error_code,
