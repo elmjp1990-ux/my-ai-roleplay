@@ -5,25 +5,28 @@ begin;
 
 do $diamond_package_test$
 declare
-  v_uid uuid := 'a1111111-1111-4111-8111-111111111111';
+  v_free_uid uuid := 'a1111111-1111-4111-8111-111111111111';
+  v_member_uid uuid := 'b2222222-2222-4222-8222-222222222222';
   v_result jsonb;
-  v_balance integer;
-  v_base_rows integer;
-  v_bonus_rows integer;
-  v_bonus_for_first_tier integer;
+  v_free_balance integer;
+  v_member_balance integer;
+  v_free_base_rows integer;
+  v_free_bonus_rows integer;
+  v_member_bonus_rows integer;
 begin
-  -- Use a synthetic profile ID without requiring an Auth fixture. This is a
+  -- Use synthetic profile IDs without requiring Auth fixtures. This is a
   -- disposable local database only; all rows are rolled back below.
   set local session_replication_role = replica;
   insert into public.profiles
     (id, handle, nickname, persona_presets, follower_count)
   values
-    (v_uid, 'diamond_test_user', 'Diamond Test', '[]'::jsonb, 0);
+    (v_free_uid, 'diamond_test_free_user', 'Diamond Free Test', '[]'::jsonb, 0),
+    (v_member_uid, 'diamond_test_monthly_user', 'Diamond Monthly Test', '[]'::jsonb, 0);
   insert into public.wallet_accounts(user_id, diamonds, silver_coins)
-  values (v_uid, 0, 100);
+  values (v_free_uid, 0, 100), (v_member_uid, 0, 100);
   set local session_replication_role = origin;
 
-  perform set_config('request.jwt.claim.sub', v_uid::text, true);
+  perform set_config('request.jwt.claim.sub', v_free_uid::text, true);
 
   -- The RPC must refuse grants until an operator enables the TEST-only switch.
   begin
@@ -62,7 +65,7 @@ begin
     raise exception 'Repeated NT$60 tier must not repeat the bonus: %', v_result;
   end if;
 
-  -- A different tier has its own first-purchase entitlement; 30% of 525 rounds to 158.
+  -- Every other tier has an independent first-purchase bonus.
   v_result := public.test_purchase_diamond_package('twd_150', 'dddddddd-dddd-4ddd-8ddd-dddddddddddd');
   if (v_result->>'base_diamonds')::integer <> 525
      or (v_result->>'bonus_diamonds')::integer <> 158
@@ -70,53 +73,91 @@ begin
     raise exception 'First NT$150 package grant mismatch: %', v_result;
   end if;
 
-  -- Active monthly membership suppresses the bonus, but not the base test package.
-  update public.profiles
-  set membership_tier = 'monthly',
-      membership_expires_at = now() + interval '30 days'
-  where id = v_uid;
-
   v_result := public.test_purchase_diamond_package('twd_290', 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee');
   if (v_result->>'base_diamonds')::integer <> 1050
-     or (v_result->>'bonus_diamonds')::integer <> 0
-     or (v_result->>'diamonds')::integer <> 2193 then
-    raise exception 'Monthly member must not receive first-purchase bonus: %', v_result;
+     or (v_result->>'bonus_diamonds')::integer <> 315
+     or (v_result->>'diamonds')::integer <> 2508 then
+    raise exception 'First NT$290 package grant mismatch: %', v_result;
   end if;
 
-  select count(*) into v_base_rows
+  v_result := public.test_purchase_diamond_package('twd_850', 'ffffffff-ffff-4fff-8fff-ffffffffffff');
+  if (v_result->>'base_diamonds')::integer <> 3200
+     or (v_result->>'bonus_diamonds')::integer <> 960
+     or (v_result->>'diamonds')::integer <> 6668 then
+    raise exception 'First NT$850 package grant mismatch: %', v_result;
+  end if;
+
+  v_result := public.test_purchase_diamond_package('twd_1390', '11111111-2222-4333-8444-555555555555');
+  if (v_result->>'base_diamonds')::integer <> 5400
+     or (v_result->>'bonus_diamonds')::integer <> 1620
+     or (v_result->>'diamonds')::integer <> 13688 then
+    raise exception 'First NT$1,390 package grant mismatch: %', v_result;
+  end if;
+
+  v_result := public.test_purchase_diamond_package('twd_2690', '22222222-3333-4444-8555-666666666666');
+  if (v_result->>'base_diamonds')::integer <> 11000
+     or (v_result->>'bonus_diamonds')::integer <> 3300
+     or (v_result->>'diamonds')::integer <> 27988 then
+    raise exception 'First NT$2,690 package grant mismatch: %', v_result;
+  end if;
+
+  select count(*) into v_free_base_rows
   from public.wallet_transactions
-  where user_id = v_uid
+  where user_id = v_free_uid
     and biz_type = 'test_diamond_purchase'
     and currency_type = 'diamonds';
 
-  select count(*) into v_bonus_rows
+  select count(*) into v_free_bonus_rows
   from public.wallet_transactions
-  where user_id = v_uid
+  where user_id = v_free_uid
     and biz_type = 'diamond_first_purchase_bonus'
     and currency_type = 'diamonds';
 
-  select count(*) into v_bonus_for_first_tier
-  from public.wallet_transactions
-  where user_id = v_uid
-    and biz_type = 'diamond_first_purchase_bonus'
-    and reference_id = 'twd_60';
-
-  if v_base_rows <> 4 or v_bonus_rows <> 2 or v_bonus_for_first_tier <> 1 then
-    raise exception 'Ledger separation / per-tier one-time bonus mismatch: base %, bonus %, tier60 %',
-      v_base_rows, v_bonus_rows, v_bonus_for_first_tier;
+  if v_free_base_rows <> 7 or v_free_bonus_rows <> 6 then
+    raise exception 'Free-user ledger separation mismatch: base %, bonus %',
+      v_free_base_rows, v_free_bonus_rows;
   end if;
 
-  select diamonds into v_balance
+  select diamonds into v_free_balance
   from public.wallet_accounts
-  where user_id = v_uid;
+  where user_id = v_free_uid;
 
-  if v_balance <> 2193 then
-    raise exception 'Final wallet balance mismatch: %', v_balance;
+  if v_free_balance <> 27988 then
+    raise exception 'Final free-user wallet balance mismatch: %', v_free_balance;
+  end if;
+
+  -- Active monthly membership suppresses the bonus, but not the base package.
+  update public.profiles
+  set membership_tier = 'monthly',
+      membership_expires_at = now() + interval '30 days'
+  where id = v_member_uid;
+
+  perform set_config('request.jwt.claim.sub', v_member_uid::text, true);
+  v_result := public.test_purchase_diamond_package('twd_60', '33333333-4444-4555-8666-777777777777');
+  if (v_result->>'base_diamonds')::integer <> 200
+     or (v_result->>'bonus_diamonds')::integer <> 0
+     or (v_result->>'diamonds')::integer <> 200 then
+    raise exception 'Monthly member must not receive first-purchase bonus: %', v_result;
+  end if;
+
+  select count(*) into v_member_bonus_rows
+  from public.wallet_transactions
+  where user_id = v_member_uid
+    and biz_type = 'diamond_first_purchase_bonus'
+    and currency_type = 'diamonds';
+
+  select diamonds into v_member_balance
+  from public.wallet_accounts
+  where user_id = v_member_uid;
+
+  if v_member_bonus_rows <> 0 or v_member_balance <> 200 then
+    raise exception 'Monthly member bonus or balance mismatch: bonus rows %, balance %',
+      v_member_bonus_rows, v_member_balance;
   end if;
 
   -- Invalid package codes must be rejected.
   begin
-    perform public.test_purchase_diamond_package('twd_999', 'ffffffff-ffff-4fff-8fff-ffffffffffff');
+    perform public.test_purchase_diamond_package('twd_999', '44444444-5555-4666-8777-888888888888');
     raise exception 'Invalid package code should have been rejected';
   exception when sqlstate '22023' then
     null;
