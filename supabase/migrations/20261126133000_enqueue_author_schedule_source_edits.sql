@@ -67,9 +67,22 @@ $function$;
 
 DROP TRIGGER IF EXISTS character_schedules_enqueue_encounter_schedule_ai
   ON public.character_schedules;
-CREATE TRIGGER character_schedules_enqueue_encounter_schedule_ai
-AFTER INSERT OR UPDATE OR DELETE ON public.character_schedules
+CREATE TRIGGER character_schedules_enqueue_manual_schedule_insert
+AFTER INSERT ON public.character_schedules
 FOR EACH ROW
+WHEN (NEW.source_type = 'manual')
+EXECUTE FUNCTION public.on_encounter_manual_schedule_changed();
+
+CREATE TRIGGER character_schedules_enqueue_manual_schedule_update
+AFTER UPDATE ON public.character_schedules
+FOR EACH ROW
+WHEN (OLD.source_type = 'manual' OR NEW.source_type = 'manual')
+EXECUTE FUNCTION public.on_encounter_manual_schedule_changed();
+
+CREATE TRIGGER character_schedules_enqueue_manual_schedule_delete
+AFTER DELETE ON public.character_schedules
+FOR EACH ROW
+WHEN (OLD.source_type = 'manual')
 EXECUTE FUNCTION public.on_encounter_manual_schedule_changed();
 
 COMMIT;
