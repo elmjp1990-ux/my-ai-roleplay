@@ -10668,6 +10668,8 @@ async function loadWalletLedger(currency) {
           daily_checkin: '每日簽到',
           reward_ad: '觀看獎勵廣告',
           purchase: '購買',
+          test_diamond_purchase: '測試儲值（基本鑽石）',
+          diamond_first_purchase_bonus: '首儲優惠贈鑽',
           admin_adjustment: '餘額調整'
         })[row.biz_type] || row.biz_type || '錢包交易';
         const characterName = roleNames.get(row.reference_id);
