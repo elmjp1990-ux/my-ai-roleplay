@@ -1081,6 +1081,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       persist();
       void loadPublicSupabaseCharacters();
       if (route?.page !== 'citymap') render();
+      else refreshCityMapWalletHeader();
       return;
     }
 
@@ -1207,6 +1208,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         state.signedIn = true;
         persist();
         if (route?.page !== 'citymap') render();
+        else refreshCityMapWalletHeader();
         if (!state.account.accountDeletionModalDismissed &&
             route?.overlay?.name !== 'account-deletion-pending') {
           openModal('account-deletion-pending', {
@@ -1228,7 +1230,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       syncStage = '讀取公開會員資料';
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio, follower_count, membership_tier, membership_expires_at')
+        .select('id, handle, nickname, avatar_url, bio, follower_count')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -1291,8 +1293,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         avatar: profile.avatar_url || '',
         profileReady: true,
         bio: profile.bio || '',
-        member: profile.membership_tier === 'monthly' &&
-          (!profile.membership_expires_at || new Date(profile.membership_expires_at).getTime() > Date.now())
+        member: privateProfile.membership_tier === 'monthly' &&
+          (!privateProfile.membership_expires_at || new Date(privateProfile.membership_expires_at).getTime() > Date.now())
           ? 'monthly' : 'free',
         birthdate: privateProfile.birthdate || '',
         personas: Array.isArray(privateProfile.persona_presets) ? privateProfile.persona_presets : [],
@@ -1302,6 +1304,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       state.signedIn = true;
       persist();
       if (route?.page !== 'citymap') render();
+      else refreshCityMapWalletHeader();
     } catch (error) {
       console.error('PersonaX 資料庫同步失敗（階段：' + syncStage + '）：', error);
       // 取消申請後的刷新由呼叫端顯示專屬訊息；一般登入流程仍使用原本提示。
@@ -4861,6 +4864,12 @@ function wallet() {
       ${avatar(u)}
     </button>` : `
     <button class="primary small" data-action="login">登入／註冊</button>`;
+}
+
+function refreshCityMapWalletHeader() {
+  if (route?.page !== 'citymap') return;
+  const accountArea = $('accountArea');
+  if (accountArea) accountArea.innerHTML = environment() + wallet();
 }
 
 /* History: each internal page gets an actual browser-history entry. */
