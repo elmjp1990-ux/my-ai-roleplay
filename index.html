@@ -9860,11 +9860,13 @@ async function loadEncounterScheduleRepairOutputs(){
     const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_list'}});
     if(error)throw error;
     const outputs=Array.isArray(data?.outputs)?data.outputs:[];
+    const history=Array.isArray(data?.published_history)?data.published_history:[];
+    const historyHtml=history.length?'<section class="stack" style="padding:12px;border:1px solid var(--border);border-radius:12px"><strong>已自動放置｜待官方後台審核</strong><p class="small muted" style="margin:0">測試介面只顯示紀錄；不在作者端審核，也不標記完成。</p>'+history.map(item=>'<article class="stack" style="padding:10px;border:1px solid var(--border);border-radius:10px"><strong>'+e(item.character_name||'角色')+'</strong><span class="small muted">已自動放置 · 待官方後台審核</span><span class="small muted">'+(item.created_at?new Date(item.created_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'')+'</span></article>').join('')+'</section>':'';
     if(!outputs.length){
-      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
+      container.innerHTML=historyHtml||'<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
       return;
     }
-    container.innerHTML=outputs.map(item=>{
+    container.innerHTML=historyHtml+outputs.map(item=>{
       const outputId=e(item.id||'');
       const hasSavedRevision=typeof item.latest_revision_text==='string'&&item.latest_revision_text.length>0;
       const editorText=e(hasSavedRevision?item.latest_revision_text:item.raw_response_text||'');
