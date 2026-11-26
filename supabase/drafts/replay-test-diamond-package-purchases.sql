@@ -126,13 +126,13 @@ begin
     raise exception 'Final free-user wallet balance mismatch: %', v_free_balance;
   end if;
 
-  -- Active monthly membership suppresses the bonus, but not the base package.
+  -- Active monthly membership does not affect diamond package promotions.
   perform set_config('request.jwt.claim.sub', v_member_uid::text, true);
   v_result := public.test_purchase_diamond_package('twd_60', '33333333-4444-4555-8666-777777777777');
   if (v_result->>'base_diamonds')::integer <> 200
-     or (v_result->>'bonus_diamonds')::integer <> 0
-     or (v_result->>'diamonds')::integer <> 200 then
-    raise exception 'Monthly member must not receive first-purchase bonus: %', v_result;
+     or (v_result->>'bonus_diamonds')::integer <> 60
+     or (v_result->>'diamonds')::integer <> 260 then
+    raise exception 'Monthly member must receive the same first-purchase bonus: %', v_result;
   end if;
 
   select count(*) into v_member_bonus_rows
@@ -145,7 +145,7 @@ begin
   from public.wallet_accounts
   where user_id = v_member_uid;
 
-  if v_member_bonus_rows <> 0 or v_member_balance <> 200 then
+  if v_member_bonus_rows <> 1 or v_member_balance <> 260 then
     raise exception 'Monthly member bonus or balance mismatch: bonus rows %, balance %',
       v_member_bonus_rows, v_member_balance;
   end if;
