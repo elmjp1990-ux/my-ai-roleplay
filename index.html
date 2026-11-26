@@ -10466,12 +10466,12 @@ function renderShop() {
   const silver = Number(u?.silver || 0).toLocaleString();
   const diamonds = Number(u?.diamonds || 0).toLocaleString();
   const diamondPackages = [
-    { amount: 200, price: 60 },
-    { amount: 490, price: 150 },
-    { amount: 960, price: 290 },
-    { amount: 2800, price: 850 },
-    { amount: 4600, price: 1390 },
-    { amount: 9000, price: 2690 }
+    { code: 'twd_60', amount: 200, price: 60 },
+    { code: 'twd_150', amount: 525, price: 150 },
+    { code: 'twd_290', amount: 1050, price: 290 },
+    { code: 'twd_850', amount: 3200, price: 850 },
+    { code: 'twd_1390', amount: 5400, price: 1390 },
+    { code: 'twd_2690', amount: 11000, price: 2690 }
   ];
   $('view').innerHTML = `
     <div class="stack store-page" style="gap:22px">
@@ -10500,11 +10500,13 @@ function renderShop() {
             <article class="panel stack" style="padding:15px;gap:12px;justify-content:space-between">
               <div class="row between" style="align-items:center;gap:8px">
                 <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
-                <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">$${item.price.toLocaleString()}</strong>
+                <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">NT${item.price.toLocaleString()}</strong>
               </div>
-              <button type="button" disabled aria-disabled="true" style="width:100%;opacity:.65;cursor:not-allowed">測試儲值功能準備中</button>
+              <span class="small" style="color:var(--accent,#b99a69)">非月費會員每級距首購加贈 30%</span>
+              <button type="button" data-action="test-diamond-package" data-id="${item.code}" style="width:100%">TEST 測試入帳（不收款）</button>
             </article>`).join('')}
         </div>
+        <p class="small muted" style="margin:0;line-height:1.7">測試環境：不會產生真實付款。每個級距僅首次購買加贈 30%；月費會員不適用，資格由資料庫判斷。</p>
 
       </section>
       <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
