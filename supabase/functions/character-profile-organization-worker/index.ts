@@ -473,7 +473,7 @@ export default {
             supabase.from("characters").select("name")
               .eq("id", inspectionProfile.character_id).eq("author_id", authorId).maybeSingle(),
             supabase.from("character_schedules")
-              .select("weekday,day_type,start_time,end_time,location_key,location_description,activity,scene_description,variant_key,variant_weight,encounter_greeting,rain_fallback_location_key,rain_fallback_activity,source_type,is_active,updated_at")
+              .select("id,weekday,day_type,start_time,end_time,location_key,location_description,activity,scene_description,priority,is_active,source_type,variant_key,variant_weight,special_event_key,encounter_greeting,is_outdoor,rain_fallback_location_key,rain_fallback_activity,rain_fallback_greeting,updated_at")
               .eq("character_id", inspectionProfile.character_id)
               .eq("is_active", true)
               .order("day_type", { ascending: true })
