@@ -1227,7 +1227,7 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
       syncStage = '讀取公開會員資料';
       let { data: profile, error: profileError } = await client
         .from('profiles')
-        .select('id, handle, nickname, avatar_url, bio, follower_count')
+        .select('id, handle, nickname, avatar_url, bio, follower_count, membership_tier, membership_expires_at')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -1290,6 +1290,9 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         avatar: profile.avatar_url || '',
         profileReady: true,
         bio: profile.bio || '',
+        member: profile.membership_tier === 'monthly' &&
+          (!profile.membership_expires_at || new Date(profile.membership_expires_at).getTime() > Date.now())
+          ? 'monthly' : 'free',
         birthdate: privateProfile.birthdate || '',
         personas: Array.isArray(privateProfile.persona_presets) ? privateProfile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
@@ -10502,7 +10505,7 @@ function renderShop() {
                 <strong style="font-size:clamp(18px,2.5vw,24px);white-space:nowrap">💎 ${item.amount.toLocaleString()}</strong>
                 <strong style="font-size:clamp(16px,2.2vw,20px);white-space:nowrap">NT${item.price.toLocaleString()}</strong>
               </div>
-              <span class="small" style="color:var(--accent,#b99a69)">非月費會員每級距首購加贈 30%</span>
+              <span class="small" style="color:var(--accent,#b99a69)">${u?.member === 'monthly' ? '月費會員不適用首儲贈鑽' : '非月費會員每級距首購加贈 30%'}</span>
               <button type="button" data-action="test-diamond-package" data-id="${item.code}" style="width:100%">TEST 測試入帳（不收款）</button>
             </article>`).join('')}
         </div>
