@@ -346,9 +346,14 @@ jobs:
                OR pg_catalog.strpos(v_definition, 'characters.name') = 0 THEN
               RAISE EXCEPTION 'Organizer payload is missing authoritative identity facts';
             END IF;
-            IF pg_catalog.strpos(pg_catalog.pg_get_functiondef(
+            v_definition := pg_catalog.pg_get_functiondef(
               'public.enqueue_character_profile_organization(uuid,boolean)'::regprocedure
-            ), 'character_profile_source_hash_payload') = 0
+            );
+            IF pg_catalog.strpos(v_definition, 'not_enqueued') = 0
+               OR pg_catalog.strpos(v_definition, 'p_source_changed IS NOT TRUE') = 0 THEN
+              RAISE EXCEPTION 'Runtime-only saves must not create a profile job';
+            END IF;
+            IF pg_catalog.strpos(v_definition, 'character_profile_source_hash_payload') = 0
                OR pg_catalog.strpos(pg_catalog.pg_get_functiondef(
                  'public.complete_character_profile_organization_job(uuid,uuid,bigint,text,jsonb)'::regprocedure
                ), 'character_profile_source_hash_payload') = 0
