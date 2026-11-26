@@ -10484,61 +10484,85 @@ function renderShop() {
     { code: 'twd_1390', amount: 5400, price: 1390 },
     { code: 'twd_2690', amount: 11000, price: 2690 }
   ];
-  $('view').innerHTML = `
-    <div class="stack store-page" style="gap:22px">
-      <section class="store-heading" style="display:block;height:auto;padding:0;background:transparent;border:0;box-shadow:none">
-        <div class="explore-eyebrow" style="letter-spacing:.14em">STORE</div>
-        <h1 style="margin:5px 0 0">商店</h1>
-      </section>
-      <section class="stack" style="gap:10px">
-        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
-          <h2 style="margin:0">我的資源</h2>
-          <button data-action="ledger">儲值紀錄</button>
+  const gem = (size = 42) => \`<svg class="store-gem-art" width="\${size}" height="\${size}" viewBox="0 0 64 72" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="poyozzGemBody" x1="8%" y1="0%" x2="88%" y2="100%"><stop offset="0" stop-color="#fff" stop-opacity=".96"/><stop offset=".24" stop-color="#e8dcff" stop-opacity=".82"/><stop offset=".58" stop-color="#a99bd0" stop-opacity=".68"/><stop offset="1" stop-color="#70688f" stop-opacity=".92"/></linearGradient>
+      <linearGradient id="poyozzGemSide" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9d1f4" stop-opacity=".78"/><stop offset="1" stop-color="#77708f" stop-opacity=".68"/></linearGradient>
+      <linearGradient id="poyozzGemLight" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff" stop-opacity=".9"/><stop offset="1" stop-color="#d8c9ff" stop-opacity=".08"/></linearGradient>
+      <filter id="poyozzGemGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="4" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    </defs>
+    <path d="M16 5 48 5 61 23 32 68 3 23Z" fill="url(#poyozzGemBody)" stroke="#eee8ff" stroke-opacity=".8" stroke-width="1.2" filter="url(#poyozzGemGlow)"/>
+    <path d="M16 5 32 23 3 23Z" fill="#fff" fill-opacity=".48"/><path d="M48 5 32 23 61 23Z" fill="#c7b9f2" fill-opacity=".48"/>
+    <path d="M16 5 32 23 32 68 3 23Z" fill="url(#poyozzGemLight)" fill-opacity=".58"/>
+    <path d="M48 5 32 23 32 68 61 23Z" fill="url(#poyozzGemSide)" fill-opacity=".72"/>
+    <path d="M3 23H61M16 5 32 23 48 5M32 23V68" fill="none" stroke="#fff" stroke-opacity=".62" stroke-width="1"/>
+    <path d="m12 17 4-7 8-3M43 10l5 1 7 9" fill="none" stroke="#fff" stroke-linecap="round" stroke-opacity=".85" stroke-width="1.5"/>
+    <path d="m8 35 3 3m43-5 3-3" stroke="#f4efff" stroke-linecap="round" stroke-opacity=".72"/>
+  </svg>\`;
+  $('view').innerHTML = \`
+    <div class="stack store-page">
+      <header class="store-hero">
+        <div class="store-hero-copy">
+          <div class="store-eyebrow"><span></span> POYOZZ · NIGHT MARKET</div>
+          <h1>水晶珍藏室</h1>
+          <p>為每一次相遇，收藏一點星光。</p>
         </div>
-        <div class="row" style="gap:12px;flex-wrap:wrap">
-          <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
-            <span aria-hidden="true" style="font-size:18px">✧</span><span class="muted" style="font-size:12px;white-space:nowrap">鑽石</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${diamonds}</strong>
+        <div class="store-hero-crystal" aria-hidden="true">\${gem(112)}<i></i></div>
+        <div class="store-hero-bottom"><span>CRYSTAL COLLECTION</span><span>01 — 06</span></div>
+      </header>
+
+      <section class="store-wallet">
+        <div class="store-section-heading">
+          <div><span class="store-kicker">YOUR TREASURES</span><h2>我的資源</h2></div>
+          <button class="store-history-link" data-action="ledger">儲值紀錄 <span>↗</span></button>
+        </div>
+        <div class="store-wallet-grid">
+          <article class="store-wallet-item store-wallet-diamond">
+            <span class="store-wallet-icon">\${gem(30)}</span>
+            <span class="store-wallet-label">鑽石</span>
+            <strong>\${diamonds}</strong>
           </article>
-          <article class="panel row" style="flex:1 1 0;min-width:0;padding:10px 9px;align-items:center;gap:6px;min-height:60px">
-            <span aria-hidden="true" style="font-size:18px">◉</span><span class="muted" style="font-size:12px;white-space:nowrap">銀幣</span><strong style="font-size:clamp(19px,2.6vw,26px);line-height:1.3">${silver}</strong>
+          <article class="store-wallet-item store-wallet-silver">
+            <span class="store-wallet-icon">◈</span>
+            <span class="store-wallet-label">銀幣</span>
+            <strong>\${silver}</strong>
           </article>
         </div>
       </section>
-      <section class="stack" style="gap:12px">
-        <div><h2 style="margin:0">鑽石儲值</h2><p class="small muted" style="margin:5px 0 0">選擇適合你的鑽石方案</p></div>
-        <div class="store-package-list">
-          ${diamondPackages.map((item) => {
+
+      <section class="store-products">
+        <div class="store-section-heading store-products-heading">
+          <div><span class="store-kicker">CHOOSE YOUR CRYSTAL</span><h2>鑽石儲值</h2><p>每個級距首次儲值，額外贈送 30%</p></div>
+          <span class="store-products-count">06 PACKAGES</span>
+        </div>
+        <div class="store-package-grid">
+          \${diamondPackages.map((item, index) => {
             const hasFirstPurchaseBonus = !state.ledger.some(entry =>
               entry.currency === 'diamond' &&
               entry.reason === '首儲優惠贈鑽' &&
               entry.referenceId === item.code
             );
             const bonus = Math.round(item.amount * 0.30);
-            return `
-              <article class="store-package-row">
-                <div class="store-package-copy">
-                  <div class="store-package-main">
-                    <strong class="store-package-amount"><span class="store-gem-mark">✧</span> ${item.amount.toLocaleString()}${hasFirstPurchaseBonus ? ` <span class="store-package-bonus">＋ ${bonus.toLocaleString()}</span>` : ''}</strong>
-                    <div class="store-package-purchase">
-                      <strong class="store-package-price">NT${item.price.toLocaleString()}</strong>
-                      <button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="${item.code}">購買</button>
-                    </div>
-                  </div>
-                  ${hasFirstPurchaseBonus ? '<span class="store-package-promo">首儲優惠</span>' : ''}
+            return \`
+              <article class="store-package-card\${index === 5 ? ' store-package-card-premium' : ''}">
+                <div class="store-card-topline"><span>CRYSTAL No.\${String(index + 1).padStart(2, '0')}</span>\${hasFirstPurchaseBonus ? '<span class="store-first-bonus">FIRST GIFT</span>' : '<span class="store-repeat-tag">COLLECTION</span>'}</div>
+                <div class="store-card-content">
+                  <div class="store-card-gem">\${gem(index >= 4 ? 66 : 58)}</div>
+                  <div class="store-card-quantity"><strong>\${item.amount.toLocaleString()}</strong><span>DIAMONDS</span></div>
                 </div>
-              </article>`;
+                \${hasFirstPurchaseBonus ? \`<div class="store-card-bonus"><span>✦</span> 首儲禮遇 <strong>+\${bonus.toLocaleString()}</strong><small>額外贈送 30%</small></div>\` : '<div class="store-card-bonus store-card-bonus-used"><span>✓</span> 此級距首儲優惠已領取</div>'}
+                <div class="store-card-footer"><strong class="store-card-price">NT$ \${item.price.toLocaleString()}</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="\${item.code}">選擇方案 <span>→</span></button></div>
+              </article>\`;
           }).join('')}
         </div>
+        <p class="store-terms-note">首儲優惠依儲值級距分別計算，每個級距限領一次；月費會員儲值同樣適用。</p>
+      </section>
 
+      <section class="store-membership">
+        <div><span class="store-kicker">A LITTLE MORE MAGIC</span><h2>月費方案</h2><p>會員方案內容與權益將於未來公布。</p></div>
+        <span class="store-membership-status">敬請期待</span>
       </section>
-      <section class="panel stack" style="gap:12px;border:1px solid var(--border)">
-        <div class="row between" style="align-items:center;gap:12px;flex-wrap:wrap">
-          <div><h2 style="margin:0 0 5px">月費方案</h2><p class="small muted" style="margin:0;line-height:1.7">會員方案內容與權益將於未來公布。</p></div>
-          <span class="badge">敬請期待</span>
-        </div>
-        <div style="min-height:42px;border:1px dashed var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;padding:10px;color:var(--muted)">會員方案即將推出</div>
-      </section>
-    </div>`;
+    </div>\`;
 }
 
 function renderProfile() {
