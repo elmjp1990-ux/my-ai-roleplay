@@ -905,6 +905,49 @@ export async function handleEncounterScheduleOrganizer(
       characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
       protectedContextByCharacter[source.character_id] =
         characterPrompt.protectedContextByCharacter[source.character_id] || [];
+
+      // Reuse a complete saved response when a prior publish failed but the
+      // character source has not changed. This path never calls the AI provider.
+      const [{ data: savedOutputs, error: savedOutputError }, { data: currentJob, error: currentJobError }] =
+        await Promise.all([
+          admin.from("encounter_schedule_generation_outputs")
+            .select("id,source_hash,raw_response_text,raw_output_truncated,created_at")
+            .eq("character_id", source.character_id)
+            .eq("status", "failed")
+            .is("removed_at", null)
+            .order("created_at", { ascending: false })
+            .limit(1),
+          admin.from("encounter_schedule_generation_jobs")
+            .select("source_hash")
+            .eq("character_id", source.character_id)
+            .maybeSingle(),
+        ]);
+      const savedOutput = Array.isArray(savedOutputs) ? savedOutputs[0] : null;
+      if (!savedOutputError && !currentJobError && savedOutput &&
+          savedOutput.source_hash === currentJob?.source_hash &&
+          savedOutput.raw_output_truncated !== true &&
+          typeof savedOutput.raw_response_text === "string" &&
+          savedOutput.raw_response_text.length > 0) {
+        try {
+          const savedPayload = JSON.parse(savedOutput.raw_response_text);
+          const savedCharacters = asRow(savedPayload).characters;
+          const savedScenes = asRow(savedPayload).scenes;
+          if (Array.isArray(savedCharacters) && savedCharacters.length === 1 &&
+              asText(asRow(savedCharacters[0]).character_id) === source.character_id &&
+              (savedScenes === undefined || Array.isArray(savedScenes))) {
+            return {
+              sourceId: source.character_id,
+              rawOutputId: asText(savedOutput.id),
+              character: asRow(savedCharacters[0]),
+              scenes: Array.isArray(savedScenes) ? savedScenes : [],
+              replayedSavedOutput: true,
+            };
+          }
+        } catch {
+          // An invalid saved response is not replayed; the normal generation
+          // path below may request a fresh response and preserves the original.
+        }
+      }
     } catch (error) {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
@@ -1026,7 +1069,9 @@ export async function handleEncounterScheduleOrganizer(
       ambiguousProviderFailure ||= result.ambiguous === true;
       continue;
     }
-    providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
+    if (result.providerResponse) {
+      providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
+    }
     rawOutputIdByCharacter.set(result.sourceId, result.rawOutputId);
     rawCharacters.push(result.character);
     for (const scene of result.scenes) {
