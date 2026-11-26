@@ -121,6 +121,24 @@ Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map
   }
 });
 
+Deno.test("custom scene keys outside the RPC allowlist remain natural-language-only", () => {
+  const blocks = hourlyBlocks();
+  blocks[17] = block(17, [
+    option({ weight: 70, location: "自訂舞台", activity: "在自訂舞台整理器材並準備演出" }),
+    option({ weight: 30, location: "公司", activity: "在辦公室整理待辦並確認工作進度" }),
+  ]);
+  const parsed = result(
+    [{ character_id: id1, placement: "modern_map", variants: variants(blocks) }],
+    [source()],
+    [{ location_key: "custom-venue-key", display_name: "自訂舞台", is_dynamic: false }],
+  );
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const custom = parsed.characters[0].variants.weekday[17].options[0];
+  if (custom.location_key !== null || custom.location_description !== "自訂舞台") {
+    throw new Error("custom scene IDs outside the publish RPC allowlist must not reject the schedule or lose its label");
+  }
+});
+
 Deno.test("accepts full weekday and holiday days with independent weighted options", () => {
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
