@@ -1,6 +1,6 @@
 {
   "version": "1.1",
-  "purpose": "Allowlisted creator-source registry for one combined Character AI Profile generation, including personality and life-context extraction. Runtime-only sources never trigger derived profile regeneration.",
+  "purpose": "Allowlisted creator-source registry for one combined Character AI Profile generation, including personality and life-context extraction. Runtime-only sources never trigger derived profile regeneration. Runtime identity facts (name, gender, age) are supplied as factual context to the organizer but excluded from the refresh hash.",
   "profile_refresh_sources": [
     {
       "path": "characters.intro",
@@ -132,19 +132,22 @@
       "path": "characters.name",
       "visibility": "runtime_context",
       "refresh_on_change": false,
-      "reason": "Current display/identity label is injected directly; renaming does not rebuild derived profile."
+      "reason": "Current display name is included in profile organization as a factual identity anchor, but renaming alone never triggers paid profile regeneration.",
+      "provided_to_profile_organizer": true
     },
     {
       "path": "characters.gender",
       "visibility": "runtime_context",
       "refresh_on_change": false,
-      "reason": "Direct role context; no need to regenerate derived profile."
+      "reason": "Authoritative gender is included in profile organization as a factual identity anchor, but changing gender alone never triggers paid profile regeneration.",
+      "provided_to_profile_organizer": true
     },
     {
       "path": "characters.age",
       "visibility": "runtime_context",
       "refresh_on_change": false,
-      "reason": "Direct role context; no need to regenerate derived profile."
+      "reason": "Authoritative age is included in profile organization as a factual identity anchor, but changing age alone never triggers paid profile regeneration; chat runtime also injects the latest age.",
+      "provided_to_profile_organizer": true
     },
     {
       "path": "characters.phone_settings",
