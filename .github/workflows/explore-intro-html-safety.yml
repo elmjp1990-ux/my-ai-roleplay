@@ -1,0 +1,25 @@
+name: Explore intro HTML safety
+
+on:
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'scripts/test-explore-navigation-ranking-intro.mjs'
+      - '.github/workflows/explore-intro-html-safety.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  explore-intro-html-safety:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Verify Explore navigation, leaderboard, and intro HTML safety
+        run: node scripts/test-explore-navigation-ranking-intro.mjs
