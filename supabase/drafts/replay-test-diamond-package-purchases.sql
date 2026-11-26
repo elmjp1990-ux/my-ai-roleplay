@@ -38,7 +38,7 @@ begin
   where singleton = true;
 
   -- First purchase of the NT$60 tier: 200 base + 60 bonus.
-  v_result := public.test_purchase_diamond_package('twd_60');
+  v_result := public.test_purchase_diamond_package('twd_60', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
   if (v_result->>'base_diamonds')::integer <> 200
      or (v_result->>'bonus_diamonds')::integer <> 60
      or (v_result->>'diamonds')::integer <> 260 then
