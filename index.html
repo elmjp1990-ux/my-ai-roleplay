@@ -4729,11 +4729,11 @@ function safeImage(value) {
 }
 function characterIntroPlainText(value,userName='你',characterName='角色') {
   const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
-  return replaceRoleplayVariables(parsed.body.textContent||'',userName,characterName).replace(/\\s+/g,' ').trim();
+  return replaceRoleplayVariables(parsed.body.textContent||'',userName,characterName).replace(/\s+/g,' ').trim();
 }
 function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
   const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
-  const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','BLOCKQUOTE','H2','H3','DIV','SPAN','A','IMG']);
+  const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','BLOCKQUOTE','H1','H2','H3','PRE','CODE','HR','DIV','SPAN','A','IMG']);
   const dangerous=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE','FORM','INPUT','BUTTON','VIDEO','AUDIO','SOURCE']);
   const root=document.createElement('div');
   const copy=(sourceNode,target)=>{
