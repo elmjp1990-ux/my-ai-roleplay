@@ -333,7 +333,7 @@ assert.match(frontend, /!isEncounterChatSession\(candidate\)/);
 assert.match(frontend, /if \(!item \|\| !canAccessSessionCharacter\(item,sessionCharacter\(item\)\)\) break;/);
 assert.match(frontend, /item\.id !== s\.id && item\.characterId === c\.id && !item\.archived && !isEncounterChatSession\(item\)/);
 assert.match(frontend, /candidate\.id!==item\.id&&candidate\.characterId===item\.characterId&&!candidate\.archived&&!isEncounterChatSession\(candidate\)/);
-assert.match(frontend, /route\.page === 'citymap' \? 'home'/);
+assert.match(frontend, /\['citymap','home','detail','session-detail'\]\.includes\(route\.page\) \? 'citymap'/);
 assert.match(frontend, /\['citymap','探索'\]/);
 assert.match(frontend, /ICON\[page === 'citymap' \? 'home' : page\]/);
 assert.match(frontend, /case 'home':go\(\{page:'citymap'\}\);break;/);
