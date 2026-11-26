@@ -219,10 +219,10 @@ AS $function$
   OFFSET LEAST(GREATEST(COALESCE(p_offset, 0), 0), 10000);
 $function$;
 
-REVOKE ALL ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text[])
+REVOKE ALL ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text)
   FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text[])
+GRANT EXECUTE ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text)
   TO anon, authenticated, service_role;
 
-COMMENT ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text[]) IS
+COMMENT ON FUNCTION public.get_public_character_leaderboard(text, integer, integer, text[], text) IS
   'Returns globally ranked public characters by completed AI reply count: all-time uses the canonical cumulative count RPC; month/week use durable Asia/Taipei daily aggregates. Week starts Monday.';
