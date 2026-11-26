@@ -74,12 +74,14 @@ const result = (
   [...builtInSceneCatalog, ...(sceneCatalog ?? [])],
 );
 
-Deno.test("maps named club venues and their alleys to existing scenes", () => {
-  if (normalizeEncounterSceneKey("LUCID俱樂部") !== "private-club" ||
-      normalizeEncounterSceneKey("LUCID俱樂部包廂") !== "private-club" ||
-      normalizeEncounterSceneKey("LUCID俱樂部休息室") !== "private-club" ||
-      normalizeEncounterSceneKey("LUCID俱樂部後巷") !== "shopping-street") {
-    throw new Error("named club venue aliases must resolve without creating new map scenes");
+Deno.test("maps every LUCID venue area, including its back alley, to the private club scene", () => {
+  for (const label of [
+    "LUCID俱樂部", "LUCID俱樂部包廂", "LUCID俱樂部休息室",
+    "LUCID俱樂部後巷", "LUCID俱樂部入口", "LUCID後巷",
+  ]) {
+    if (normalizeEncounterSceneKey(label) !== "private-club") {
+      throw new Error("all LUCID venue areas must map to private-club: " + label);
+    }
   }
 });
 
