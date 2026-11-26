@@ -338,6 +338,19 @@ Deno.test("classifies activity space independently from scene location", () => {
       normalizeEncounterSceneKey("Live House", "白天進行樂團演出") !== "live-house") {
     throw new Error("explicit night-bar and daytime Live House locations must remain distinct");
   }
+  const latePerformance = "演出進入高潮，汗水順著額角滑落，吉他聲震耳欲聾";
+  const earlyPerformance = "在台上進行正式演出，彈奏電吉他帶動全場氣氛";
+  if (normalizeEncounterSceneKey("Livehouse", latePerformance, "", "20:00") !== "live-house" ||
+      normalizeEncounterSceneKey("Livehouse", earlyPerformance, "", "20:00") !== "live-house") {
+    throw new Error("music performances before 21:00 must use the exhibition space");
+  }
+  if (normalizeEncounterSceneKey("Livehouse", earlyPerformance, "", "21:00") !== "night-bar" ||
+      normalizeEncounterSceneKey("Livehouse", latePerformance, "", "23:00") !== "night-bar") {
+    throw new Error("music performances from 21:00 onward must use the night bar");
+  }
+  if (normalizeEncounterSceneKey("Livehouse", "在地下樂團團練並排練新歌", "", "23:00") !== "live-house") {
+    throw new Error("rehearsals must not be reclassified as night-bar performances");
+  }
 });
 
 Deno.test("prioritizes explicit fixed destinations over incidental activity keywords", () => {
