@@ -4718,15 +4718,23 @@ function safeImage(value) {
   } catch (_) {}
   return '';
 }
+function characterIntroPlainText(value,userName='你',characterName='角色') {
+  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
+  return replaceRoleplayVariables(parsed.body.textContent||'',userName,characterName).replace(/\\s+/g,' ').trim();
+}
 function renderCharacterIntroHtml(value,userName='你',characterName='角色') {
-  const source=replaceRoleplayVariables(String(value||''),userName,characterName);
-  const parsed=new DOMParser().parseFromString(source,'text/html');
+  const parsed=new DOMParser().parseFromString(String(value||''),'text/html');
   const allowed=new Set(['P','BR','STRONG','B','EM','I','U','S','UL','OL','LI','BLOCKQUOTE','H2','H3','DIV','SPAN','A','IMG']);
   const dangerous=new Set(['SCRIPT','STYLE','IFRAME','OBJECT','EMBED','SVG','MATH','TEMPLATE','FORM','INPUT','BUTTON','VIDEO','AUDIO','SOURCE']);
   const root=document.createElement('div');
   const copy=(sourceNode,target)=>{
     for(const child of [...sourceNode.childNodes]){
-      if(child.nodeType===Node.TEXT_NODE){target.appendChild(document.createTextNode(child.nodeValue||''));continue;}
+      if(child.nodeType===Node.TEXT_NODE){
+        target.appendChild(document.createTextNode(
+          replaceRoleplayVariables(child.nodeValue||'',userName,characterName)
+        ));
+        continue;
+      }
       if(child.nodeType!==Node.ELEMENT_NODE)continue;
       const tag=child.tagName;
       if(dangerous.has(tag))continue;
@@ -5330,7 +5338,7 @@ function card(c,owner = false) {
       </div>
       <div class="card-body">
         <h3>${e(c.name)}</h3>
-        <p class="card-intro">${e(replaceRoleplayVariables(c.intro, currentUser()?.nickname || '你', c.name))}</p>
+        <p class="card-intro">${e(characterIntroPlainText(c.intro,currentUser()?.nickname||'你',c.name))}</p>
         <div class="card-tags">${(c.tags || []).slice(0,5).map(tagButton).join('')}</div>
          ${c.isNSFW === true ? '<div class="nsfw-card-badge" aria-label="成人敏感內容，限 18 歲以上">18+ NSFW</div>' : ''}
         ${owner ? `
@@ -12957,7 +12965,7 @@ document.addEventListener('submit',async event => {
           }
         }
         // Close picker deterministically so the old draft cannot overwrite selected tags.
-        { const returnRoute={...route}; delete returnRoute.overlay; go(returnRoute,true); render(); }
+        { const returnRoute={...route}; delete returnRoute.overlay; if(o.mode==='explore')delete returnRoute.tag; go(returnRoute,true); render(); }
         if(o.mode==='explore')refreshExploreListing();
         break;
       }
