@@ -40,7 +40,7 @@ assert.match(html, /rawSrc\.length>maxIntroImageUrlLength/);
 assert.match(html, /renderedIntroImages\+\+/,
   'Only valid HTTPS images within the URL limit count toward the three-image allowance.');
 assert.match(html, /\.character-public-intro img\{[^}]*margin:0 auto/);
-assert.match(html, /\.character-public-intro p:has\(> img\)\{margin:0\}/,
+assert.match(html, /\.character-public-intro p:has\(img\)\{margin:0\}/,
   'Consecutive intro images must not inherit paragraph spacing.');
 assert.match(html, /\.explore-utility-row\{[^}]*margin:18px 0 10px\}/,
   'Explore utility buttons need breathing room below the latest-activity panel.');
