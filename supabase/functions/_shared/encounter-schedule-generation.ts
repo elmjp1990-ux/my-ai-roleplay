@@ -897,8 +897,12 @@ export function parseEncounterScheduleBatchOutput(
   // is never included in the AI prompt; unmatched descriptions stay intact.
   const catalogByDisplayName = new Map(
     sceneCatalog
-      .map((scene) => [text(scene.display_name).toLocaleLowerCase(), normalizeEncounterSceneKey(scene.location_key)] as const)
-      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1] !== null && SQL_PUBLISH_LOCATION_KEYS.has(entry[1]))),
+      .map((scene) => {
+        const rawKey = text(scene.location_key).trim();
+        const publishKey = SQL_PUBLISH_LOCATION_KEYS.has(rawKey) ? rawKey : null;
+        return [text(scene.display_name).toLocaleLowerCase(), publishKey] as const;
+      })
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1] !== null)),
   );
   for (const character of characters) {
     const source = sourceById.get(character.character_id);
