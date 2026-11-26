@@ -7,6 +7,7 @@ const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profil
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
 const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
+const runtimeIdentityMigration = fs.readFileSync("supabase/migrations/20261126100000_character_profile_runtime_identity_context.sql", "utf8");
 const manualProfileMigration = fs.readFileSync("supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql", "utf8");
 const manualScheduleClaimMigration = fs.readFileSync("supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
@@ -364,4 +365,8 @@ assert.match(workerCore, /"characters\\.name",[\\s\\S]*"characters\\.gender",[\\
 assert.match(coreUtils, /compare\\(runtime, 'gender'[\\s\\S]*compare\\(runtime, 'age'/,
   "Changing gender or age alone must remain runtime-only and not enqueue profile regeneration");
 
+assert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\\s\\S]*characters\\.age/,
+  "Runtime identity facts must be excluded from the refresh hash");
+assert.match(runtimeIdentityMigration, /characters\\.age[\\s\\S]*character_profile_source_payload/,
+  "The organizer source payload must include the author-set age");
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
