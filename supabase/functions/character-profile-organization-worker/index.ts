@@ -451,8 +451,56 @@ export default {
           { p_author_id: authorId },
         );
         if (nextError) return Response.json({ error: "profile_status_unavailable" }, { status: 503 });
+
+        // Inspection is intentionally separate from the next-generation queue.
+        // Show the author's most recently saved profile and its existing schedules
+        // without claiming a job, invoking a model, or changing any schedule data.
+        const { data: inspectionProfile, error: inspectionProfileError } = await supabase
+          .from("character_profile_organization")
+          .select("character_id,profile,model,generated_at,updated_at")
+          .eq("author_id", authorId)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (inspectionProfileError) {
+          return Response.json({ error: "profile_inspection_unavailable" }, { status: 503 });
+        }
+
+        let inspectionCharacterName: string | null = null;
+        let inspectionSchedules: Record<string, unknown>[] = [];
+        if (inspectionProfile?.character_id) {
+          const [characterResult, scheduleResult] = await Promise.all([
+            supabase.from("characters").select("name")
+              .eq("id", inspectionProfile.character_id).eq("author_id", authorId).maybeSingle(),
+            supabase.from("character_schedules")
+              .select("id,weekday,day_type,start_time,end_time,location_key,location_description,activity,scene_description,priority,is_active,source_type,variant_key,variant_weight,special_event_key,encounter_greeting,is_outdoor,rain_fallback_location_key,rain_fallback_activity,rain_fallback_greeting,updated_at")
+              .eq("character_id", inspectionProfile.character_id)
+              .eq("is_active", true)
+              .order("day_type", { ascending: true })
+              .order("weekday", { ascending: true })
+              .order("start_time", { ascending: true })
+              .order("variant_key", { ascending: true })
+              .limit(240),
+          ]);
+          if (characterResult.error || scheduleResult.error) {
+            return Response.json({ error: "schedule_inspection_unavailable" }, { status: 503 });
+          }
+          inspectionCharacterName = characterResult.data?.name || null;
+          inspectionSchedules = Array.isArray(scheduleResult.data)
+            ? scheduleResult.data as Record<string, unknown>[] : [];
+        }
+
         if (!nextJob?.character_id) {
-          return Response.json({ status: "no_pending_schedule_jobs", profile_ready: false });
+          return Response.json({
+            status: "no_pending_schedule_jobs",
+            profile_ready: false,
+            inspection_character_id: inspectionProfile?.character_id || null,
+            inspection_character_name: inspectionCharacterName,
+            inspection_profile: inspectionProfile?.profile || null,
+            inspection_model: inspectionProfile?.model || null,
+            inspection_updated_at: inspectionProfile?.updated_at || null,
+            inspection_schedules: inspectionSchedules,
+          });
         }
         const [profileResult, jobResult] = await Promise.all([
           supabase.rpc("get_character_ai_profile_for_chat", {
@@ -488,6 +536,12 @@ export default {
           profile_available_at: jobResult.data?.available_at || null,
           profile_preview: profileReady ? profile : null,
           model: CHARACTER_PROFILE_MODEL,
+          inspection_character_id: inspectionProfile?.character_id || null,
+          inspection_character_name: inspectionCharacterName,
+          inspection_profile: inspectionProfile?.profile || null,
+          inspection_model: inspectionProfile?.model || null,
+          inspection_updated_at: inspectionProfile?.updated_at || null,
+          inspection_schedules: inspectionSchedules,
         });
       }
       if (mode !== "manual") {

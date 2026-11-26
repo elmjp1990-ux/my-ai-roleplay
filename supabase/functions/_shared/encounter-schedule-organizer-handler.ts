@@ -593,13 +593,12 @@ export async function handleEncounterScheduleOrganizer(
     if (mode === "repair_list") {
       // Expired originals remain stored for audit/history; expiry only removes edit eligibility.
       const { data: outputs, error: outputsError } = await admin.from("encounter_schedule_generation_outputs")
-        .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at")
+        .select("id,batch_id,character_id,requested_model,provider,response_model,finish_reason,raw_response_text,raw_output_truncated,raw_response_body,response_body_truncated,http_status,status,failure_code,validation_errors,created_at,expires_at")
         .eq("actor_user_id", actorUserId)
         .is("removed_at", null)
-        .in("status", ["failed", "partial", "received", "dismissed"])
-        .gt("expires_at", new Date().toISOString())
+        .in("status", ["failed", "partial", "received", "dismissed", "completed"])
         .order("created_at", { ascending: false })
-        .limit(20);
+        .limit(40);
       if (outputsError) return json({ error: "schedule_repair_list_unavailable" }, 503);
       const outputIds = (outputs || []).map((item: any) => item.id).filter(Boolean);
       const { data: revisions, error: revisionsError } = outputIds.length
@@ -627,17 +626,25 @@ export async function handleEncounterScheduleOrganizer(
         .filter((job: any) => ["failed", "needs_reconciliation"].includes(job.status))
         .map((job: any) => [job.character_id, job]));
       const names = new Map((characters || []).map((item: any) => [item.id, item.name]));
+      const outputItems = (outputs || []).map((item: any) => ({
+        ...item,
+        character_name: names.get(item.character_id) || "角色",
+        job_status: (jobs || []).find((job: any) => job.character_id === item.character_id)?.status || item.status,
+        raw_response_text: item.raw_response_text || item.raw_response_body || "",
+        latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
+        latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
+        latest_revision_at: latestRevisionByOutput.get(item.id)?.created_at || null,
+      }));
+      const repairable = outputItems.filter((item: any) =>
+        repairableJobByCharacter.has(item.character_id) && new Date(item.expires_at || 0).getTime() > Date.now()
+      );
+      const publishedHistory = outputItems.filter((item: any) =>
+        item.job_status === "completed" || item.status === "completed"
+      );
       return json({
         status: "available",
-        outputs: (outputs || []).filter((item: any) => repairableJobByCharacter.has(item.character_id)).map((item: any) => ({
-          ...item,
-          character_name: names.get(item.character_id) || "角色",
-          job_status: repairableJobByCharacter.get(item.character_id)?.status || "failed",
-          raw_response_text: item.raw_response_text || item.raw_response_body || "",
-          latest_revision_text: latestRevisionByOutput.get(item.id)?.corrected_response_text || null,
-          latest_revision_status: latestRevisionByOutput.get(item.id)?.status || null,
-          latest_revision_at: latestRevisionByOutput.get(item.id)?.created_at || null,
-        })),
+        outputs: repairable,
+        published_history: publishedHistory,
       });
     }
     if (mode === "repair_hide") return await handleScheduleRepairHide(admin, authData.user.id, body);
@@ -849,6 +856,7 @@ export async function handleEncounterScheduleOrganizer(
   const failedCharacterIds = new Set<string>();
   const reviewRequiredCharacterIds = new Set<string>();
   const postPublishReviewCharacterIds = new Set<string>();
+  const partialPublishReviewCharacterIds = new Set<string>();
   const publishedScheduleCharacterIds = new Set<string>();
   const validationErrors: string[] = [];
   const characterDiagnosticsById = new Map<string, Record<string, unknown>>();
@@ -904,6 +912,50 @@ export async function handleEncounterScheduleOrganizer(
       characterPrompt = buildEncounterScheduleBatchMessages([source], sceneCatalog);
       protectedContextByCharacter[source.character_id] =
         characterPrompt.protectedContextByCharacter[source.character_id] || [];
+
+      // Reuse a complete saved response when a prior publish failed but the
+      // character source has not changed. This path never calls the AI provider.
+      const [{ data: savedOutputs, error: savedOutputError }, { data: currentJob, error: currentJobError }] =
+        await Promise.all([
+          admin.from("encounter_schedule_generation_outputs")
+            .select("id,source_hash,actor_user_id,raw_response_text,raw_output_truncated,created_at")
+            .eq("character_id", source.character_id)
+            .eq("status", "failed")
+            .is("removed_at", null)
+            .order("created_at", { ascending: false })
+            .limit(1),
+          admin.from("encounter_schedule_generation_jobs")
+            .select("source_hash,author_id")
+            .eq("character_id", source.character_id)
+            .maybeSingle(),
+        ]);
+      const savedOutput = Array.isArray(savedOutputs) ? savedOutputs[0] : null;
+      if (!savedOutputError && !currentJobError && savedOutput &&
+          savedOutput.source_hash === currentJob?.source_hash &&
+          savedOutput.actor_user_id === currentJob?.author_id &&
+          savedOutput.raw_output_truncated !== true &&
+          typeof savedOutput.raw_response_text === "string" &&
+          savedOutput.raw_response_text.length > 0) {
+        try {
+          const savedPayload = JSON.parse(savedOutput.raw_response_text);
+          const savedCharacters = asRow(savedPayload).characters;
+          const savedScenes = asRow(savedPayload).scenes;
+          if (Array.isArray(savedCharacters) && savedCharacters.length === 1 &&
+              asText(asRow(savedCharacters[0]).character_id) === source.character_id &&
+              (savedScenes == null || Array.isArray(savedScenes))) {
+            return {
+              sourceId: source.character_id,
+              rawOutputId: asText(savedOutput.id),
+              character: asRow(savedCharacters[0]),
+              scenes: Array.isArray(savedScenes) ? savedScenes : [],
+              replayedSavedOutput: true,
+            };
+          }
+        } catch {
+          // An invalid saved response is not replayed; the normal generation
+          // path below may request a fresh response and preserves the original.
+        }
+      }
     } catch (error) {
       return { sourceId: source.character_id, failureCode: asText(error instanceof Error ? error.message : "schedule_prompt_invalid"), retryable: false, ambiguous: false };
     }
@@ -1025,7 +1077,9 @@ export async function handleEncounterScheduleOrganizer(
       ambiguousProviderFailure ||= result.ambiguous === true;
       continue;
     }
-    providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
+    if ("providerResponse" in result && result.providerResponse) {
+      providerResponses.push({ sourceId: result.sourceId, providerResponse: result.providerResponse });
+    }
     rawOutputIdByCharacter.set(result.sourceId, result.rawOutputId);
     rawCharacters.push(result.character);
     for (const scene of result.scenes) {
@@ -1144,7 +1198,44 @@ export async function handleEncounterScheduleOrganizer(
     const characterPublishedCount = Number(publishRow.published_character_count || 0);
     const characterUnplacedCount = Number(publishRow.unplaced_character_count || 0);
     if (characterPublishedCount + characterUnplacedCount > 0) publishedScheduleCharacterIds.add(item.sourceId);
-    await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
+    const isPartialOutput = item.character.partial === true;
+    const partialErrors = Array.isArray(item.character.validation_errors)
+      ? item.character.validation_errors.filter((value: unknown): value is string => typeof value === "string").slice(0, 50)
+      : [];
+    if (isPartialOutput) {
+      const reviewedAt = new Date().toISOString();
+      const { error: partialReviewError } = await admin
+        .from("encounter_schedule_generation_jobs")
+        .update({
+          status: "needs_review",
+          lease_token: null,
+          lease_expires_at: null,
+          last_error_code: "schedule_partial_output_review_required",
+          updated_at: reviewedAt,
+        })
+        .eq("character_id", item.sourceId)
+        .eq("status", "completed");
+      if (partialReviewError) {
+        failedCharacterIds.add(item.sourceId);
+        characterDiagnosticsById.set(item.sourceId, {
+          partial_output: true,
+          validation_errors: partialErrors,
+          review_state_persist_failed: true,
+        });
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+          "partial", "schedule_partial_review_state_persist_failed", partialErrors);
+      } else {
+        partialPublishReviewCharacterIds.add(item.sourceId);
+        characterDiagnosticsById.set(item.sourceId, {
+          partial_output: true,
+          validation_errors: partialErrors,
+        });
+        await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null,
+          "partial", "schedule_partial_output_review_required", partialErrors);
+      }
+    } else {
+      await updateRawGenerationOutput(admin, rawOutputIdByCharacter.get(item.sourceId) || null, "completed");
+    }
     publishedCharacterCount += characterPublishedCount;
     unplacedCharacterCount += characterUnplacedCount;
     skippedCharacterCount += Number(publishRow.skipped_private_character_count || 0);
@@ -1274,12 +1365,15 @@ export async function handleEncounterScheduleOrganizer(
   const partial = remaining > 0 || ambiguousPublishFailure || ambiguousProviderFailure || failedCharacterIds.size > 0;
   for (const item of providerResponses) {
     const characterDiagnostics = characterDiagnosticsById.get(item.sourceId) || {};
-    const characterFailureCode = typeof characterDiagnostics.validation_errors === "object"
-      ? "schedule_character_validation_failed"
-      : typeof characterDiagnostics.publish_error === "string" || typeof characterDiagnostics.publish_status === "string"
-        ? "schedule_character_publish_failed"
-        : partial ? "schedule_partial_character_failure" : null;
-    await recordBatchUsage(admin, batchId, item.providerResponse, partial ? "partial" : "completed",
+    const characterFailureCode = characterDiagnostics.partial_output === true
+      ? "schedule_partial_output_review_required"
+      : typeof characterDiagnostics.validation_errors === "object"
+        ? "schedule_character_validation_failed"
+        : typeof characterDiagnostics.publish_error === "string" || typeof characterDiagnostics.publish_status === "string"
+          ? "schedule_character_publish_failed"
+          : partial ? "schedule_partial_character_failure" : null;
+    const usageIsPartial = partial || characterDiagnostics.partial_output === true;
+    await recordBatchUsage(admin, batchId, item.providerResponse, usageIsPartial ? "partial" : "completed",
       characterFailureCode, item.sourceId, characterDiagnostics);
   }
   return json({
@@ -1289,7 +1383,7 @@ export async function handleEncounterScheduleOrganizer(
     published_character_count: publishedCharacterCount,
     unplaced_character_count: unplacedCharacterCount,
     skipped_private_character_count: skippedCharacterCount,
-    needs_review_character_count: reviewRequiredCharacterIds.size + postPublishReviewCount,
+    needs_review_character_count: reviewRequiredCharacterIds.size + postPublishReviewCount + partialPublishReviewCharacterIds.size,
     failed_character_count: partial ? Math.max(remaining, failedCharacterIds.size) : 0,
     validation_errors: validationErrors.slice(0, 30),
     scene_publish_status: scenePublishStatus,

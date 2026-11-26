@@ -10005,11 +10005,13 @@ async function loadEncounterScheduleRepairOutputs(){
     const {data,error}=await window.mySupabase.functions.invoke('encounter-schedule-organizer',{body:{mode:'repair_list'}});
     if(error)throw error;
     const outputs=Array.isArray(data?.outputs)?data.outputs:[];
+    const history=Array.isArray(data?.published_history)?data.published_history:[];
+    const historyHtml=history.length?'<section class="stack" style="padding:12px;border:1px solid var(--border);border-radius:12px"><strong>已自動放置｜待官方後台審核</strong><p class="small muted" style="margin:0">測試介面只顯示紀錄；不在作者端審核，也不標記完成。</p>'+history.map(item=>'<article class="stack" style="padding:10px;border:1px solid var(--border);border-radius:10px"><strong>'+e(item.character_name||'角色')+'</strong><span class="small muted">已自動放置 · 待官方後台審核</span><span class="small muted">'+(item.created_at?new Date(item.created_at).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):'')+'</span></article>').join('')+'</section>':'';
     if(!outputs.length){
-      container.innerHTML='<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
+      container.innerHTML=historyHtml||'<p class="small muted">目前沒有可人工補正的失敗回覆。若失敗發生於原始回覆留存功能上線前，系統會保留失敗與用量紀錄，略過該角色，不會自動重試。</p>';
       return;
     }
-    container.innerHTML=outputs.map(item=>{
+    container.innerHTML=historyHtml+outputs.map(item=>{
       const outputId=e(item.id||'');
       const hasSavedRevision=typeof item.latest_revision_text==='string'&&item.latest_revision_text.length>0;
       const editorText=e(hasSavedRevision?item.latest_revision_text:item.raw_response_text||'');
@@ -10080,6 +10082,27 @@ function renderCharacterProfilePreview(profile, characterName, model) {
   return '<article class="panel stack" style="padding:12px;gap:8px"><div><strong>'+e(characterName||"角色")+'｜AI 角色資料整理結果</strong><p class="small muted" style="margin:4px 0 0">'+e(model||"DeepSeek V4 Flash 0423")+' · 已保存，可先檢查</p></div>'+summaries+unknownMarkup+conflictMarkup+(insufficientReason?'<p class="small muted">角色一致性規則資料不足：'+e(insufficientReason)+'</p>':'')+'<details><summary class="small">查看完整 JSON（含來源依據與待釐清項目）</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:420px;overflow:auto;font-size:11px">'+raw+'</pre></details></article>';
 }
 
+function renderExistingEncounterSchedules(rows, characterName, characterId) {
+  const schedules = Array.isArray(rows) ? rows : [];
+  if (!schedules.length) return '<p class="small muted">這位角色目前沒有可編輯的有效行程。</p>';
+  const editable = schedules.map(row => ({
+    id: row.id, weekday: row.weekday, day_type: row.day_type,
+    start_time: row.start_time, end_time: row.end_time, location_key: row.location_key,
+    location_description: row.location_description, activity: row.activity,
+    scene_description: row.scene_description, priority: row.priority, is_active: row.is_active,
+    source_type: row.source_type, variant_key: row.variant_key, variant_weight: row.variant_weight,
+    special_event_key: row.special_event_key, encounter_greeting: row.encounter_greeting,
+    is_outdoor: row.is_outdoor, rain_fallback_location_key: row.rain_fallback_location_key,
+    rain_fallback_activity: row.rain_fallback_activity, rain_fallback_greeting: row.rain_fallback_greeting
+  }));
+  return '<section class="panel stack" style="padding:12px;gap:10px">' +
+    '<strong>既有行程｜' + e(characterName || '角色') + '（JSON 可編輯）</strong>' +
+    '<p class="small muted" style="margin:0">共 ' + schedules.length + ' 筆有效行程。可直接修改下方 JSON 後儲存；只更新有變動的行程，不呼叫 AI、不重建整份資料。每筆行程的 id 請保留。</p>' +
+    '<textarea id="encounterExistingSchedulesJson" rows="18" spellcheck="false" style="width:100%;font-family:monospace;font-size:12px;white-space:pre;overflow:auto">' + e(JSON.stringify(editable, null, 2)) + '</textarea>' +
+    '<div class="row wrap" style="justify-content:flex-end"><button type="button" data-action="save-existing-encounter-schedules" data-character-id="' + e(characterId || '') + '">儲存行程修改</button></div>' +
+    '<p id="encounterExistingSchedulesSaveStatus" class="small muted" style="margin:0">純查看不會觸發 AI；儲存作者修改後，才會依來源變更規則重新整理。</p>' +
+  '</section>';
+}
 async function loadEncounterScheduleTestTools(){
   const section=document.getElementById('encounterScheduleTestTools');
   if(!section)return;
@@ -10128,27 +10151,38 @@ async function loadEncounterScheduleTestTools(){
       profileTargetName=String(profileData.next_character_name||'角色');
       profileAvailableAt=profileData.profile_available_at?new Date(profileData.profile_available_at).getTime():0;
       const profileWaiting=profileAvailableAt>Date.now();
-      if(profileStatus)profileStatus.textContent=!profileTargetAvailable
-        ?'目前沒有待生成行程的公開角色。'
-        :profileReady
-          ?'下一位：'+profileTargetName+'｜角色資料已整理完成，請檢查下方結果後再執行第二步。'
-          :profileJobStatus==='processing'
-            ?'下一位：'+profileTargetName+'｜角色資料正在整理中，請稍候。'
-            :profileJobStatus==='failed'
-              ?'下一位：'+profileTargetName+'｜上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。失敗紀錄已保留；可手動重試（若前次 AI 實際完成，可能產生重複服務成本）。'
-              :profileWaiting
-                ?'下一位：'+profileTargetName+'｜稍後才可再次手動整理：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'})
-                :'下一位：'+profileTargetName+'｜尚未完成角色資料整理，請先執行第一步。';
-      if(profilePreview)profilePreview.innerHTML=profileReady
-        ?renderCharacterProfilePreview(profileData.profile_preview,profileTargetName,profileData.model)
+      const inspectionName=String(profileData.inspection_character_name||'');
+      if(profileStatus)profileStatus.textContent=
+        (inspectionName?'目前檢視：'+inspectionName+' 的既有角色資料（唯讀）。':'目前沒有已保存的角色資料可供檢視。')+
+        (profileTargetAvailable?'｜下一位待生成：'+profileTargetName+'。':'｜目前沒有待生成行程的公開角色。')+
+        (profileReady?' 下一位角色的資料也已整理完成，可檢查後進行第二步。':
+          profileJobStatus==='processing'?' 下一位角色正在整理中。':
+          profileJobStatus==='failed'?' 下一位角色上次整理失敗：'+String(profileData.profile_error_code||'unknown')+'。':
+          profileWaiting?' 下一位角色稍後才可重試：'+new Date(profileAvailableAt).toLocaleString('zh-TW',{timeZone:'Asia/Taipei'}):
+          profileTargetAvailable?' 下一位角色尚未完成資料整理。':'');
+      if(profilePreview)profilePreview.innerHTML=profileData.inspection_profile
+        ?renderCharacterProfilePreview(profileData.inspection_profile,inspectionName,profileData.inspection_model)
         :'';
+      const schedulePreview=document.getElementById('encounterScheduleExistingPreview');
+      if(schedulePreview)schedulePreview.innerHTML=renderExistingEncounterSchedules(
+        profileData.inspection_schedules, inspectionName, profileData.inspection_character_id
+      );
       if(profileButton){
         const enabled=profileTargetAvailable&&!profileReady&&!profileWaiting&&profileJobStatus!=='processing';
         profileButton.dataset.aiEnabled=enabled?'true':'false';
         profileButton.dataset.profileRetry=profileJobStatus==='failed'?'true':'false';
-        profileButton.textContent=profileJobStatus==='failed'?'手動重試 AI 整理':'AI 整理下一位角色資料';
+        profileButton.textContent=!profileTargetAvailable
+          ?'目前沒有待生成角色'
+          :profileJobStatus==='failed'
+            ?'手動重試下一位：'+profileTargetName
+            :'AI 整理下一位角色資料：'+profileTargetName;
         profileButton.disabled=!enabled;
       }
+      const scheduleButton=document.querySelector('[data-action="organize-encounter-schedules"]');
+      if(scheduleButton)scheduleButton.textContent=profileTargetAvailable
+        ?'AI 生成下一位角色行程與場景：'+profileTargetName
+        :'目前沒有待生成角色';
+      
     }catch(profileError){
       profileStatusError=true;
       if(profileStatus)profileStatus.textContent='角色資料狀態讀取失敗；為避免未整理就呼叫行程 AI，第二步已暫停。';
@@ -10218,6 +10252,60 @@ async function loadEncounterScheduleTestTools(){
 }
 
 document.addEventListener('click',async event=>{
+  const saveSchedulesButton=event.target.closest('[data-action="save-existing-encounter-schedules"]');
+  if(saveSchedulesButton){
+    event.preventDefault();
+    const characterId=String(saveSchedulesButton.dataset.characterId||'');
+    const editor=document.getElementById('encounterExistingSchedulesJson');
+    const status=document.getElementById('encounterExistingSchedulesSaveStatus');
+    if(!characterId||!editor||!window.mySupabase)return;
+    let edited;
+    try{
+      edited=JSON.parse(editor.value);
+      if(!Array.isArray(edited))throw new Error('JSON 必須是陣列');
+      if(edited.some(row=>!row||typeof row!=='object'||!row.id))throw new Error('每筆行程都必須保留原本的 id');
+      const ids=edited.map(row=>String(row.id));
+      if(new Set(ids).size!==ids.length)throw new Error('行程 id 不可重複');
+    }catch(error){
+      if(status)status.textContent='JSON 格式或資料錯誤：'+(error?.message||'請檢查內容');
+      return;
+    }
+    saveSchedulesButton.disabled=true;
+    if(status)status.textContent='正在驗證並儲存修改…';
+    try{
+      const client=window.mySupabase;
+      const {data:currentRows,error:readError}=await client.from('character_schedules')
+        .select('id,character_id,weekday,day_type,start_time,end_time,location_key,location_description,activity,scene_description,priority,is_active,source_type,variant_key,variant_weight,special_event_key,encounter_greeting,is_outdoor,rain_fallback_location_key,rain_fallback_activity,rain_fallback_greeting')
+        .eq('character_id',characterId).eq('is_active',true);
+      if(readError)throw readError;
+      const current=Array.isArray(currentRows)?currentRows:[];
+      const currentIds=new Set(current.map(row=>String(row.id)));
+      if(edited.length!==current.length||edited.some(row=>!currentIds.has(String(row.id)))){
+        throw new Error('為避免資料不完整，目前請保留所有既有行程 id 與筆數；新增／刪除需另外安全處理。');
+      }
+      const allowed=['weekday','day_type','start_time','end_time','location_key','location_description','activity','scene_description','priority','is_active','variant_key','variant_weight','special_event_key','encounter_greeting','is_outdoor','rain_fallback_location_key','rain_fallback_activity','rain_fallback_greeting'];
+      const originalById=new Map(current.map(row=>[String(row.id),row]));
+      for(const row of edited){
+        const original=originalById.get(String(row.id));
+        const patch={};
+        for(const key of allowed){
+          if(Object.prototype.hasOwnProperty.call(row,key)&&JSON.stringify(row[key]??null)!==JSON.stringify(original[key]??null))patch[key]=row[key];
+        }
+        if(!Object.keys(patch).length)continue;
+        patch.source_type='manual';
+        const {error:updateError}=await client.from('character_schedules').update(patch).eq('id',row.id).eq('character_id',characterId);
+        if(updateError)throw updateError;
+      }
+      if(status)status.textContent='行程修改已儲存。正在重新讀取確認…';
+      await loadEncounterScheduleTestTools();
+      if(status)status.textContent='行程修改已儲存並重新讀取確認；純查看不會呼叫 AI。';
+    }catch(error){
+      if(status)status.textContent='儲存失敗：'+(error?.message||'請稍後重試');
+    }finally{
+      saveSchedulesButton.disabled=false;
+    }
+    return;
+  }
   const profileButton=event.target.closest('[data-action="organize-character-profile"]');
   if(profileButton){
     event.preventDefault();
@@ -10669,15 +10757,16 @@ function renderModal(o) {
           <p class="small muted" id="encounterScheduleTestStatus">正在確認是否為允許的測試環境…</p>
           <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
             <strong>第一步｜角色資料整理</strong>
-            <p class="small muted" style="margin:0">先整理下一位待生成行程角色的背景、個性、動機、行為與生活脈絡。每次只處理一位；完成後會顯示完整整理結果供作者檢查。</p>
+            <p class="small muted" style="margin:0">上方顯示最近一次已保存的角色資料供檢查；下一位待生成角色另行標示。檢視既有資料不會呼叫 AI，也不會改動任何內容。</p>
             <p class="small muted" id="characterProfileTestStatus" style="margin:0">正在確認角色資料狀態…</p>
             <div id="characterProfilePreview" class="stack"></div>
             <button type="button" data-action="organize-character-profile" disabled>AI 整理下一位角色資料</button>
           </div>
           <div class="stack" style="margin:10px 0;padding:12px;border:1px solid var(--border);border-radius:12px">
             <strong>第二步｜行程與場景生成</strong>
-            <p class="small muted" style="margin:0">只有第一步成功保存且資料檢查完成後，才可生成同一位角色的行程與共同行程場景。</p>
-            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成角色行程與場景</button>
+            <p class="small muted" style="margin:0">以下先顯示最近一次已保存角色的行程供檢查。生成按鈕只會處理佇列中下一位角色，且需先完成該角色的第一步；不會重生上方已完成角色。</p>
+            <div id="encounterScheduleExistingPreview" class="stack"></div>
+            <button type="button" data-action="organize-encounter-schedules" disabled>AI 生成下一位角色行程與場景</button>
           </div>
           <div class="stack" style="margin:10px 0">
             <strong>待核對工作</strong>

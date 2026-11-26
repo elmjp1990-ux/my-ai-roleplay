@@ -1,5 +1,6 @@
 import {
   type EncounterSceneCatalogEntry,
+  ENCOUNTER_SCENE_KEYS,
   buildEncounterScheduleBatchMessages,
   classifyEncounterWorldview,
   getEncounterWorldviewScheduleDisposition,
@@ -74,6 +75,70 @@ const result = (
   [...builtInSceneCatalog, ...(sceneCatalog ?? [])],
 );
 
+Deno.test("maps every LUCID venue area, including its back alley, to the private club scene", () => {
+  for (const label of [
+    "LUCID俱樂部", "LUCID俱樂部包廂", "LUCID俱樂部休息室",
+    "LUCID俱樂部後巷", "LUCID俱樂部入口", "LUCID後巷",
+  ]) {
+    if (normalizeEncounterSceneKey(label) !== "private-club") {
+      throw new Error("all LUCID venue areas must map to private-club: " + label);
+    }
+  }
+});
+
+Deno.test("distributes Jiang Chenyuan generic worksite hours across existing map scenes", () => {
+  const worksiteBlocks = Array.from({ length: 24 }, (_, hour) => block(hour, [
+    option({ weight: 60, location: "高級公寓", activity: "前往裝修工地監工並確認施工進度" }),
+    option({ weight: 40, location: "高級公寓", activity: "巡視工地並與施工工班確認進度" }),
+  ]));
+  const jiang = source(id1, {
+    name: "江辰遠",
+    intro: "現代城市中的室內設計師，負責不同地點的工程監工。",
+    schedule_description: "依工程進度前往不同案場，監工並確認施工品質。",
+  });
+  const parsed = result([{
+    character_id: id1, placement: "modern_map", variants: variants(worksiteBlocks),
+  }], [jiang]);
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const allKeys = [
+    ...parsed.characters[0].variants.weekday.flatMap((hour) => hour.options.map((slot) => slot.location_key)),
+    ...parsed.characters[0].variants.holiday.flatMap((hour) => hour.options.map((slot) => slot.location_key)),
+  ];
+  const mapped = new Set(allKeys);
+  if (mapped.size !== ENCOUNTER_SCENE_KEYS.length ||
+      ENCOUNTER_SCENE_KEYS.some((key) => !mapped.has(key))) {
+    throw new Error("Jiang's worksite should be distributed across every existing scene anchor");
+  }
+  if (parsed.characters[0].variants.weekday[0].options[0].location_description !== "工地") {
+    throw new Error("construction activity should be represented as a movable worksite");
+  }
+
+  const other = result([{
+    character_id: id1, placement: "modern_map", variants: variants(worksiteBlocks),
+  }], [source(id1, { name: "其他角色" })]);
+  if (!other.ok || other.characters[0].variants.weekday[0].options[0].location_key !== "luxury-apartment") {
+    throw new Error("generic worksite auto-distribution must remain scoped to Jiang Chenyuan");
+  }
+});
+
+Deno.test("custom scene keys outside the RPC allowlist remain natural-language-only", () => {
+  const blocks = hourlyBlocks();
+  blocks[17] = block(17, [
+    option({ weight: 70, location: "自訂場域", activity: "在自訂場域整理設備並準備今日工作流程" }),
+    option({ weight: 30, location: "公司", activity: "在辦公室整理待辦並確認工作進度" }),
+  ]);
+  const parsed = result(
+    [{ character_id: id1, placement: "modern_map", variants: variants(blocks) }],
+    [source()],
+    [{ location_key: "custom-venue-key", display_name: "自訂場域", is_dynamic: false }],
+  );
+  if (!parsed.ok) throw new Error(parsed.errors.join(","));
+  const custom = parsed.characters[0].variants.weekday[17].options[0];
+  if (custom.location_key !== null || custom.location_description !== "自訂場域") {
+    throw new Error("custom scene IDs outside the publish RPC allowlist must not reject the schedule or lose its label");
+  }
+});
+
 Deno.test("accepts full weekday and holiday days with independent weighted options", () => {
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants() }]);
   if (!parsed.ok) throw new Error(parsed.errors.join(","));
@@ -103,57 +168,77 @@ Deno.test("accepts descriptive venue labels such as 歸途（酒吧）", () => {
   }
 });
 
-Deno.test("rejects missing hours, gaps, and non-hourly blocks", () => {
+Deno.test("salvages valid hours when a day has missing, duplicated, or malformed blocks", () => {
   const missing = hourlyBlocks().slice(0, 23);
   const missingResult = result([{ character_id: id1, placement: "modern_map", variants: variants(missing) }]);
-  if (missingResult.ok || !missingResult.errors.some((error) => error.includes("must_cover_24_hours"))) throw new Error("23-hour day accepted");
+  if (!missingResult.ok || !missingResult.characters[0].partial) throw new Error("23 valid hours should be published for review");
+  if (missingResult.characters[0].variants.weekday.length !== 23) throw new Error("valid 23-hour subset was not preserved");
+
   const gap = hourlyBlocks();
   gap[12] = { ...gap[12], start_time: "13:00", end_time: "14:00" };
   const gapResult = result([{ character_id: id1, placement: "modern_map", variants: variants(gap) }]);
-  if (gapResult.ok || !gapResult.errors.some((error) => error.includes("contiguous_24_hour_day"))) throw new Error("hour gap accepted");
+  if (!gapResult.ok || !gapResult.characters[0].partial) throw new Error("duplicate hour should be salvaged as a partial day");
+  if (gapResult.characters[0].variants.weekday.length !== 23) throw new Error("overlapping hour was not excluded");
+
   const nonHourly = hourlyBlocks();
   nonHourly[0] = { ...nonHourly[0], start_time: "00:30", end_time: "01:30" };
   const nonHourlyResult = result([{ character_id: id1, placement: "modern_map", variants: variants(nonHourly) }]);
-  if (nonHourlyResult.ok) throw new Error("non-hour interval accepted");
+  if (!nonHourlyResult.ok || nonHourlyResult.characters[0].variants.weekday.length !== 23) {
+    throw new Error("non-hour interval should be excluded without discarding other hours");
+  }
 });
 
-Deno.test("requires at least two options in every hourly block", () => {
+Deno.test("salvages a single valid option and normalizes its weight to 100", () => {
   const blocks = hourlyBlocks();
-  blocks[12] = block(12, [option()]);
+  blocks[12] = block(12, [option({ weight: 40 })]);
   const parsed = result([{ character_id: id1, placement: "modern_map", variants: variants(blocks) }]);
-  if (parsed.ok || !parsed.errors.some((error) => error.includes("options_count_invalid"))) {
-    throw new Error("hourly block with only one option accepted");
-  }
+  if (!parsed.ok || !parsed.characters[0].partial) throw new Error("single valid option should be retained for review");
+  const saved = parsed.characters[0].variants.weekday[12].options;
+  if (saved.length !== 1 || saved[0].weight !== 100) throw new Error("single option weight was not normalized");
 });
 
-Deno.test("requires 2-3 options and exact 100 percent weight totals per hour", () => {
-  const tooFew = hourlyBlocks();
-  tooFew[0] = block(0, [option()]);
-  const tooFewResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooFew) }]);
-  if (tooFewResult.ok || !tooFewResult.errors.some((error) => error.includes("options_count_invalid"))) {
-    throw new Error("one option accepted");
-  }
+Deno.test("filters excess options and normalizes valid option weights per hour", () => {
   const tooMany = hourlyBlocks();
-  tooMany[0] = block(0, [option({ weight: 34 }), option({ weight: 33 }), option({ weight: 33 }), option()]);
+  tooMany[0] = block(0, [
+    option({ weight: 34 }), option({ weight: 33, activity: "在辦公室檢查待辦並回覆客戶訊息" }),
+    option({ weight: 33, activity: "在公司整理資料並確認今天的工作進度" }),
+    option({ weight: 10, activity: "在公司整理資料並確認今天的工作進度" }),
+  ]);
   const tooManyResult = result([{ character_id: id1, placement: "modern_map", variants: variants(tooMany) }]);
-  if (tooManyResult.ok) throw new Error("four options accepted");
+  if (!tooManyResult.ok || !tooManyResult.characters[0].partial) throw new Error("excess option should be excluded");
+  const options = tooManyResult.characters[0].variants.weekday[0].options;
+  if (options.length !== 3 || options.reduce((sum, item) => sum + item.weight, 0) !== 100) {
+    throw new Error("remaining options must be capped and renormalized to 100");
+  }
+
   const wrongWeight = hourlyBlocks();
   wrongWeight[0] = block(0, [option({ weight: 75 }), option({ weight: 20 })]);
   const weightResult = result([{ character_id: id1, placement: "modern_map", variants: variants(wrongWeight) }]);
-  if (weightResult.ok || !weightResult.errors.some((error) => error.includes("option_weights_must_sum_100"))) {
-    throw new Error("invalid weight total accepted");
+  if (!weightResult.ok || !weightResult.characters[0].partial) throw new Error("wrong source weights should be normalized");
+  if (weightResult.characters[0].variants.weekday[0].options.reduce((sum, item) => sum + item.weight, 0) !== 100) {
+    throw new Error("normalized option weights must sum to 100");
   }
 });
 
-Deno.test("limits activity descriptions to 8-30 characters and rejects extra greeting fields", () => {
+Deno.test("excludes invalid options while retaining other valid hours", () => {
   const short = hourlyBlocks();
-  short[0] = block(0, [option({ activity: "睡覺" }), option({ weight: 0, activity: "醒來喝水後又躺回床上休息" })]);
+  short[0] = block(0, [
+    option({ activity: "睡覺" }),
+    option({ weight: 0, activity: "醒來喝水後又躺回床上休息" }),
+  ]);
   const shortResult = result([{ character_id: id1, placement: "modern_map", variants: variants(short) }]);
-  if (shortResult.ok || !shortResult.errors.some((error) => error.includes("activity_length_invalid"))) throw new Error("short activity accepted");
+  if (!shortResult.ok || !shortResult.characters[0].partial) throw new Error("invalid options should not discard the whole character");
+  if (shortResult.characters[0].variants.weekday.some((item) => item.start_time === "00:00")) {
+    throw new Error("an hour with no valid options must be omitted");
+  }
+
   const extra = hourlyBlocks();
-  extra[0] = block(0, [option({ encounter_greeting: "不應由行程 AI 產生的招呼" }), option({ weight: 0 })]);
+  extra[0] = block(0, [
+    option({ encounter_greeting: "不應由行程 AI 產生的招呼" }),
+    option({ weight: 0 }),
+  ]);
   const extraResult = result([{ character_id: id1, placement: "modern_map", variants: variants(extra) }]);
-  if (extraResult.ok || !extraResult.errors.some((error) => error.includes("option_0_keys_invalid"))) throw new Error("generated greeting field accepted");
+  if (!extraResult.ok || !extraResult.characters[0].partial) throw new Error("invalid extra fields should be excluded");
 });
 
 Deno.test("rain fallback fields are optional and unrestricted by scene policy", () => {
@@ -252,6 +337,19 @@ Deno.test("classifies activity space independently from scene location", () => {
   if (normalizeEncounterSceneKey("夜間酒吧", "晚上九點後進行樂團演出") !== "night-bar" ||
       normalizeEncounterSceneKey("Live House", "白天進行樂團演出") !== "live-house") {
     throw new Error("explicit night-bar and daytime Live House locations must remain distinct");
+  }
+  const latePerformance = "演出進入高潮，汗水順著額角滑落，吉他聲震耳欲聾";
+  const earlyPerformance = "在台上進行正式演出，彈奏電吉他帶動全場氣氛";
+  if (normalizeEncounterSceneKey("Livehouse", latePerformance, "", "20:00") !== "live-house" ||
+      normalizeEncounterSceneKey("Livehouse", earlyPerformance, "", "20:00") !== "live-house") {
+    throw new Error("music performances before 21:00 must use the exhibition space");
+  }
+  if (normalizeEncounterSceneKey("Livehouse", earlyPerformance, "", "21:00") !== "night-bar" ||
+      normalizeEncounterSceneKey("Livehouse", latePerformance, "", "23:00") !== "night-bar") {
+    throw new Error("music performances from 21:00 onward must use the night bar");
+  }
+  if (normalizeEncounterSceneKey("Livehouse", "在地下樂團團練並排練新歌", "", "23:00") !== "live-house") {
+    throw new Error("rehearsals must not be reclassified as night-bar performances");
   }
 });
 
@@ -394,10 +492,11 @@ Deno.test("keeps free natural-language locations and applies system scene matchi
       normalizeEncounterSceneKey("餐廳") !== "department-store") throw new Error("canonical A–N scene aliases regressed");
 
   const tooLong = hourlyBlocks();
-  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
-  const rejected = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
-  if (rejected.ok || !rejected.errors.some((error) => error.includes("location_invalid"))) {
-    throw new Error("location label longer than twenty characters accepted");
+  tooLong[8] = block(8, [option({ weight: 60, location: "超級長的地點名稱超級長的地點名稱超級長的地點名稱超級長的地點名稱" }), option({ weight: 40 })]);
+  const salvaged = result([{ character_id: id1, placement: "modern_map", variants: variants(tooLong) }]);
+  if (!salvaged.ok || !salvaged.characters[0].partial ||
+      salvaged.characters[0].variants.weekday[8].options.some((item) => item.location_description === "超級長的地點名稱超級長的地點名稱超級長的地點名稱超級長的地點名稱")) {
+    throw new Error("overlong location should be excluded while the valid option is salvaged");
   }
 });
 

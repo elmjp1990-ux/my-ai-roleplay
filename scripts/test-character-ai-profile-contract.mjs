@@ -7,6 +7,7 @@ const registry = JSON.parse(fs.readFileSync("supabase/drafts/character-ai-profil
 const frontend = fs.readFileSync("index.html", "utf8");
 const migration = fs.readFileSync("supabase/migrations/20261107120000_character_ai_profile_organization_queue.sql", "utf8");
 const profileVersionMigration = fs.readFileSync("supabase/migrations/20261119160000_character_profile_life_context_version.sql", "utf8");
+const runtimeIdentityMigration = fs.readFileSync("supabase/migrations/20261126100000_character_profile_runtime_identity_context.sql", "utf8");
 const manualProfileMigration = fs.readFileSync("supabase/migrations/20261122120000_manual_character_profile_before_encounter_schedule.sql", "utf8");
 const manualScheduleClaimMigration = fs.readFileSync("supabase/migrations/20261122130000_scope_manual_encounter_schedule_claims.sql", "utf8");
 const schedulerMigration = fs.readFileSync("supabase/migrations/20261107123000_schedule_character_profile_organization_worker.sql", "utf8");
@@ -78,7 +79,7 @@ const classifierSandbox = { window: {} };
 vm.runInNewContext(coreUtils, classifierSandbox);
 const classifyProfileChange = classifierSandbox.window.PoyozzCoreUtils.classifyCharacterProfileChanges;
 const baseCharacter = {
-  name: "角色甲", intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
+  name: "角色甲", gender: "male", age: 23, intro: "一名生活在城市中的角色", race: "人類", style: "沉穩",
   phone_settings: {}, phoneSettings: {}, privateInfo: "住在城市", tags: [], personalityProfile: { coreTraits: ["冷靜"], values: ["誠實"] },
 };
 const basePrivate = { private_info: "住在城市", personality_profile: baseCharacter.personalityProfile };
@@ -89,6 +90,10 @@ const classify = (characterPatch = {}, privatePatch = {}, existingPatch = {}) =>
   normalizePersonalityProfile: value => value || {},
   rowPhoneSettingsForDiff: value => value || {},
 });
+assert.equal(classify({ age: 24 }).requiresDerivedRefresh, false,
+  "Changing the author-set age must not trigger paid AI profile regeneration");
+assert.equal(classify({ gender: "female" }).requiresDerivedRefresh, false,
+  "Changing the author-set gender must not trigger paid AI profile regeneration");
 assert.equal(classify({ name: "角色乙" }).requiresDerivedRefresh, false,
   "Renaming a character must not trigger AI profile generation");
 assert.equal(classify({ opening: "優化後的開場白" }).requiresDerivedRefresh, false,
@@ -351,4 +356,25 @@ assert.match(coreUtils, /const prev = existingPrivateProfile\?\.personality_prof
 assert.match(coreUtils, /personality_or_character_context_changed/, "Meaningful personality changes must be explicitly classified for refresh");
 assert.match(coreUtils, /relationshipPacing.*occupation/, "Occupation changes must be classified as AI-relevant source changes");
 
+
+for (const path of ["characters.name", "characters.gender", "characters.age"]) {
+  const runtimeFact = registry.runtime_only_sources.find(item => item.path === path);
+  assert.equal(runtimeFact?.provided_to_profile_organizer, true,
+    path + " must be provided to the organizer without becoming a refresh trigger");
+}
+assert.match(workerCore, /characters\.age[\s\S]*identity_background[\s\S]*不可改成約略年齡/,
+  "Organizer prompt must preserve the exact author-set age in identity_background");
+assert.match(workerCore, /BASIC_IDENTITY_SOURCE_KEYS[\s\S]*identity_background[\s\S]*basic_identity_source_not_allowed/,
+  "Basic identity facts may support identity_background only, never personality or life-context inference");
+assert.match(workerCore, /"characters\.name",[\s\S]*"characters\.gender",[\s\S]*"characters\.age"/,
+  "Organizer source validator must allow authoritative basic identity facts");
+assert.match(coreUtils, /compare\(runtime, 'gender'[\s\S]*compare\(runtime, 'age'/,
+  "Changing gender or age alone must remain runtime-only and not enqueue profile regeneration");
+
+assert.match(runtimeIdentityMigration, /p_source_changed IS NOT TRUE[\s\S]*not_enqueued/,
+  "A runtime-only save with no existing profile job must not create a pending job");
+assert.match(runtimeIdentityMigration, /character_profile_source_hash_payload[\s\S]*characters\.age/,
+  "Runtime identity facts must be excluded from the refresh hash");
+assert.match(runtimeIdentityMigration, /characters\.age[\s\S]*character_profile_source_payload/,
+  "The organizer source payload must include the author-set age");
 console.log("Character AI Profile schema, queue, Worker, scheduling, save enqueue, Story integration and privacy contracts passed.");
