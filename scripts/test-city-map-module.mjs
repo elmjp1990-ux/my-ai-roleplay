@@ -216,7 +216,7 @@ assert.match(html, /processing_character_count/);
 assert.match(html, /failed_character_count/);
 assert.match(html, /needs_reconciliation_count/);
 assert.match(html, /button.dataset\.aiEnabled!=='true'\|\|button\.disabled/);
-assert.match(html, /AI 生成角色行程與場景/);
+assert.match(html, /AI 生成下一位角色行程與場景/);
 assert.doesNotMatch(html, /if\(error\|\|data\?\.enabled!==true\)\{section\.remove\(\);return;\}/);
 
 assert.match(html, /if\(!client\)throw new Error\('城市角色行程服務尚未連線。'\)/);
