@@ -337,3 +337,10 @@
 .profile-membership-copy>span{font-size:10px;letter-spacing:.16em;color:var(--muted)}
 .profile-membership-copy>strong{font-size:19px;letter-spacing:.03em;color:var(--text)}
 .profile-membership-status{flex:0 0 auto;padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;white-space:nowrap}
+
+
+/* MY uses the exact same cumulative top-up tier as the shop; monthly is only a status note. */
+.profile-topup-membership{align-items:flex-start}
+.profile-topup-membership .profile-membership-copy>strong{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.profile-topup-membership .profile-membership-copy>strong small{font-size:12px;font-weight:600;color:var(--muted)}
+.profile-topup-membership .profile-membership-copy>.profile-monthly-status{font-size:12px;letter-spacing:0;color:var(--muted);line-height:1.6}
