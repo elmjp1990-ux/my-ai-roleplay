@@ -2,6 +2,7 @@ export type StoryPhoneEvent = {
   event_type: "message" | "social_post" | "missed_call" | "voice_message" | "notification";
   title: string;
   body: string;
+  field_index?: number;
 };
 
 export type StoryTurnEnvelope = {
@@ -156,7 +157,9 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
       const candidate = indexedCandidate ?? (positionalCandidate && typeof (positionalCandidate as StoryPhoneEvent & { field_index?: number }).field_index !== "number"
         ? positionalCandidate
         : undefined);
-      if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
+      const indexedCandidateHasWrongTitle = indexedCandidate
+        && indexedCandidate.title.trim() !== label.trim();
+      if (!candidate || indexedCandidateHasWrongTitle || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
       }
       const candidateBody = candidate.body || fallbackBodyForLabel(label);
