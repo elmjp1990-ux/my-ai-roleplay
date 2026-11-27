@@ -84,3 +84,11 @@
 .store-shop-hero:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 22%,rgba(206,184,255,.06) 50%,transparent 78%);mix-blend-mode:screen}
 @media(max-width:560px){.store-shop-hero{gap:4px}.store-shop-hero .store-night-hero-copy{flex:1 1 auto;max-width:none}.store-shop-gem-showcase{width:115px;height:130px;flex:0 0 115px;margin:0}.store-shop-gem-showcase .store-crystal-svg{width:112px;height:112px}}
 @media(max-width:380px){.store-shop-gem-showcase{width:86px;flex-basis:86px;margin-left:-8px}.store-shop-gem-showcase .store-crystal-svg{width:92px;height:92px}}
+
+
+/* First small diamond pack uses its supplied full-card artwork instead of the single diamond icon. */
+.store-crystal-package.store-package-small{position:relative;isolation:isolate;overflow:hidden;background:linear-gradient(135deg,rgba(22,17,39,.38),rgba(18,19,37,.72)),url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg") center/cover no-repeat;border-color:rgba(215,190,255,.55);box-shadow:inset 0 1px rgba(255,255,255,.2),0 8px 20px rgba(3,5,18,.22)}
+.store-crystal-package.store-package-small::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(17,14,32,.22),rgba(17,14,32,.62))}
+.store-crystal-package.store-package-small .store-package-topline,.store-crystal-package.store-package-small .store-package-diamond-count,.store-crystal-package.store-package-small .store-package-bonus-line,.store-crystal-package.store-package-small .store-package-bottom>strong{color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.55)}
+.store-crystal-package.store-package-small .store-package-gem-mark{display:none}
+.store-crystal-package.store-package-small .store-package-buy{border-color:rgba(239,222,255,.75);background:linear-gradient(135deg,rgba(176,133,236,.78),rgba(100,72,151,.82));color:#fff}
