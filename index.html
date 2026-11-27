@@ -1283,6 +1283,13 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         throw new Error('錢包初始化函式沒有回傳有效的鑽石與銀幣餘額。');
       }
 
+      const { data: topupTotalRow, error: topupTotalError } = await client
+        .from('user_topup_totals')
+        .select('total_twd')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (topupTotalError) throw new Error('讀取累積儲值金額失敗：' + topupTotalError.message);
+
       // 避免較早發出的請求覆蓋另一個已登入帳號。
       syncStage = '更新登入狀態';
       if (state.account?.uid !== user.id) return;
@@ -1299,7 +1306,8 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
         birthdate: privateProfile.birthdate || '',
         personas: Array.isArray(privateProfile.persona_presets) ? privateProfile.persona_presets : [],
         diamonds: Number(walletRow.diamonds ?? 0),
-        silver: Number(walletRow.silver_coins ?? 0)
+        silver: Number(walletRow.silver_coins ?? 0),
+        totalTopupTwd: Number(topupTotalRow?.total_twd || 0)
       };
       state.signedIn = true;
       persist();
@@ -10565,10 +10573,17 @@ document.addEventListener('click',async event=>{
 function renderShop() {
   const u=currentUser();
   if(u?.uid&&window.mySupabase&&window.__poyozzShopBonusLedgerUid!==u.uid){window.__poyozzShopBonusLedgerUid=u.uid;void loadWalletLedger('diamond').then(ok=>{if(ok&&state.account?.uid===u.uid&&route.page==='shop')renderShop();else if(!ok)window.__poyozzShopBonusLedgerUid=null;});}
-  const silver=Number(u?.silver||0).toLocaleString(),diamonds=Number(u?.diamonds||0).toLocaleString();
+  const diamonds=Number(u?.diamonds||0).toLocaleString();
+  const topupTotal=Math.max(0,Number(u?.totalTopupTwd||0));
+  const tiers=[{level:0,name:'星塵會員',threshold:0},{level:1,name:'白銀會員',threshold:5000},{level:2,name:'黃金會員',threshold:20000},{level:3,name:'白金會員',threshold:80000},{level:4,name:'鑽石會員',threshold:180000},{level:5,name:'星耀會員',threshold:300000}];
+  const tier=tiers.reduce((current,item)=>topupTotal>=item.threshold?item:current,tiers[0]);
+  const tierNext=tiers[tier.level+1]||null;
+  const progress=tierNext?Math.max(0,Math.min(100,(topupTotal-tier.threshold)/(tierNext.threshold-tier.threshold)*100)):100;
+  const tierProgressLabel=tierNext?`${Math.min(topupTotal,tierNext.threshold).toLocaleString()} / ${tierNext.threshold.toLocaleString()}`:`${topupTotal.toLocaleString()} / 300,000`;
   const packs=[{code:'twd_60',amount:200,price:60},{code:'twd_150',amount:525,price:150},{code:'twd_290',amount:1050,price:290},{code:'twd_850',amount:3200,price:850},{code:'twd_1390',amount:5400,price:1390},{code:'twd_2690',amount:11000,price:2690}];
   const gem='<img class="store-crystal-svg" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="紫羅蘭幻彩鑽石水晶" width="145" height="145" decoding="async" fetchpriority="high">';
-  $('view').innerHTML='<div class="stack store-page store-night-page" style="gap:22px">'+'<section class="store-night-hero"><div class="store-night-hero-copy"><div class="store-eyebrow">POYOZZ · CRYSTAL VAULT</div><h1>夢幻水晶商店</h1><p>為每一次相遇，收藏更多閃耀時刻。</p><div class="store-hero-note"><i></i> 水晶補給站</div></div><div class="store-night-gem">'+gem+'<span class="store-gem-orbit"></span><span class="store-gem-orbit store-gem-orbit-two"></span><b>✦</b></div></section>'+'<section><div class="store-section-heading"><div><small>YOUR TREASURES</small><h2>我的資源</h2></div><button class="store-history-link" data-action="ledger">儲值紀錄　↗</button></div><div class="store-resource-grid"><article class="store-resource-card"><i><img class="poyozz-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="20" height="20" loading="lazy" decoding="async"></i><div><span>鑽石餘額</span><strong>'+diamonds+'</strong></div><small>DIAMONDS</small></article><article class="store-resource-card store-resource-silver"><i><img class="poyozz-silver-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/silver.png" alt="" aria-hidden="true" width="22" height="22" loading="lazy" decoding="async"></i><div><span>銀幣餘額</span><strong>'+silver+'</strong></div><small>SILVER COINS</small></article></div></section>'+'<section><div class="store-section-heading store-package-heading"><div><small>CHOOSE YOUR CRYSTALS</small><h2>鑽石儲值</h2><p>每個級距首次購買，額外贈送 30% 鑽石</p></div><span class="store-bonus-seal">FIRST<br>+30%</span></div><div class="store-package-grid">'+packs.map((item,i)=>{const first=!state.ledger.some(x=>x.currency==='diamond'&&x.reason==='首儲優惠贈鑽'&&x.referenceId===item.code);const bonus=Math.round(item.amount*.3);return '<article class="store-crystal-package'+(i===5?' store-package-featured':'')+'"><div class="store-package-topline"><span>CRYSTAL '+String(i+1).padStart(2,'0')+'</span><b class="'+(first?'store-package-first-badge':'store-package-used-badge')+'">'+(first?'首儲 +30%':'首儲已領取')+'</b></div><div class="store-package-gem-mark"><img class="poyozz-diamond-icon store-package-diamond-icon" src="https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/%E7%B4%AB%E7%BE%85%E8%98%AD%E5%B9%BB%E5%BD%A9%E9%91%BD%E7%9F%B3%E6%B0%B4%E6%99%B6.png" alt="" aria-hidden="true" width="35" height="35" loading="lazy" decoding="async"></div><div class="store-package-diamond-count"><strong>'+item.amount.toLocaleString()+'</strong><span>鑽石</span></div>'+(first?'<div class="store-package-bonus-line">首儲加贈 <strong>+'+bonus.toLocaleString()+'</strong> · 共 '+(item.amount+bonus).toLocaleString()+' 鑽</div>':'<div class="store-package-bonus-line store-package-bonus-muted">再次購買仍可獲得基本鑽石</div>')+'<div class="store-package-bottom"><strong>NT$'+item.price.toLocaleString()+'</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="'+item.code+'">選擇方案　›</button></div></article>';}).join('')+'</div><p class="store-package-footnote">首儲優惠依每個儲值級距分別計算；月費會員同樣享有符合資格的首儲贈鑽。</p></section></div>';
+    const packageGem=gem.replace('store-crystal-svg','poyozz-diamond-icon store-package-diamond-icon').replace('width="145" height="145"','width="35" height="35"');
+  $('view').innerHTML='<div class="stack store-page store-night-page" style="gap:22px">'+'<section class="store-night-hero store-shop-hero"><div class="store-night-hero-copy"><div class="store-eyebrow">POYOZZ · SHOP</div><h1>商城小舖</h1><div class="store-hero-note store-diamond-heading"><i></i> 鑽石補給</div></div><div class="store-night-gem">'+gem+'<span class="store-gem-orbit"></span><span class="store-gem-orbit store-gem-orbit-two"></span><b>✦</b></div></section>'+'<section class="store-member-level-card"><div class="store-member-top"><div><small>MEMBER LEVEL</small><h2>'+tier.name+'</h2></div><div class="store-member-level-number">Lv'+tier.level+'</div></div><div class="store-member-progress-track"><div class="store-member-progress-fill" style="width:'+progress.toFixed(2)+'%"></div></div><div class="store-member-progress-caption"><strong>'+tierProgressLabel+'</strong><span>'+(tierNext?'Lv'+tierNext.level+' · '+tierNext.name:'MAX LEVEL')+'</span></div><div class="store-member-total"><span>累積儲值</span><strong>NT$'+topupTotal.toLocaleString()+'</strong></div><button class="store-history-link store-member-history" data-action="ledger">儲值紀錄　↗</button></section>'+'<section><div class="store-section-heading store-package-heading"><div><small>DIAMOND SUPPLY</small><h2>鑽石儲值</h2></div></div><div class="store-package-grid">'+packs.map((item,i)=>{const first=!state.ledger.some(x=>x.currency==='diamond'&&x.reason==='首儲優惠贈鑽'&&x.referenceId===item.code);const bonus=Math.round(item.amount*.3);const packageNames=['小資鑽石包','基本鑽石包','輕量鑽石包','暢享鑽石包','尊享鑽石包','豪華鑽石包'];return '<article class="store-crystal-package'+(i===5?' store-package-featured':'')+'"><div class="store-package-topline"><span>'+packageNames[i]+'</span>'+(first?'<b class="store-package-first-badge store-first-bonus-circle">First 30% bonus</b>':'')+'</div><div class="store-package-gem-mark">'+packageGem+'</div><div class="store-package-diamond-count"><strong>'+item.amount.toLocaleString()+'</strong><span>鑽石</span></div>'+(first?'<div class="store-package-bonus-line">額外贈送 <strong>+'+bonus.toLocaleString()+'</strong> · 總計 '+(item.amount+bonus).toLocaleString()+' 鑽</div>':'<div class="store-package-bonus-line store-package-bonus-muted">基本鑽石</div>')+'<div class="store-package-bottom"><strong>NT$'+item.price.toLocaleString()+'</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="'+item.code+'">購買</button></div></article>';}).join('')+'</div><p class="store-package-footnote">首儲優惠依每個儲值級距分別計算；月費會員同樣享有符合資格的首儲贈鑽。</p></section></div>';
 }
 function renderProfile() {
   const u = currentUser();
@@ -12019,6 +12034,7 @@ document.addEventListener('click',async event => {
           const result=Array.isArray(data)?data[0]:data;
           if (!result || result.status !== 'granted') throw new Error('目前無法確認入帳結果，請稍後查看錢包紀錄。');
           state.account.diamonds=Number(result.diamonds ?? state.account.diamonds ?? 0);
+          state.account.totalTopupTwd=Number(state.account.totalTopupTwd||0)+Number(result.price_twd||0);
           localStorage.removeItem(requestStorageKey);
           await loadWalletLedger('diamond');
           persist();
