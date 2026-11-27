@@ -64,3 +64,361 @@
 .wallet-cost-part .poyozz-silver-icon,.wallet-modal-cost .poyozz-silver-icon,.wallet-resource-row .poyozz-silver-icon{width:18px;height:18px;}
 .wallet-silver .poyozz-silver-icon{width:16px;height:16px;}
 .store-resource-silver .poyozz-silver-icon{width:22px;height:22px;}
+
+/* Shop member tier and package UI refinements */
+.store-shop-hero .store-eyebrow{letter-spacing:.24em}.store-shop-hero h1{font-weight:650;letter-spacing:.04em}.store-shop-hero .store-diamond-heading{margin-top:10px;font-size:15px;letter-spacing:.1em}
+.store-member-level-card{position:relative;overflow:hidden;padding:20px 22px 18px;border:1px solid rgba(218,194,255,.23);border-radius:22px;background:linear-gradient(125deg,rgba(147,113,190,.2),rgba(255,255,255,.055) 58%,rgba(193,170,231,.12));box-shadow:inset 0 1px rgba(255,255,255,.12),0 12px 28px rgba(8,5,15,.18);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.store-member-top{display:flex;align-items:center;justify-content:space-between;gap:14px}.store-member-top small{font-size:10px;letter-spacing:.22em;opacity:.72}.store-member-top h2{margin:5px 0 0;font-size:23px;letter-spacing:.06em}.store-member-level-number{font-size:27px;font-weight:750;letter-spacing:.04em;color:#e7d5ff;text-shadow:0 0 18px rgba(193,153,255,.35)}
+.store-member-progress-track{height:9px;margin:20px 0 8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden;box-shadow:inset 0 1px 3px rgba(0,0,0,.25)}.store-member-progress-fill{height:100%;border-radius:inherit;background:linear-gradient(90deg,#a78bce,#e8d8ff);box-shadow:0 0 13px rgba(202,164,255,.36);transition:width .35s ease}
+.store-member-progress-caption{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;opacity:.86}.store-member-progress-caption strong{font-variant-numeric:tabular-nums}.store-member-total{display:flex;align-items:center;justify-content:space-between;margin-top:17px;padding-top:13px;border-top:1px solid rgba(255,255,255,.1)}.store-member-total span{font-size:12px;opacity:.72}.store-member-total strong{font-size:18px;letter-spacing:.04em}.store-member-history{display:block;margin:10px 0 0 auto;padding:4px 0;background:transparent;border:0;color:inherit;font-size:12px;opacity:.7}
+.store-package-heading{margin-bottom:14px}.store-package-heading h2{letter-spacing:.05em}.store-package-topline{align-items:flex-start;min-height:34px}.store-package-topline>span{font-weight:650;letter-spacing:.04em}.store-first-bonus-circle{width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;padding:4px;border-radius:50%;white-space:normal;text-align:center;line-height:1.1;font-size:10px;letter-spacing:-.02em;transform:rotate(7deg);box-shadow:0 0 0 2px rgba(255,255,255,.12),0 4px 16px rgba(156,113,207,.24);background:linear-gradient(145deg,rgba(202,167,255,.32),rgba(111,77,157,.25));border:1px solid rgba(232,211,255,.65);color:#f1e4ff}
+.store-package-bonus-line{min-height:34px}.store-crystal-package .store-package-bottom{margin-top:auto;min-height:51px;flex-shrink:0}.store-package-buy{min-width:82px;letter-spacing:.08em;font-weight:650}
+@media(max-width:600px){.store-member-level-card{padding:17px 16px}.store-member-top h2{font-size:20px}.store-member-level-number{font-size:24px}.store-member-progress-caption{font-size:11px}.store-first-bonus-circle{width:48px;height:48px;flex-basis:48px;font-size:9px}}
+
+/* Keep the existing Violet Crystal as a sibling flex item on the hero's right side. */
+.store-shop-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;background:radial-gradient(ellipse at 82% 48%,rgba(151,111,219,.38),transparent 43%),radial-gradient(ellipse at 20% 110%,rgba(95,73,153,.24),transparent 52%),linear-gradient(118deg,#12162a,#28203f 58%,#181b30)}
+.store-shop-hero .store-night-hero-copy{flex:1 1 auto;min-width:0;max-width:none}
+.store-shop-hero .store-diamond-heading{margin-top:20px}
+.store-shop-gem-showcase{position:relative;z-index:1;display:grid;place-items:center;width:180px;height:170px;flex:0 0 180px;margin:0 7% 0 0;filter:drop-shadow(0 12px 22px #885ddc52)}
+.store-shop-gem-showcase .store-crystal-svg{width:145px;height:145px;filter:drop-shadow(0 0 18px #b08bff3d)}
+.store-shop-hero:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 22%,rgba(206,184,255,.06) 50%,transparent 78%);mix-blend-mode:screen}
+@media(max-width:560px){.store-shop-hero{gap:4px}.store-shop-hero .store-night-hero-copy{flex:1 1 auto;max-width:none}.store-shop-gem-showcase{width:115px;height:130px;flex:0 0 115px;margin:0}.store-shop-gem-showcase .store-crystal-svg{width:112px;height:112px}}
+@media(max-width:380px){.store-shop-gem-showcase{width:86px;flex-basis:86px;margin-left:-8px}.store-shop-gem-showcase .store-crystal-svg{width:92px;height:92px}}
+
+
+/* First small diamond pack shows the supplied artwork in its original colors. */
+.store-crystal-package.store-package-small{position:relative;isolation:isolate;overflow:hidden;background-image:url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg");background-position:center;background-size:cover;background-repeat:no-repeat;border-color:rgba(215,190,255,.55);box-shadow:inset 0 1px rgba(255,255,255,.2),0 8px 20px rgba(3,5,18,.16)}
+.store-crystal-package.store-package-small::before{content:none}
+.store-crystal-package.store-package-small .store-package-topline,.store-crystal-package.store-package-small .store-package-diamond-count,.store-crystal-package.store-package-small .store-package-bonus-line,.store-crystal-package.store-package-small .store-package-bottom>strong{color:inherit;text-shadow:0 1px 3px rgba(25,15,40,.2)}
+.store-crystal-package.store-package-small .store-package-gem-mark{display:none}
+.store-crystal-package.store-package-small .store-package-buy{border-color:rgba(239,222,255,.75);background:rgba(133,100,185,.72);color:#fff}
+
+
+/* Uploaded diamond package artwork — same full-color card treatment as the small pack. */
+.store-crystal-package.store-package-basic{background-image:url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg")}
+.store-crystal-package.store-package-light{background-image:url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg")}
+.store-crystal-package.store-package-delight{background-image:url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg")}
+.store-crystal-package.store-package-luxury{background-image:url("https://cdn.jsdelivr.net/gh/elmjp1990-ux/my-ai-roleplay@main/assets/shop/%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg")}
+.store-crystal-package.store-package-basic,
+.store-crystal-package.store-package-light,
+.store-crystal-package.store-package-delight,
+.store-crystal-package.store-package-luxury{background-position:center;background-size:cover;background-repeat:no-repeat;border-color:rgba(215,190,255,.55);box-shadow:inset 0 1px rgba(255,255,255,.2),0 8px 20px rgba(3,5,18,.16)}
+.store-crystal-package.store-package-basic .store-package-gem-mark,
+.store-crystal-package.store-package-light .store-package-gem-mark,
+.store-crystal-package.store-package-delight .store-package-gem-mark,
+.store-crystal-package.store-package-luxury .store-package-gem-mark{display:none}
+.store-crystal-package.store-package-basic .store-package-topline,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-bonus-line,
+.store-crystal-package.store-package-basic .store-package-bottom>strong,
+.store-crystal-package.store-package-light .store-package-topline,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-bonus-line,
+.store-crystal-package.store-package-light .store-package-bottom>strong,
+.store-crystal-package.store-package-delight .store-package-topline,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-bonus-line,
+.store-crystal-package.store-package-delight .store-package-bottom>strong,
+.store-crystal-package.store-package-luxury .store-package-topline,
+.store-crystal-package.store-package-luxury .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-bonus-line,
+.store-crystal-package.store-package-luxury .store-package-bottom>strong{text-shadow:0 1px 3px rgba(25,15,40,.2)}
+.store-crystal-package.store-package-basic .store-package-buy,
+.store-crystal-package.store-package-light .store-package-buy,
+.store-crystal-package.store-package-delight .store-package-buy,
+.store-crystal-package.store-package-luxury .store-package-buy{border-color:rgba(239,222,255,.75);background:rgba(133,100,185,.72);color:#fff}
+
+
+/* Optimized shop artwork: serve cached 1200px WebP derivatives for every pack. */
+/* A restrained plum-to-charcoal glass gradient protects text contrast without flattening the artwork. */
+.store-crystal-package.store-package-small{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-basic{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-light{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-delight{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-premium{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-luxury{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-small,
+.store-crystal-package.store-package-basic,
+.store-crystal-package.store-package-light,
+.store-crystal-package.store-package-delight,
+.store-crystal-package.store-package-premium,
+.store-crystal-package.store-package-luxury{
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  border-color:rgba(224,205,255,.62);
+  box-shadow:inset 0 1px rgba(255,255,255,.24),0 9px 24px rgba(3,5,18,.22);
+}
+.store-crystal-package.store-package-small .store-package-topline,
+.store-crystal-package.store-package-basic .store-package-topline,
+.store-crystal-package.store-package-light .store-package-topline,
+.store-crystal-package.store-package-delight .store-package-topline,
+.store-crystal-package.store-package-premium .store-package-topline,
+.store-crystal-package.store-package-luxury .store-package-topline{
+  color:#fff;
+  text-shadow:0 2px 9px rgba(12,8,24,.72);
+}
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  color:#fff;
+  text-shadow:0 2px 10px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-diamond-count span,
+.store-crystal-package.store-package-basic .store-package-diamond-count span,
+.store-crystal-package.store-package-light .store-package-diamond-count span,
+.store-crystal-package.store-package-delight .store-package-diamond-count span,
+.store-crystal-package.store-package-premium .store-package-diamond-count span,
+.store-crystal-package.store-package-luxury .store-package-diamond-count span{
+  color:rgba(255,250,255,.94);
+}
+.store-crystal-package.store-package-small .store-package-bonus-line,
+.store-crystal-package.store-package-basic .store-package-bonus-line,
+.store-crystal-package.store-package-light .store-package-bonus-line,
+.store-crystal-package.store-package-delight .store-package-bonus-line,
+.store-crystal-package.store-package-premium .store-package-bonus-line,
+.store-crystal-package.store-package-luxury .store-package-bonus-line{
+  color:#f1e7ff;
+  text-shadow:0 1px 7px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-bonus-line strong,
+.store-crystal-package.store-package-basic .store-package-bonus-line strong,
+.store-crystal-package.store-package-light .store-package-bonus-line strong,
+.store-crystal-package.store-package-delight .store-package-bonus-line strong,
+.store-crystal-package.store-package-premium .store-package-bonus-line strong,
+.store-crystal-package.store-package-luxury .store-package-bonus-line strong{
+  color:#fff;
+}
+.store-crystal-package.store-package-small .store-package-bottom>strong,
+.store-crystal-package.store-package-basic .store-package-bottom>strong,
+.store-crystal-package.store-package-light .store-package-bottom>strong,
+.store-crystal-package.store-package-delight .store-package-bottom>strong,
+.store-crystal-package.store-package-premium .store-package-bottom>strong,
+.store-crystal-package.store-package-luxury .store-package-bottom>strong{
+  color:#fff;
+  text-shadow:0 2px 8px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-bottom,
+.store-crystal-package.store-package-basic .store-package-bottom,
+.store-crystal-package.store-package-light .store-package-bottom,
+.store-crystal-package.store-package-delight .store-package-bottom,
+.store-crystal-package.store-package-premium .store-package-bottom,
+.store-crystal-package.store-package-luxury .store-package-bottom{
+  border-top-color:rgba(255,245,255,.30);
+}
+.store-crystal-package.store-package-small .store-package-buy,
+.store-crystal-package.store-package-basic .store-package-buy,
+.store-crystal-package.store-package-light .store-package-buy,
+.store-crystal-package.store-package-delight .store-package-buy,
+.store-crystal-package.store-package-premium .store-package-buy,
+.store-crystal-package.store-package-luxury .store-package-buy{
+  border-color:rgba(246,232,255,.78);
+  background:rgba(43,31,63,.78);
+  color:#fff;
+  box-shadow:inset 0 1px rgba(255,255,255,.20),0 4px 12px rgba(10,6,20,.24);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.store-crystal-package.store-package-small .store-package-first-badge,
+.store-crystal-package.store-package-basic .store-package-first-badge,
+.store-crystal-package.store-package-light .store-package-first-badge,
+.store-crystal-package.store-package-delight .store-package-first-badge,
+.store-crystal-package.store-package-premium .store-package-first-badge,
+.store-crystal-package.store-package-luxury .store-package-first-badge{
+  border-color:rgba(248,235,255,.62);
+  background:rgba(40,27,61,.76);
+  color:#fff;
+  text-shadow:0 1px 5px rgba(0,0,0,.42);
+}
+.store-crystal-package.store-package-premium .store-package-gem-mark,
+.store-crystal-package.store-package-basic .store-package-gem-mark,
+.store-crystal-package.store-package-light .store-package-gem-mark,
+.store-crystal-package.store-package-delight .store-package-gem-mark,
+.store-crystal-package.store-package-luxury .store-package-gem-mark{
+  display:none;
+}
+
+
+/* Brighter artwork with contrast concentrated only behind the lower text area. */
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  text-shadow:0 1px 2px rgba(25,15,40,.92),0 2px 10px rgba(25,15,40,.58);
+}
+.store-crystal-package .store-package-bonus-line{
+  min-height:27px;
+  display:flex;
+  align-items:center;
+}
+.store-crystal-package .store-package-bonus-muted{
+  visibility:hidden;
+}
+
+
+/* Keep the first-bonus badge footprint so diamond counts never jump after redemption. */
+.store-crystal-package .store-package-first-badge-hidden{
+  visibility:hidden;
+}
+
+
+/* POYOZZ member cards: six restrained, distinct material finishes. */
+.store-member-level-card{isolation:isolate;border-color:var(--member-edge,rgba(255,255,255,.2));background:var(--member-surface,linear-gradient(125deg,#292b35,#171923 62%,#252532));color:var(--member-text,#f4f2f8);box-shadow:inset 0 1px rgba(255,255,255,.2),inset 0 -18px 38px var(--member-shade,rgba(0,0,0,.12)),0 14px 32px rgba(8,5,15,.2)}
+.store-member-level-card:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 88% 8%,var(--member-glow,rgba(255,255,255,.12)),transparent 48%),linear-gradient(115deg,rgba(255,255,255,.12),transparent 38%,rgba(255,255,255,.035));}
+.store-member-level-card .store-member-top small,.store-member-level-card .store-member-total span{color:var(--member-muted,rgba(255,255,255,.72));opacity:1}
+.store-member-level-card .store-member-top h2{color:var(--member-text,#f4f2f8);text-shadow:0 2px 12px var(--member-text-shadow,rgba(0,0,0,.18))}
+.store-member-level-card .store-member-level-number{color:var(--member-accent,#eee8fa);text-shadow:0 1px 12px var(--member-glow,rgba(255,255,255,.2))}
+.store-member-level-card .store-member-progress-track{background:var(--member-track,rgba(0,0,0,.2));box-shadow:inset 0 1px 3px rgba(0,0,0,.22)}
+.store-member-level-card .store-member-progress-fill{background:var(--member-fill,linear-gradient(90deg,#aaa0bd,#f1eaff));box-shadow:0 0 13px var(--member-glow,rgba(255,255,255,.24))}
+.store-member-level-card .store-member-progress-caption{color:var(--member-muted,rgba(255,255,255,.78))}
+.store-member-level-card .store-member-total{border-top-color:var(--member-divider,rgba(255,255,255,.18))}
+.store-member-level-card .store-member-total strong{color:var(--member-text,#f4f2f8)}
+.store-member-level-card .store-member-history{color:var(--member-muted,rgba(255,255,255,.78))}
+.store-member-level-lv0{--member-surface:linear-gradient(128deg,#454650 0%,#292b34 48%,#171920 100%);--member-edge:rgba(190,194,207,.3);--member-text:#f0f0f4;--member-muted:#c4c5ce;--member-accent:#d6d7df;--member-fill:linear-gradient(90deg,#777b89,#d4d6df);--member-glow:rgba(205,211,230,.18);--member-shade:rgba(0,0,0,.25);--member-track:rgba(0,0,0,.28)}
+.store-member-level-lv1{--member-surface:linear-gradient(128deg,#f0f1f3 0%,#cfd3da 48%,#aeb4bf 100%);--member-edge:rgba(255,255,255,.8);--member-text:#343943;--member-muted:#555d69;--member-accent:#59616d;--member-fill:linear-gradient(90deg,#858e9c,#f8f9fb);--member-glow:rgba(255,255,255,.62);--member-shade:rgba(67,75,89,.1);--member-track:rgba(58,65,77,.17);--member-divider:rgba(67,75,89,.2);--member-text-shadow:rgba(255,255,255,.65)}
+.store-member-level-lv2{--member-surface:linear-gradient(128deg,#e7d5a7 0%,#c9ae70 48%,#9e824b 100%);--member-edge:rgba(255,239,195,.78);--member-text:#42351f;--member-muted:#665536;--member-accent:#705b32;--member-fill:linear-gradient(90deg,#9c7a3e,#f7e7b9);--member-glow:rgba(255,237,190,.48);--member-shade:rgba(85,61,23,.12);--member-track:rgba(76,56,25,.17);--member-divider:rgba(91,68,31,.2);--member-text-shadow:rgba(255,245,216,.42)}
+.store-member-level-lv3{--member-surface:linear-gradient(128deg,#f4f5f6 0%,#d9dde2 48%,#b8bec7 100%);--member-edge:rgba(255,255,255,.9);--member-text:#353b45;--member-muted:#5c6470;--member-accent:#58616e;--member-fill:linear-gradient(90deg,#929ba8,#fff);--member-glow:rgba(255,255,255,.7);--member-shade:rgba(70,78,89,.1);--member-track:rgba(56,65,78,.16);--member-divider:rgba(67,75,89,.2);--member-text-shadow:rgba(255,255,255,.72)}
+.store-member-level-lv4{--member-surface:linear-gradient(128deg,#e8e3f8 0%,#b9c9df 38%,#8b9ebd 72%,#77728f 100%);--member-edge:rgba(238,229,255,.88);--member-text:#292d42;--member-muted:#4c526b;--member-accent:#494d70;--member-fill:linear-gradient(90deg,#8d8cc5,#f4eaff 52%,#b8e6ef);--member-glow:rgba(224,215,255,.68);--member-shade:rgba(48,43,78,.13);--member-track:rgba(45,47,76,.18);--member-divider:rgba(64,61,94,.22);--member-text-shadow:rgba(255,255,255,.65)}
+.store-member-level-lv5{--member-surface:linear-gradient(122deg,#29283e 0%,#171a2c 42%,#34304c 72%,#111725 100%);--member-edge:rgba(207,190,255,.82);--member-text:#f7f2ff;--member-muted:#d4cce8;--member-accent:#f0e4ff;--member-fill:linear-gradient(90deg,#7468a9,#d9c8ff 48%,#a7dce9);--member-glow:rgba(185,155,255,.4);--member-shade:rgba(0,0,0,.32);--member-track:rgba(0,0,0,.3);--member-divider:rgba(218,200,255,.24);--member-text-shadow:rgba(13,10,30,.55);border-width:1.5px;box-shadow:inset 0 1px rgba(255,255,255,.28),inset 0 -24px 48px rgba(0,0,0,.25),0 16px 38px rgba(7,5,20,.3),0 0 24px rgba(174,143,255,.12)}
+.store-member-level-lv5:after{content:"";position:absolute;inset:1px;z-index:-1;pointer-events:none;border-radius:20px;background:linear-gradient(112deg,transparent 12%,rgba(255,255,255,.1) 34%,transparent 53%,rgba(183,220,255,.08) 72%,transparent 88%)}
+@media(max-width:600px){.store-member-level-lv5{box-shadow:inset 0 1px rgba(255,255,255,.24),inset 0 -18px 36px rgba(0,0,0,.24),0 10px 24px rgba(7,5,20,.26)}}
+
+
+/* POYOZZ SHOP banner: preserve the complete supplied artwork without a dark gradient or crop. */
+.store-shop-hero{min-height:220px;padding:28px 5.5%;justify-content:flex-end;align-items:center;background-color:#171629;background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2FSHOPBANNER.jpg&w=1600&output=webp&q=86");background-size:contain;background-position:center;background-repeat:no-repeat;border-color:rgba(207,184,255,.28)}
+.store-shop-hero:before,.store-shop-hero:after{content:none!important;display:none!important}
+.store-shop-hero .store-night-hero-copy{flex:0 1 54%;width:54%;max-width:54%;margin-left:auto;text-align:right;z-index:2}
+.store-shop-hero .store-eyebrow{color:#e1d3ff;letter-spacing:.24em;text-shadow:0 1px 8px rgba(8,7,20,.72)}
+.store-shop-hero h1{margin:10px 0 9px;color:#fff;font-size:clamp(28px,4.2vw,40px);font-weight:750;letter-spacing:.08em;text-shadow:0 2px 10px rgba(8,7,20,.78)}
+.store-shop-tagline{margin:0;color:#fff;font-size:clamp(12px,1.55vw,15px);line-height:1.8;letter-spacing:.035em;text-shadow:0 1px 9px rgba(5,5,15,.85);white-space:normal}
+@media(max-width:560px){.store-shop-hero{min-height:180px;padding:20px 16px;background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2FSHOPBANNER.jpg&w=900&output=webp&q=86");background-size:contain;background-position:center;background-repeat:no-repeat}.store-shop-hero .store-night-hero-copy{flex-basis:59%;width:59%;max-width:59%}.store-shop-hero h1{font-size:25px}.store-shop-tagline{font-size:11px;line-height:1.65}}
+@media(max-width:380px){.store-shop-hero .store-night-hero-copy{flex-basis:62%;width:62%;max-width:62%}.store-shop-hero h1{font-size:22px}.store-shop-tagline{font-size:10px}}
+
+
+/* Diamond package artwork: remove heavy overlays and fit the full image to each card. */
+.store-crystal-package.store-package-small,
+.store-crystal-package.store-package-basic,
+.store-crystal-package.store-package-light,
+.store-crystal-package.store-package-delight,
+.store-crystal-package.store-package-premium,
+.store-crystal-package.store-package-luxury{
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+.store-crystal-package.store-package-small{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-basic{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-light{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-delight{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-premium{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-luxury{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  text-shadow:0 1px 3px rgba(25,15,40,.8);
+}
+.store-crystal-package .store-package-bonus-line,
+.store-crystal-package .store-package-topline,
+.store-crystal-package .store-package-bottom>strong{
+  text-shadow:0 1px 3px rgba(25,15,40,.72);
+}
+
+/* Keep the supplied 16:9 shop banner at its native visual ratio. */
+.store-shop-hero{
+  aspect-ratio:16 / 9;
+  min-height:0;
+  height:auto;
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+  padding:clamp(16px,4%,36px) 5.5%;
+}
+.store-shop-hero .store-night-hero-copy{
+  flex:0 1 54%;
+  width:54%;
+  max-width:54%;
+}
+.store-member-monthly-status{
+  margin-top:9px;
+  color:var(--member-muted,rgba(255,255,255,.78));
+  font-size:11px;
+  line-height:1.6;
+  letter-spacing:.02em;
+}
+@media(max-width:560px){
+  .store-shop-hero{
+    aspect-ratio:16 / 9;
+    min-height:0;
+    padding:14px 16px;
+    background-size:100% 100%;
+  }
+  .store-shop-hero .store-night-hero-copy{
+    flex-basis:59%;
+    width:59%;
+    max-width:59%;
+  }
+}
+@media(max-width:380px){
+  .store-shop-hero .store-night-hero-copy{
+    flex-basis:62%;
+    width:62%;
+    max-width:62%;
+  }
+}
+
+
+/* Mobile shop banner typography: a quieter, editorial two-line subtitle. */
+.store-shop-hero .store-shop-tagline{
+  display:grid;
+  justify-items:end;
+  gap:3px;
+  margin-top:2px;
+  color:rgba(255,255,255,.96);
+  font-weight:560;
+  letter-spacing:.075em;
+  line-height:1.7;
+}
+.store-shop-hero .store-shop-tagline span{display:block}
+@media(max-width:560px){
+  .store-shop-hero .store-night-hero-copy{transform:translateY(-7px)}
+  .store-shop-hero h1{
+    margin:0 0 9px;
+    font-size:clamp(22px,6.2vw,25px);
+    font-weight:720;
+    letter-spacing:.055em;
+    line-height:1.2;
+  }
+  .store-shop-hero .store-shop-tagline{
+    gap:2px;
+    font-size:clamp(10px,2.85vw,11.5px);
+    font-weight:600;
+    letter-spacing:.07em;
+    line-height:1.65;
+    text-shadow:0 1px 5px rgba(5,5,15,.9);
+  }
+}
+@media(max-width:380px){
+  .store-shop-hero .store-night-hero-copy{transform:translateY(-6px)}
+  .store-shop-hero h1{font-size:21px}
+  .store-shop-hero .store-shop-tagline{font-size:10px;letter-spacing:.045em}
+}
+
+/* Public shop browsing for signed-out visitors. */
+.store-guest-note{
+  margin:-8px 0 2px;
+  padding:11px 14px;
+  border:1px solid rgba(190,168,220,.28);
+  border-radius:12px;
+  background:rgba(190,168,220,.08);
+  color:var(--muted,rgba(255,255,255,.78));
+  font-size:12px;
+  line-height:1.7;
+}
