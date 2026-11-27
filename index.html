@@ -10586,7 +10586,10 @@ function getTopupMembershipTier(totalTwd){
 
 function renderTopupMembershipCard(totalTwd,monthlyStatus=''){
   const topupTotal=Math.max(0,Number(totalTwd)||0);
-  const membershipCard=renderTopupMembershipCard(topupTotal);
+  const tier=getTopupMembershipTier(topupTotal);
+  const tierNext=POYOZZ_TOPUP_MEMBER_TIERS[tier.level+1]||null;
+  const progress=tierNext?Math.max(0,Math.min(100,(topupTotal-tier.threshold)/(tierNext.threshold-tier.threshold)*100)):100;
+  const tierProgressLabel=tierNext?Math.min(topupTotal,tierNext.threshold).toLocaleString()+' / '+tierNext.threshold.toLocaleString():topupTotal.toLocaleString()+' / 300,000';
   return '<section class="store-member-level-card store-member-level-lv'+tier.level+'"><div class="store-member-top"><div><small>MEMBER LEVEL</small><h2>'+tier.name+'</h2></div><div class="store-member-level-number">Lv'+tier.level+'</div></div><div class="store-member-progress-track"><div class="store-member-progress-fill" style="width:'+progress.toFixed(2)+'%"></div></div><div class="store-member-progress-caption"><strong>'+tierProgressLabel+'</strong><span>'+(tierNext?'Lv'+tierNext.level+' · '+tierNext.name:'MAX LEVEL')+'</span></div><div class="store-member-total"><span>累積儲值</span><strong>NT$'+topupTotal.toLocaleString()+'</strong></div>'+(monthlyStatus?'<div class="store-member-monthly-status">'+e(monthlyStatus)+'</div>':'')+'<button class="store-history-link store-member-history" data-action="ledger">儲值紀錄　↗</button></section>';
 }
 /* Account */
@@ -10595,10 +10598,7 @@ function renderShop() {
   if(u?.uid&&window.mySupabase&&window.__poyozzShopBonusLedgerUid!==u.uid){window.__poyozzShopBonusLedgerUid=u.uid;void loadWalletLedger('diamond').then(ok=>{if(ok&&state.account?.uid===u.uid&&route.page==='shop')renderShop();else if(!ok)window.__poyozzShopBonusLedgerUid=null;});}
   const diamonds=Number(u?.diamonds||0).toLocaleString();
   const topupTotal=Math.max(0,Number(u?.totalTopupTwd||0));
-  const tier=getTopupMembershipTier(topupTotal);
-  const tierNext=POYOZZ_TOPUP_MEMBER_TIERS[tier.level+1]||null;
-  const progress=tierNext?Math.max(0,Math.min(100,(topupTotal-tier.threshold)/(tierNext.threshold-tier.threshold)*100)):100;
-  const tierProgressLabel=tierNext?`${Math.min(topupTotal,tierNext.threshold).toLocaleString()} / ${tierNext.threshold.toLocaleString()}`:`${topupTotal.toLocaleString()} / 300,000`;
+  const membershipCard=renderTopupMembershipCard(topupTotal);
   const packs=[{code:'twd_60',amount:200,price:60},{code:'twd_150',amount:525,price:150},{code:'twd_290',amount:1050,price:290},{code:'twd_850',amount:3200,price:850},{code:'twd_1390',amount:5400,price:1390},{code:'twd_2690',amount:11000,price:2690}];
   const gem='<img class="store-crystal-svg" src="https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2F%25E7%25B4%25AB%25E7%25BE%2585%25E8%2598%25AD%25E5%25B9%25BB%25E5%25BD%25A9%25E9%2591%25BD%25E7%259F%25B3%25E6%25B0%25B4%25E6%2599%25B6.png&w=512&output=webp&q=82&maxage=1y" alt="紫羅蘭幻彩鑽石水晶" width="145" height="145" decoding="async" fetchpriority="high">';
     const packageGem=gem.replace('store-crystal-svg','poyozz-diamond-icon store-package-diamond-icon').replace('width="145" height="145"','width="35" height="35"');
