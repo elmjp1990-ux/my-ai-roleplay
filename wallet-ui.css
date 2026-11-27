@@ -344,3 +344,47 @@
 .profile-topup-membership .profile-membership-copy>strong{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .profile-topup-membership .profile-membership-copy>strong small{font-size:12px;font-weight:600;color:var(--muted)}
 .profile-topup-membership .profile-membership-copy>.profile-monthly-status{font-size:12px;letter-spacing:0;color:var(--muted);line-height:1.6}
+
+
+/* Keep the supplied 16:9 shop banner at its native visual ratio. */
+.store-shop-hero{
+  aspect-ratio:16 / 9;
+  min-height:0;
+  height:auto;
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+  padding:clamp(16px,4%,36px) 5.5%;
+}
+.store-shop-hero .store-night-hero-copy{
+  flex:0 1 54%;
+  width:54%;
+  max-width:54%;
+}
+.store-member-monthly-status{
+  margin-top:9px;
+  color:var(--member-muted,rgba(255,255,255,.78));
+  font-size:11px;
+  line-height:1.6;
+  letter-spacing:.02em;
+}
+@media(max-width:560px){
+  .store-shop-hero{
+    aspect-ratio:16 / 9;
+    min-height:0;
+    padding:14px 16px;
+    background-size:100% 100%;
+  }
+  .store-shop-hero .store-night-hero-copy{
+    flex-basis:59%;
+    width:59%;
+    max-width:59%;
+  }
+}
+@media(max-width:380px){
+  .store-shop-hero .store-night-hero-copy{
+    flex-basis:62%;
+    width:62%;
+    max-width:62%;
+  }
+}
