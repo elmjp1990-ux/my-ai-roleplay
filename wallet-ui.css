@@ -259,3 +259,9 @@
 .store-crystal-package .store-package-bonus-muted{
   visibility:hidden;
 }
+
+
+/* Keep the first-bonus badge footprint so diamond counts never jump after redemption. */
+.store-crystal-package .store-package-first-badge-hidden{
+  visibility:hidden;
+}
