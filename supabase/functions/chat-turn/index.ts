@@ -694,6 +694,11 @@ Deno.serve(async (request) => {
     playerName,
     characterName,
     currentStoryWorldState,
+    currentPhoneStates: (Array.isArray(phoneStateResult.data) ? phoneStateResult.data : []).map((row: DbRow) => ({
+      field_index: Number(row.field_index),
+      title: asString(row.title),
+      body: asString(row.body),
+    })),
   });
   await updateAiGenerationDiagnostic(admin, diagnosticId, { status: "completed", failureStage: null, failureCode: null });
   const assistantRow = {
