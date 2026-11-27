@@ -125,11 +125,16 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
         parsedPhoneEvents.push(null);
         continue;
       }
+      const explicitFieldIndex = typeof event.field_index === "number" && Number.isInteger(event.field_index)
+        && event.field_index >= 0 && event.field_index < 8
+        ? event.field_index
+        : null;
       parsedPhoneEvents.push({
         event_type: event.event_type as StoryPhoneEvent["event_type"],
         title,
         body,
-      });
+        ...(explicitFieldIndex === null ? {} : { field_index: explicitFieldIndex }),
+      } as StoryPhoneEvent & { field_index?: number });
     }
   }
 
@@ -142,7 +147,15 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
   } else {
     phoneEvents = configuredPrompts.map((prompt, index) => {
       const label = promptLabel(prompt, boundedText(options.characterName, 80) || "角色", playerName);
-      const candidate = parsedPhoneEvents[index] ?? undefined;
+      // Explicit field_index takes priority over array order. Legacy outputs still use their original position.
+      const indexedCandidate = parsedPhoneEvents.find((event) =>
+        event && typeof (event as StoryPhoneEvent & { field_index?: number }).field_index === "number"
+        && (event as StoryPhoneEvent & { field_index?: number }).field_index === index
+      );
+      const positionalCandidate = parsedPhoneEvents[index];
+      const candidate = indexedCandidate ?? (positionalCandidate && typeof (positionalCandidate as StoryPhoneEvent & { field_index?: number }).field_index !== "number"
+        ? positionalCandidate
+        : undefined);
       if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
         return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
       }
