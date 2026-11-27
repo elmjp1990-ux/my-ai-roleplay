@@ -12034,7 +12034,7 @@ document.addEventListener('click',async event => {
           const result=Array.isArray(data)?data[0]:data;
           if (!result || result.status !== 'granted') throw new Error('目前無法確認入帳結果，請稍後查看錢包紀錄。');
           state.account.diamonds=Number(result.diamonds ?? state.account.diamonds ?? 0);
-          state.account.totalTopupTwd=Number(state.account.totalTopupTwd||0)+Number(result.price_twd||0);
+          if(!result.replayed)state.account.totalTopupTwd=Number(state.account.totalTopupTwd||0)+Number(result.price_twd||0);
           localStorage.removeItem(requestStorageKey);
           await loadWalletLedger('diamond');
           persist();
