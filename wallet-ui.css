@@ -410,3 +410,15 @@
   .store-shop-hero h1{font-size:21px}
   .store-shop-hero .store-shop-tagline{font-size:10px;letter-spacing:.045em}
 }
+
+/* Public shop browsing for signed-out visitors. */
+.store-guest-note{
+  margin:-8px 0 2px;
+  padding:11px 14px;
+  border:1px solid rgba(190,168,220,.28);
+  border-radius:12px;
+  background:rgba(190,168,220,.08);
+  color:var(--muted,rgba(255,255,255,.78));
+  font-size:12px;
+  line-height:1.7;
+}
