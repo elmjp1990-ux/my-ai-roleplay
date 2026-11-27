@@ -373,3 +373,40 @@
     max-width:62%;
   }
 }
+
+
+/* Mobile shop banner typography: a quieter, editorial two-line subtitle. */
+.store-shop-hero .store-shop-tagline{
+  display:grid;
+  justify-items:end;
+  gap:3px;
+  margin-top:2px;
+  color:rgba(255,255,255,.96);
+  font-weight:560;
+  letter-spacing:.075em;
+  line-height:1.7;
+}
+.store-shop-hero .store-shop-tagline span{display:block}
+@media(max-width:560px){
+  .store-shop-hero .store-night-hero-copy{transform:translateY(-7px)}
+  .store-shop-hero h1{
+    margin:0 0 9px;
+    font-size:clamp(22px,6.2vw,25px);
+    font-weight:720;
+    letter-spacing:.055em;
+    line-height:1.2;
+  }
+  .store-shop-hero .store-shop-tagline{
+    gap:2px;
+    font-size:clamp(10px,2.85vw,11.5px);
+    font-weight:600;
+    letter-spacing:.07em;
+    line-height:1.65;
+    text-shadow:0 1px 5px rgba(5,5,15,.9);
+  }
+}
+@media(max-width:380px){
+  .store-shop-hero .store-night-hero-copy{transform:translateY(-6px)}
+  .store-shop-hero h1{font-size:21px}
+  .store-shop-hero .store-shop-tagline{font-size:10px;letter-spacing:.045em}
+}
