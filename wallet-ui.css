@@ -127,3 +127,116 @@
 .store-crystal-package.store-package-light .store-package-buy,
 .store-crystal-package.store-package-delight .store-package-buy,
 .store-crystal-package.store-package-luxury .store-package-buy{border-color:rgba(239,222,255,.75);background:rgba(133,100,185,.72);color:#fff}
+
+
+/* Optimized shop artwork: serve cached 1200px WebP derivatives for every pack. */
+/* A restrained plum-to-charcoal glass gradient protects text contrast without flattening the artwork. */
+.store-crystal-package.store-package-small{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-basic{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-light{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-delight{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-premium{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-luxury{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-small,
+.store-crystal-package.store-package-basic,
+.store-crystal-package.store-package-light,
+.store-crystal-package.store-package-delight,
+.store-crystal-package.store-package-premium,
+.store-crystal-package.store-package-luxury{
+  background-position:center;
+  background-size:cover;
+  background-repeat:no-repeat;
+  border-color:rgba(224,205,255,.62);
+  box-shadow:inset 0 1px rgba(255,255,255,.24),0 9px 24px rgba(3,5,18,.22);
+}
+.store-crystal-package.store-package-small .store-package-topline,
+.store-crystal-package.store-package-basic .store-package-topline,
+.store-crystal-package.store-package-light .store-package-topline,
+.store-crystal-package.store-package-delight .store-package-topline,
+.store-crystal-package.store-package-premium .store-package-topline,
+.store-crystal-package.store-package-luxury .store-package-topline{
+  color:#fff;
+  text-shadow:0 2px 9px rgba(12,8,24,.72);
+}
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  color:#fff;
+  text-shadow:0 2px 10px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-diamond-count span,
+.store-crystal-package.store-package-basic .store-package-diamond-count span,
+.store-crystal-package.store-package-light .store-package-diamond-count span,
+.store-crystal-package.store-package-delight .store-package-diamond-count span,
+.store-crystal-package.store-package-premium .store-package-diamond-count span,
+.store-crystal-package.store-package-luxury .store-package-diamond-count span{
+  color:rgba(255,250,255,.94);
+}
+.store-crystal-package.store-package-small .store-package-bonus-line,
+.store-crystal-package.store-package-basic .store-package-bonus-line,
+.store-crystal-package.store-package-light .store-package-bonus-line,
+.store-crystal-package.store-package-delight .store-package-bonus-line,
+.store-crystal-package.store-package-premium .store-package-bonus-line,
+.store-crystal-package.store-package-luxury .store-package-bonus-line{
+  color:#f1e7ff;
+  text-shadow:0 1px 7px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-bonus-line strong,
+.store-crystal-package.store-package-basic .store-package-bonus-line strong,
+.store-crystal-package.store-package-light .store-package-bonus-line strong,
+.store-crystal-package.store-package-delight .store-package-bonus-line strong,
+.store-crystal-package.store-package-premium .store-package-bonus-line strong,
+.store-crystal-package.store-package-luxury .store-package-bonus-line strong{
+  color:#fff;
+}
+.store-crystal-package.store-package-small .store-package-bottom>strong,
+.store-crystal-package.store-package-basic .store-package-bottom>strong,
+.store-crystal-package.store-package-light .store-package-bottom>strong,
+.store-crystal-package.store-package-delight .store-package-bottom>strong,
+.store-crystal-package.store-package-premium .store-package-bottom>strong,
+.store-crystal-package.store-package-luxury .store-package-bottom>strong{
+  color:#fff;
+  text-shadow:0 2px 8px rgba(12,8,24,.78);
+}
+.store-crystal-package.store-package-small .store-package-bottom,
+.store-crystal-package.store-package-basic .store-package-bottom,
+.store-crystal-package.store-package-light .store-package-bottom,
+.store-crystal-package.store-package-delight .store-package-bottom,
+.store-crystal-package.store-package-premium .store-package-bottom,
+.store-crystal-package.store-package-luxury .store-package-bottom{
+  border-top-color:rgba(255,245,255,.30);
+}
+.store-crystal-package.store-package-small .store-package-buy,
+.store-crystal-package.store-package-basic .store-package-buy,
+.store-crystal-package.store-package-light .store-package-buy,
+.store-crystal-package.store-package-delight .store-package-buy,
+.store-crystal-package.store-package-premium .store-package-buy,
+.store-crystal-package.store-package-luxury .store-package-buy{
+  border-color:rgba(246,232,255,.78);
+  background:rgba(43,31,63,.78);
+  color:#fff;
+  box-shadow:inset 0 1px rgba(255,255,255,.20),0 4px 12px rgba(10,6,20,.24);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+.store-crystal-package.store-package-small .store-package-first-badge,
+.store-crystal-package.store-package-basic .store-package-first-badge,
+.store-crystal-package.store-package-light .store-package-first-badge,
+.store-crystal-package.store-package-delight .store-package-first-badge,
+.store-crystal-package.store-package-premium .store-package-first-badge,
+.store-crystal-package.store-package-luxury .store-package-first-badge{
+  border-color:rgba(248,235,255,.62);
+  background:rgba(40,27,61,.76);
+  color:#fff;
+  text-shadow:0 1px 5px rgba(0,0,0,.42);
+}
+.store-crystal-package.store-package-premium .store-package-gem-mark,
+.store-crystal-package.store-package-basic .store-package-gem-mark,
+.store-crystal-package.store-package-light .store-package-gem-mark,
+.store-crystal-package.store-package-delight .store-package-gem-mark,
+.store-crystal-package.store-package-luxury .store-package-gem-mark{
+  display:none;
+}
