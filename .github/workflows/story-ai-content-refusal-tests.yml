@@ -16,6 +16,8 @@ on:
       - "supabase/functions/_shared/story-turn-envelope.ts"
       - "supabase/functions/_shared/story-turn-envelope.test.ts"
       - "supabase/functions/_shared/story-memory-summary.ts"
+      - "supabase/functions/_shared/story-summary-language.ts"
+      - "supabase/functions/_shared/story-summary-language.test.ts"
       - "supabase/migrations/20261106090000_story_turn_affinity_and_phone_events.sql"
       - "supabase/migrations/20261106110000_harden_story_turn_service_role_claims.sql"
       - "supabase/migrations/20261110120000_story_phone_state_and_memory_summary_read.sql"
@@ -263,6 +265,8 @@ jobs:
         run: deno test supabase/functions/_shared/character-profile-organization.test.ts
       - name: Verify Story phone RPC and suggested reply persistence regressions
         run: node scripts/test-story-phone-and-suggestions-regression.mjs
+      - name: Test player-language detection for Story summaries
+        run: deno test supabase/functions/_shared/story-summary-language.test.ts
       - name: Test structured Story turn evaluation parsing
         run: deno test supabase/functions/_shared/story-turn-envelope.test.ts
       - name: Run provider result normalization tests
