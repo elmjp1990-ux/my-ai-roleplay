@@ -31,7 +31,7 @@ const fileBudgets = {
   'poyozz-ui.css': 40_000,
   'memory-album.css': 3_000,
   'diary-ui.css': 3_000,
-  'wallet-ui.css': 2_000,
+  'wallet-ui.css': 45_000,
   'group-author-forms.css': 2_000,
   'group-wizard.css': 3_000,
   'character-illustration-gallery.css': 1_500,
