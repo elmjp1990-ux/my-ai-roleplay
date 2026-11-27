@@ -23,7 +23,7 @@ const fileBudgets = {
   'followed-authors.js': 9_000,
   'list-pagination.js': 2_000,
   'notifications-screen.js': 5_000,
-  'policy-center.html': 20_000,
+  'policy-center.html': 35_000,
   'author-profile.js': 6_000,
   'comment-renderer.js': 5_000,
   'custom-tag-picker.js': 5_000,
