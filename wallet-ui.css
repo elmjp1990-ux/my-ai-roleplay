@@ -75,11 +75,12 @@
 .store-package-bonus-line{min-height:34px}.store-crystal-package .store-package-bottom{margin-top:auto;min-height:51px;flex-shrink:0}.store-package-buy{min-width:82px;letter-spacing:.08em;font-weight:650}
 @media(max-width:600px){.store-member-level-card{padding:17px 16px}.store-member-top h2{font-size:20px}.store-member-level-number{font-size:24px}.store-member-progress-caption{font-size:11px}.store-first-bonus-circle{width:48px;height:48px;flex-basis:48px;font-size:9px}}
 
-/* Position the existing Violet Crystal artwork directly under the Diamond Supply label */
-.store-shop-hero{background:radial-gradient(ellipse at 76% 48%,rgba(151,111,219,.34),transparent 43%),radial-gradient(ellipse at 20% 110%,rgba(95,73,153,.24),transparent 52%),linear-gradient(118deg,#12162a,#28203f 58%,#181b30)}
-.store-shop-hero .store-night-hero-hero-copy{max-width:62%}
-.store-shop-hero .store-night-hero-copy{max-width:62%}
+/* Keep the existing Violet Crystal as a sibling flex item on the hero's right side. */
+.store-shop-hero{display:flex;align-items:center;justify-content:space-between;gap:18px;background:radial-gradient(ellipse at 82% 48%,rgba(151,111,219,.38),transparent 43%),radial-gradient(ellipse at 20% 110%,rgba(95,73,153,.24),transparent 52%),linear-gradient(118deg,#12162a,#28203f 58%,#181b30)}
+.store-shop-hero .store-night-hero-copy{flex:1 1 auto;min-width:0;max-width:none}
 .store-shop-hero .store-diamond-heading{margin-top:20px}
-.store-shop-gem-showcase{width:180px;height:170px;flex-basis:180px;margin-right:7%;filter:drop-shadow(0 12px 22px #885ddc52)}
+.store-shop-gem-showcase{position:relative;z-index:1;display:grid;place-items:center;width:180px;height:170px;flex:0 0 180px;margin:0 7% 0 0;filter:drop-shadow(0 12px 22px #885ddc52)}
 .store-shop-gem-showcase .store-crystal-svg{width:145px;height:145px;filter:drop-shadow(0 0 18px #b08bff3d)}
 .store-shop-hero:after{content:"";position:absolute;inset:0;pointer-events:none;background:linear-gradient(115deg,transparent 22%,rgba(206,184,255,.06) 50%,transparent 78%);mix-blend-mode:screen}
+@media(max-width:560px){.store-shop-hero{gap:4px}.store-shop-hero .store-night-hero-copy{flex:1 1 auto;max-width:none}.store-shop-gem-showcase{width:115px;height:130px;flex:0 0 115px;margin:0}.store-shop-gem-showcase .store-crystal-svg{width:112px;height:112px}}
+@media(max-width:380px){.store-shop-gem-showcase{width:86px;flex-basis:86px;margin-left:-8px}.store-shop-gem-showcase .store-crystal-svg{width:92px;height:92px}}
