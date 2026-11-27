@@ -10591,7 +10591,7 @@ function renderShop() {
   const diamonds=Number(u?.diamonds||0).toLocaleString();
   const topupTotal=Math.max(0,Number(u?.totalTopupTwd||0));
   const tier=getTopupMembershipTier(topupTotal);
-  const tierNext=tiers[tier.level+1]||null;
+  const tierNext=POYOZZ_TOPUP_MEMBER_TIERS[tier.level+1]||null;
   const progress=tierNext?Math.max(0,Math.min(100,(topupTotal-tier.threshold)/(tierNext.threshold-tier.threshold)*100)):100;
   const tierProgressLabel=tierNext?`${Math.min(topupTotal,tierNext.threshold).toLocaleString()} / ${tierNext.threshold.toLocaleString()}`:`${topupTotal.toLocaleString()} / 300,000`;
   const packs=[{code:'twd_60',amount:200,price:60},{code:'twd_150',amount:525,price:150},{code:'twd_290',amount:1050,price:290},{code:'twd_850',amount:3200,price:850},{code:'twd_1390',amount:5400,price:1390},{code:'twd_2690',amount:11000,price:2690}];
