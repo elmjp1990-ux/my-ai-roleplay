@@ -298,3 +298,42 @@
 .store-shop-tagline{margin:0;color:#fff;font-size:clamp(12px,1.55vw,15px);line-height:1.8;letter-spacing:.035em;text-shadow:0 1px 9px rgba(5,5,15,.85);white-space:normal}
 @media(max-width:560px){.store-shop-hero{min-height:180px;padding:20px 16px;background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2FSHOPBANNER.jpg&w=900&output=webp&q=86");background-size:contain;background-position:center;background-repeat:no-repeat}.store-shop-hero .store-night-hero-copy{flex-basis:59%;width:59%;max-width:59%}.store-shop-hero h1{font-size:25px}.store-shop-tagline{font-size:11px;line-height:1.65}}
 @media(max-width:380px){.store-shop-hero .store-night-hero-copy{flex-basis:62%;width:62%;max-width:62%}.store-shop-hero h1{font-size:22px}.store-shop-tagline{font-size:10px}}
+
+
+/* Diamond package artwork: remove heavy overlays and fit the full image to each card. */
+.store-crystal-package.store-package-small,
+.store-crystal-package.store-package-basic,
+.store-crystal-package.store-package-light,
+.store-crystal-package.store-package-delight,
+.store-crystal-package.store-package-premium,
+.store-crystal-package.store-package-luxury{
+  background-size:100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+}
+.store-crystal-package.store-package-small{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-basic{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-light{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-delight{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-premium{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-luxury{background-image:url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  text-shadow:0 1px 3px rgba(25,15,40,.8);
+}
+.store-crystal-package .store-package-bonus-line,
+.store-crystal-package .store-package-topline,
+.store-crystal-package .store-package-bottom>strong{
+  text-shadow:0 1px 3px rgba(25,15,40,.72);
+}
+
+/* MY membership card follows the account's actual monthly/free membership state. */
+.profile-membership-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border:1px solid var(--border);border-radius:15px;background:linear-gradient(120deg,rgba(194,177,222,.18),rgba(255,255,255,.045));}
+.profile-membership-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
+.profile-membership-copy>span{font-size:10px;letter-spacing:.16em;color:var(--muted)}
+.profile-membership-copy>strong{font-size:19px;letter-spacing:.03em;color:var(--text)}
+.profile-membership-status{flex:0 0 auto;padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;white-space:nowrap}
