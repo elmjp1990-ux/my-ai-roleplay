@@ -74,3 +74,10 @@
 .store-package-heading{margin-bottom:14px}.store-package-heading h2{letter-spacing:.05em}.store-package-topline{align-items:flex-start;min-height:34px}.store-package-topline>span{font-weight:650;letter-spacing:.04em}.store-first-bonus-circle{width:52px;height:52px;flex:0 0 52px;display:grid;place-items:center;padding:4px;border-radius:50%;white-space:normal;text-align:center;line-height:1.1;font-size:10px;letter-spacing:-.02em;transform:rotate(7deg);box-shadow:0 0 0 2px rgba(255,255,255,.12),0 4px 16px rgba(156,113,207,.24);background:linear-gradient(145deg,rgba(202,167,255,.32),rgba(111,77,157,.25));border:1px solid rgba(232,211,255,.65);color:#f1e4ff}
 .store-package-bonus-line{min-height:34px}.store-package-buy{min-width:82px;letter-spacing:.08em;font-weight:650}
 @media(max-width:600px){.store-member-level-card{padding:17px 16px}.store-member-top h2{font-size:20px}.store-member-level-number{font-size:24px}.store-member-progress-caption{font-size:11px}.store-first-bonus-circle{width:48px;height:48px;flex-basis:48px;font-size:9px}}
+
+/* Position the existing Violet Crystal artwork directly under the Diamond Supply label */
+.store-shop-hero{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:unset;padding:26px 20px 22px;background:radial-gradient(ellipse at 50% 55%,rgba(127,91,190,.26),transparent 54%),linear-gradient(118deg,#12162a,#23203c 58%,#181b30)}
+.store-shop-hero .store-night-hero-copy{max-width:100%;display:flex;flex-direction:column;align-items:center}
+.store-shop-hero .store-diamond-heading{margin-top:12px}
+.store-shop-gem-showcase{margin:12px 0 0;width:auto;height:auto;flex:0 0 auto;filter:drop-shadow(0 12px 22px #885ddc52)}
+.store-shop-gem-showcase .store-crystal-svg{display:block;width:145px;height:145px;filter:drop-shadow(0 0 18px #b08bff3d)}
