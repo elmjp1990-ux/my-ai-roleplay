@@ -331,21 +331,6 @@
   text-shadow:0 1px 3px rgba(25,15,40,.72);
 }
 
-/* MY membership card follows the account's actual monthly/free membership state. */
-.profile-membership-card{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 16px;border:1px solid var(--border);border-radius:15px;background:linear-gradient(120deg,rgba(194,177,222,.18),rgba(255,255,255,.045));}
-.profile-membership-copy{display:flex;flex-direction:column;gap:5px;min-width:0}
-.profile-membership-copy>span{font-size:10px;letter-spacing:.16em;color:var(--muted)}
-.profile-membership-copy>strong{font-size:19px;letter-spacing:.03em;color:var(--text)}
-.profile-membership-status{flex:0 0 auto;padding:6px 10px;border:1px solid var(--border);border-radius:999px;color:var(--muted);font-size:11px;white-space:nowrap}
-
-
-/* MY uses the exact same cumulative top-up tier as the shop; monthly is only a status note. */
-.profile-topup-membership{align-items:flex-start}
-.profile-topup-membership .profile-membership-copy>strong{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
-.profile-topup-membership .profile-membership-copy>strong small{font-size:12px;font-weight:600;color:var(--muted)}
-.profile-topup-membership .profile-membership-copy>.profile-monthly-status{font-size:12px;letter-spacing:0;color:var(--muted);line-height:1.6}
-
-
 /* Keep the supplied 16:9 shop banner at its native visual ratio. */
 .store-shop-hero{
   aspect-ratio:16 / 9;
