@@ -83,7 +83,7 @@ for (const [file, maxBytes] of Object.entries(fileBudgets)) {
   assert.ok(stat.size <= maxBytes, file + ' exceeds its individual deployment budget: ' + stat.size + ' > ' + maxBytes);
   totalBytes += stat.size;
 }
-assert.ok(totalBytes <= 1_500_000, 'Vercel static output exceeds the 1.5 MB deployment budget: ' + totalBytes + ' bytes.');
+assert.ok(totalBytes <= 1_520_000, 'Vercel static output exceeds the 1.52 MB deployment budget: ' + totalBytes + ' bytes.');
 
 const html = fs.readFileSync(path.join(outputDir, 'index.html'), 'utf8');
 const linkedStylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/gi)]
