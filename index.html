@@ -911,6 +911,13 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
 
 </style>
 <link rel="stylesheet" href="./poyozz-ui.css">
+<style id="poyozz-policy-footer-style">
+.poyozz-policy-footer{display:flex;flex-wrap:wrap;justify-content:center;gap:8px 18px;padding:18px 20px 92px;margin:0 auto;color:var(--muted);font-size:12px;text-align:center}
+.poyozz-policy-footer a{color:inherit;text-decoration:none}
+.poyozz-policy-footer a:hover{color:var(--text);text-decoration:underline}
+@media(min-width:768px){.poyozz-policy-footer{padding-bottom:24px}}
+#modal a[href*="policy-center"]{color:var(--text);text-decoration:underline;text-underline-offset:3px}
+</style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <link rel="stylesheet" href="./city-map-ui.css">
@@ -956,6 +963,17 @@ dialog::backdrop { background:#000a; backdrop-filter:blur(4px); }
   </header>
   <main id="view"></main>
 </div>
+
+<footer class="poyozz-policy-footer" aria-label="政策與服務資訊">
+  <a href="./policy-center.html#terms">使用者服務條款</a>
+  <a href="./policy-center.html#privacy">隱私權政策</a>
+  <a href="./policy-center.html#payments">付款與鑽石說明</a>
+  <a href="./policy-center.html#membership">會員方案</a>
+  <a href="./policy-center.html#refunds">取消與退款政策</a>
+  <a href="./policy-center.html#ai">AI 服務規範</a>
+  <a href="./policy-center.html#intellectual-property">智慧財產權</a>
+  <a href="./policy-center.html#contact">客服與申訴</a>
+</footer>
 
 <nav id="mobileNav" class="mobile-nav" aria-label="主要選單"></nav>
 <dialog id="modal"></dialog>
@@ -10602,7 +10620,7 @@ function renderShop() {
   const packs=[{code:'twd_60',amount:200,price:60},{code:'twd_150',amount:525,price:150},{code:'twd_290',amount:1050,price:290},{code:'twd_850',amount:3200,price:850},{code:'twd_1390',amount:5400,price:1390},{code:'twd_2690',amount:11000,price:2690}];
   const gem='<img class="store-crystal-svg" src="https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2F%25E7%25B4%25AB%25E7%25BE%2585%25E8%2598%25AD%25E5%25B9%25BB%25E5%25BD%25A9%25E9%2591%25BD%25E7%259F%25B3%25E6%25B0%25B4%25E6%2599%25B6.png&w=512&output=webp&q=82&maxage=1y" alt="紫羅蘭幻彩鑽石水晶" width="145" height="145" decoding="async" fetchpriority="high">';
     const packageGem=gem.replace('store-crystal-svg','poyozz-diamond-icon store-package-diamond-icon').replace('width="145" height="145"','width="35" height="35"');
-  $('view').innerHTML='<div class="stack store-page store-night-page" style="gap:22px">'+'<section class="store-night-hero store-shop-hero"><div class="store-night-hero-copy"><h1>POYOZZ SHOP</h1><p class="store-shop-tagline"><span>讓心動不再受限</span><span>延續每一個專屬的秘密對話</span></p></div></section>'+membershipCard+(!u?'<p class="store-guest-note">登入後即可查看個人累積儲值與會員進度；購買鑽石及月費方案需先登入。</p>':'')+'<section><div class="store-section-heading store-package-heading"><div><small>DIAMOND SUPPLY</small><h2>鑽石儲值</h2></div></div><div class="store-package-grid">'+packs.map((item,i)=>{const first=!u||!state.ledger.some(x=>x.currency==='diamond'&&x.reason==='首儲優惠贈鑽'&&x.referenceId===item.code);const bonus=Math.round(item.amount*.3);const packageNames=['小資鑽石包','基本鑽石包','輕量鑽石包','暢享鑽石包','尊享鑽石包','豪華鑽石包'];const packageArtworkClasses=['store-package-small','store-package-basic','store-package-light','store-package-delight','store-package-premium','store-package-luxury'];return '<article class="store-crystal-package'+(packageArtworkClasses[i]?' '+packageArtworkClasses[i]:'')+(i===5?' store-package-featured':'')+'"><div class="store-package-topline"><span>'+packageNames[i]+'</span>'+'<b class="store-package-first-badge store-first-bonus-circle'+(first?'':' store-package-first-badge-hidden')+'">First 30% bonus</b>'+'</div>'+(i===0?'':'<div class="store-package-gem-mark">'+packageGem+'</div>')+'<div class="store-package-diamond-count"><strong>'+item.amount.toLocaleString()+'</strong><span>鑽石</span></div>'+'<div class="store-package-bonus-line'+(first?'':' store-package-bonus-muted')+'">'+(first?'首次贈 <strong>+'+bonus.toLocaleString()+'</strong> · 總計 '+(item.amount+bonus).toLocaleString()+' 鑽':'　')+'</div>'+'<div class="store-package-bottom"><strong>NT$'+item.price.toLocaleString()+'</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="'+item.code+'">'+(u?'購買':'登入後購買')+'</button></div></article>';}).join('')+'</div><p class="store-package-footnote">首儲優惠依每個儲值級距分別計算；月費會員同樣享有符合資格的首儲贈鑽。</p></section></div>';
+  $('view').innerHTML='<div class="stack store-page store-night-page" style="gap:22px">'+'<section class="store-night-hero store-shop-hero"><div class="store-night-hero-copy"><h1>POYOZZ SHOP</h1><p class="store-shop-tagline"><span>讓心動不再受限</span><span>延續每一個專屬的秘密對話</span></p></div></section>'+membershipCard+(!u?'<p class="store-guest-note">登入後即可查看個人累積儲值與會員進度；購買鑽石及月費方案需先登入。</p>':'')+'<section><div class="store-section-heading store-package-heading"><div><small>DIAMOND SUPPLY</small><h2>鑽石儲值</h2></div></div><div class="store-package-grid">'+packs.map((item,i)=>{const first=!u||!state.ledger.some(x=>x.currency==='diamond'&&x.reason==='首儲優惠贈鑽'&&x.referenceId===item.code);const bonus=Math.round(item.amount*.3);const packageNames=['小資鑽石包','基本鑽石包','輕量鑽石包','暢享鑽石包','尊享鑽石包','豪華鑽石包'];const packageArtworkClasses=['store-package-small','store-package-basic','store-package-light','store-package-delight','store-package-premium','store-package-luxury'];return '<article class="store-crystal-package'+(packageArtworkClasses[i]?' '+packageArtworkClasses[i]:'')+(i===5?' store-package-featured':'')+'"><div class="store-package-topline"><span>'+packageNames[i]+'</span>'+'<b class="store-package-first-badge store-first-bonus-circle'+(first?'':' store-package-first-badge-hidden')+'">First 30% bonus</b>'+'</div>'+(i===0?'':'<div class="store-package-gem-mark">'+packageGem+'</div>')+'<div class="store-package-diamond-count"><strong>'+item.amount.toLocaleString()+'</strong><span>鑽石</span></div>'+'<div class="store-package-bonus-line'+(first?'':' store-package-bonus-muted')+'">'+(first?'首次贈 <strong>+'+bonus.toLocaleString()+'</strong> · 總計 '+(item.amount+bonus).toLocaleString()+' 鑽':'　')+'</div>'+'<div class="store-package-bottom"><strong>NT$'+item.price.toLocaleString()+'</strong><button type="button" class="store-package-buy" data-action="test-diamond-package" data-id="'+item.code+'">'+(u?'購買':'登入後購買')+'</button></div></article>';}).join('')+'</div><p class="store-package-footnote">首儲優惠依每個儲值級距分別計算；月費會員同樣享有符合資格的首儲贈鑽。</p></section><section class="store-policy-area" aria-label="商店服務與交易說明" style="padding:16px 18px;border:1px solid var(--border);border-radius:16px;background:var(--panel);text-align:center"><p class="small" style="margin:0;line-height:1.8;color:var(--muted)">購買前請詳細閱讀<a href="./policy-center.html#refunds" target="_blank" rel="noopener">取消、退貨與退款</a>政策，點擊「購買」即表示您<strong>已閱讀、瞭解並同意接受本政策之所有內容。</strong></p></section></div>';
 }
 function renderProfile() {
   const u = currentUser();
@@ -10823,8 +10841,13 @@ function renderModal(o) {
       openInsufficientFundsDialog('single');
       break;
     case 'login':
-      showDialog('登入 PersonaX',`
-        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>`);
+      showDialog('登入 POYOZZ',`
+        <button onclick="loginWithGoogle()" class="primary" style="width:100%">Google登入</button>
+        <p class="small muted" style="margin:14px 0 0;text-align:center;line-height:1.8">
+          本服務僅供年滿 18 歲之使用者使用。註冊或登入 POYOZZ，即代表您確認已年滿 18 歲，並同意
+          <a href="./policy-center.html#terms" target="_blank" rel="noopener">《使用者服務條款》</a>及
+          <a href="./policy-center.html#privacy" target="_blank" rel="noopener">《隱私權政策》</a>。
+        </p>`);
       break;
       break;
     case 'tags':
