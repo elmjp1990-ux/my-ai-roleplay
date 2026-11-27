@@ -183,7 +183,7 @@ BEGIN
       s.weekday, s.day_type, s.start_time, s.end_time, s.location_key,
       s.location_description, s.activity, s.scene_description, s.priority,
       s.is_active, s.variant_key, s.variant_weight, s.special_event_key,
-      s.encounter_greeting, s.is_outdoor, s.rain_fallback_location_key,
+      COALESCE(s.encounter_greeting, ''), s.is_outdoor, s.rain_fallback_location_key,
       s.rain_fallback_activity, s.rain_fallback_greeting
     ) IS DISTINCT FROM ROW(
       i.weekday, i.day_type, i.start_time, i.end_time, i.location_key,
