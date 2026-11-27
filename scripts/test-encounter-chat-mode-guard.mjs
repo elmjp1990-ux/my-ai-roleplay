@@ -278,7 +278,7 @@ assert.doesNotMatch(frontend, /sessionsWithAssistantReply/,
   'Encounter memory list must not scan chat_messages just to detect completed sessions');
 assert.match(frontend, /這裡收藏你與['"]\+e\(sessionCharacter\(session\)\?\.name\|\|['"]角色['"]\)/);
 assert.ok(frontend.includes('<span>陌生人</span>'));
-assert.match(frontend, /profileJobStatus==='failed'[\s\S]*?手動重試 AI 整理/);
+assert.match(frontend, /profileJobStatus==='failed'[\s\S]*?手動重試下一位/);
 assert.match(frontend, /enqueue_character_profile_organization/);
 assert.match(frontend, /前次已完成的模型請求重複計費/);
 assert.match(frontend, /historyApi\.loadCloudHistory\(person,currentUser,client,\{append\}\)/);
