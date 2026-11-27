@@ -20,6 +20,7 @@ export type StoryTurnEnvelopeOptions = {
   playerName?: string;
   characterName?: string;
   currentStoryWorldState?: { story_time?: string; story_location?: string } | null;
+  currentPhoneStates?: Array<{ field_index: number; title: string; body: string }>;
 };
 
 const fallbackSuggestedReplies = (): string[] => [
@@ -160,7 +161,16 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
       const indexedCandidateHasWrongTitle = indexedCandidate
         && indexedCandidate.title.trim() !== label.trim();
       if (!candidate || indexedCandidateHasWrongTitle || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
-        return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
+        // Keep the last snapshot only when the configured field identity still matches;
+        // a renamed/re-purposed author field must not inherit unrelated old content.
+        const priorState = (options.currentPhoneStates ?? []).find((state) =>
+          state.field_index === index && state.title.trim() === label.trim() && boundedText(state.body, 600)
+        );
+        return {
+          event_type: "notification",
+          title: label,
+          body: priorState ? boundedText(priorState.body, 600) : fallbackBodyForLabel(label),
+        };
       }
       const candidateBody = candidate.body || fallbackBodyForLabel(label);
       return {
