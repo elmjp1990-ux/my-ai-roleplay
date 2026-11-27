@@ -1,3 +1,4 @@
+import { detectPlayerSummaryLanguage } from "./story-summary-language.ts";
 import { requestOpenRouterChatCompletion } from "./openrouter-chat-completions.ts";
 import { asRecord as row, asTrimmedString as str } from "./ai-value-utils.ts";
 import { recordAiGenerationDiagnostic, updateAiGenerationDiagnostic } from "./ai-generation-diagnostics.ts";
@@ -273,6 +274,8 @@ export async function processDueStoryMemorySummary(
   const previousSummary = str(previousBatch?.summary) ||
     (rows.length === 0 ? str(sessionData.summary) : "");
   const characterName = str(session.character_name) || "角色";
+  const playerMessages = sourceMessages.filter((message: DbRow) => message.role === "user").map((message: DbRow) => str(message.content));
+  const summaryLanguage = detectPlayerSummaryLanguage(playerMessages);
   const transcript = sourceMessages.map((message: DbRow) =>
     (message.role === "assistant" ? characterName : "玩家") + "：" + str(message.content)
   ).join("\n");
@@ -296,7 +299,7 @@ export async function processDueStoryMemorySummary(
         content: [
           "你是 POYOZZ 的長期劇情記憶整理器與關係校正器。每次只整理本批新增的五個已完成回合，產生一則獨立的本批重點摘要，供角色下次接續故事使用。",
           "只輸出 JSON object：{\"summary\":\"30～100 個中文字的本批摘要\",\"affinity_correction\":0,\"affinity_reason\":\"校正理由\"}。不要 Markdown 或其他文字。",
-          "摘要目標為 30～100 個中文字，單一精簡段落，不要標題、條列、分析或補充說明。只摘要本批五回合新發生的重點，不要把前一批摘要的 1～5 回合事件再次寫入；既有摘要只供理解長期背景，除非本批有明確更新，否則不要重述。",
+          "摘要目標為 30～100 字，單一精簡段落，不要標題、條列、分析或補充說明。摘要必須使用玩家本批對話主要輸入語言及文字系統；本批判定語言為：" + summaryLanguage + "。嚴禁將玩家使用的繁體中文轉成簡體中文，也不可自行固定使用中文；若玩家使用英文、日文、韓文或其他語言，摘要就用該語言。只摘要本批五回合新發生的重點，不要把前一批摘要的 1～5 回合事件再次寫入；既有摘要只供理解長期背景，除非本批有明確更新，否則不要重述。",
           "好感度校正不是把這五回合的變化重新累加。每回合好感度已即時微調；請檢視五回合完整互動後，判斷目前累積值是否需要小幅修正，只回傳 -5 到 5 的整數 correction。若逐回合評估合理就填 0；不可把五回合淨變化再加一次，也不可因單次甜蜜互動直接跳級。",
           "優先保留玩家明確偏好、角色關係變化、重要共同事件、承諾、界線、情緒轉折，以及尚未完成或下次要接續的事情。",
           "只記錄確實發生或明確約定的內容。不可推測、補造事件、替玩家決定想法或行動，也不可把角色提出但未完成的事寫成已完成。",
