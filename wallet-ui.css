@@ -131,12 +131,12 @@
 
 /* Optimized shop artwork: serve cached 1200px WebP derivatives for every pack. */
 /* A restrained plum-to-charcoal glass gradient protects text contrast without flattening the artwork. */
-.store-crystal-package.store-package-small{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
-.store-crystal-package.store-package-basic{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
-.store-crystal-package.store-package-light{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
-.store-crystal-package.store-package-delight{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
-.store-crystal-package.store-package-premium{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
-.store-crystal-package.store-package-luxury{background-image:linear-gradient(180deg,rgba(24,18,39,.30) 0%,rgba(24,18,39,.12) 34%,rgba(18,14,31,.84) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-small{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8F%E8%B3%87%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-basic{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%9F%BA%E6%9C%AC%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-light{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%BC%95%E9%87%8F%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-delight{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E6%9A%A2%E9%9F%BF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-premium{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E5%B0%8A%E4%BA%AB%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
+.store-crystal-package.store-package-luxury{background-image:linear-gradient(180deg,rgba(24,18,39,.06) 0%,rgba(24,18,39,.02) 38%,rgba(18,14,31,.58) 100%),linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.025) 58%,rgba(255,255,255,0) 100%),url("https://images.weserv.nl/?url=https%3A%2F%2Fraw.githubusercontent.com%2Felmjp1990-ux%2Fmy-ai-roleplay%2Fmain%2Fassets%2Fshop%2F%E8%B1%AA%E8%8F%AF%E9%91%BD%E7%9F%B3%E5%8C%85.jpg&w=1200&output=webp&q=82&maxage=1y")}
 .store-crystal-package.store-package-small,
 .store-crystal-package.store-package-basic,
 .store-crystal-package.store-package-light,
@@ -239,4 +239,23 @@
 .store-crystal-package.store-package-delight .store-package-gem-mark,
 .store-crystal-package.store-package-luxury .store-package-gem-mark{
   display:none;
+}
+
+
+/* Brighter artwork with contrast concentrated only behind the lower text area. */
+.store-crystal-package.store-package-small .store-package-diamond-count,
+.store-crystal-package.store-package-basic .store-package-diamond-count,
+.store-crystal-package.store-package-light .store-package-diamond-count,
+.store-crystal-package.store-package-delight .store-package-diamond-count,
+.store-crystal-package.store-package-premium .store-package-diamond-count,
+.store-crystal-package.store-package-luxury .store-package-diamond-count{
+  text-shadow:0 1px 2px rgba(25,15,40,.92),0 2px 10px rgba(25,15,40,.58);
+}
+.store-crystal-package .store-package-bonus-line{
+  min-height:27px;
+  display:flex;
+  align-items:center;
+}
+.store-crystal-package .store-package-bonus-muted{
+  visibility:hidden;
 }
