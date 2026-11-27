@@ -10,7 +10,7 @@
     :root{color-scheme:dark;--bg:#171522;--panel:rgba(42,39,58,.78);--line:rgba(224,216,246,.15);--text:#f5f0fb;--muted:#c2b9d0;--accent:#e5c9a8;--link:#f0d6b6}
     *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -15%,rgba(123,105,151,.28),transparent 55%),var(--bg);color:var(--text);font:15px/1.85 system-ui,-apple-system,"Noto Sans TC",sans-serif}
     a{color:var(--link);text-underline-offset:3px}.shell{width:min(1100px,calc(100% - 32px));margin:0 auto;padding:28px 0 64px}
-    header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:28px}.brand{font-size:20px;letter-spacing:.18em;font-weight:750;color:var(--text);text-decoration:none}.back{border:1px solid var(--line);border-radius:999px;padding:8px 15px;text-decoration:none;color:var(--muted);font-size:13px}
+    header{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:28px}.brand{display:inline-flex;align-items:center;text-decoration:none;min-height:34px}.brand img{display:block;width:132px;height:34px;object-fit:contain;object-position:left center}.back{border:1px solid var(--line);border-radius:999px;padding:8px 15px;text-decoration:none;color:var(--muted);font-size:13px}
     .hero{padding:32px clamp(20px,5vw,52px);border:1px solid var(--line);border-radius:24px;background:linear-gradient(135deg,rgba(111,94,137,.28),rgba(42,39,58,.76));box-shadow:0 18px 55px #09071155}
     .eyebrow{color:var(--accent);font-size:11px;letter-spacing:.22em}.hero h1{font-size:clamp(28px,5vw,42px);line-height:1.25;margin:8px 0}.hero p{color:var(--muted);max-width:720px;margin:0}
     .layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:22px;margin-top:22px;align-items:start}.nav,.content{border:1px solid var(--line);border-radius:20px;background:var(--panel);backdrop-filter:blur(18px)}
@@ -23,7 +23,7 @@
 </head>
 <body>
   <div class="shell">
-    <header><a class="brand" href="./index.html">POYOZZ</a><a class="back" href="./index.html">返回 POYOZZ</a></header>
+    <header><a class="brand" href="./index.html" aria-label="POYOZZ 首頁"><img src="./LOGO_WEBLOGO.webp" alt="POYOZZ"></a><a class="back" href="./index.html">返回 POYOZZ</a></header>
     <div class="hero"><div class="eyebrow">POYOZZ · POLICY CENTER</div><h1>政策與服務說明</h1><p>在開始角色探索、創作與對話前，請閱讀以下服務規範。我們會以清楚透明的方式說明帳號、內容、付款、會員與個人資料的使用方式。</p></div>
     <div class="layout">
       <nav class="nav" aria-label="政策目錄">
@@ -149,9 +149,15 @@
         </section>
         <section id="membership">
           <h2>05｜會員方案與自動續約規則</h2>
-          <p>POYOZZ 月費會員方案目前標示為 <strong>NT$150／月</strong>，採自動續約制。訂閱前請確認付款頁面所載的方案內容、扣款週期、續約金額及取消方式。</p>
-          <ul><li>月費會員資格與依累積儲值金額計算的會員等級，為兩套分開計算的制度。</li><li>月費會員若另行購買鑽石，仍可依活動條件享有首次儲值優惠；是否符合資格以系統及活動頁面顯示為準。</li><li>月費會員權益依訂閱有效期間提供；取消續約後，已付款當期的會員權益原則上可使用至該期到期日。</li><li>訂閱續約、取消或付款失敗等狀態，以帳號內訂閱資訊及付款服務商紀錄為準。</li></ul>
-          <p class="muted">若購買頁面對特定方案另有明確說明，該方案結帳前揭露內容亦為交易條件的一部分。</p>
+          <p>POYOZZ 月費會員方案之價格、扣款週期、續約金額及會員權益，均以網站購買頁面於結帳前所顯示的最新資訊為準。月費會員方案採自動續約制者，將依購買頁面所載週期及金額續訂；訂閱前請詳閱方案內容、扣款日期及取消方式。</p>
+          <ul>
+            <li>月費會員資格與依累積儲值金額計算的會員等級，為兩套分開計算的制度。</li>
+            <li>月費會員若另行購買鑽石，仍可依活動條件享有首次儲值優惠；是否符合資格以系統及活動頁面顯示為準。</li>
+            <li>月費會員權益依訂閱有效期間提供；取消續約後，已付款當期的會員權益原則上可使用至該期到期日。</li>
+            <li>訂閱續約、取消或付款失敗等狀態，以帳號內訂閱資訊及付款服務商紀錄為準。</li>
+            <li><strong>未成年人訂閱規範：</strong>未滿 14 歲者不得註冊或購買會員方案；年滿 14 歲但未滿 18 歲者，應先取得法定代理人同意，並由法定代理人協助確認訂閱價格、扣款週期、自動續約及取消方式。未成年人不得未經法定代理人同意，擅自使用他人付款工具或建立付費訂閱。POYOZZ 不要求於網站上傳或提交法定代理人同意書，但使用者及法定代理人仍應自行確認已取得必要同意。</li>
+          </ul>
+          <p class="muted">若購買頁面對特定方案另有明確說明，該方案結帳前揭露內容亦為交易條件的一部分。實際價格及交易條件以結帳前頁面顯示為準。</p>
         </section>
         <section id="refunds">
           <h2>06｜取消、退貨與退款政策</h2>
