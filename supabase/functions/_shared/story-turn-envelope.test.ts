@@ -249,3 +249,42 @@ Deno.test("story world state follows contextual time jumps and location correcti
   });
   assertEquals(omitted.story_world_state, previous);
 });
+
+Deno.test("dynamic configured phone fields map by explicit index and reject only invalid fields", () => {
+  const prompts = [
+    "自訂欄位 A|A 的用途",
+    "自訂欄位 B|B 的用途",
+    "自訂欄位 C|C 的用途",
+  ];
+  const parsed = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "正常回覆",
+    phone_events: [
+      { field_index: 2, event_type: "notification", title: "自訂欄位 C", body: "C 的新內容" },
+      { field_index: 0, event_type: "notification", title: "自訂欄位 A", body: "A 的新內容" },
+      { field_index: 1, event_type: "notification", title: "自訂欄位 B", body: "B 的新內容" },
+    ],
+  }), { configuredPrompts: prompts });
+  assertEquals(parsed.phone_events, [
+    { event_type: "notification", title: "自訂欄位 A", body: "A 的新內容" },
+    { event_type: "notification", title: "自訂欄位 B", body: "B 的新內容" },
+    { event_type: "notification", title: "自訂欄位 C", body: "C 的新內容" },
+  ]);
+
+  const partial = parseStoryTurnEnvelope(JSON.stringify({
+    reply: "主要回覆仍然成功",
+    phone_events: [
+      { field_index: 2, event_type: "notification", title: "自訂欄位 C", body: "C 正常更新" },
+      { field_index: 0, event_type: "notification", title: "自訂欄位 A", body: "A 正常更新" },
+      { field_index: 1, event_type: "notification", title: "錯誤欄位標題", body: "不應寫入欄位 B" },
+    ],
+  }), {
+    configuredPrompts: prompts,
+    currentPhoneStates: [{ field_index: 1, title: "自訂欄位 B", body: "B 的上次有效內容" }],
+  });
+  assertEquals(partial.reply, "主要回覆仍然成功");
+  assertEquals(partial.phone_events, [
+    { event_type: "notification", title: "自訂欄位 A", body: "A 正常更新" },
+    { event_type: "notification", title: "自訂欄位 B", body: "B 的上次有效內容" },
+    { event_type: "notification", title: "自訂欄位 C", body: "C 正常更新" },
+  ]);
+});

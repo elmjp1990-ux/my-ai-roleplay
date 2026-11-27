@@ -2,6 +2,7 @@ export type StoryPhoneEvent = {
   event_type: "message" | "social_post" | "missed_call" | "voice_message" | "notification";
   title: string;
   body: string;
+  field_index?: number;
 };
 
 export type StoryTurnEnvelope = {
@@ -19,6 +20,7 @@ export type StoryTurnEnvelopeOptions = {
   playerName?: string;
   characterName?: string;
   currentStoryWorldState?: { story_time?: string; story_location?: string } | null;
+  currentPhoneStates?: Array<{ field_index: number; title: string; body: string }>;
 };
 
 const fallbackSuggestedReplies = (): string[] => [
@@ -125,11 +127,16 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
         parsedPhoneEvents.push(null);
         continue;
       }
+      const explicitFieldIndex = typeof event.field_index === "number" && Number.isInteger(event.field_index)
+        && event.field_index >= 0 && event.field_index < 8
+        ? event.field_index
+        : null;
       parsedPhoneEvents.push({
         event_type: event.event_type as StoryPhoneEvent["event_type"],
         title,
         body,
-      });
+        ...(explicitFieldIndex === null ? {} : { field_index: explicitFieldIndex }),
+      } as StoryPhoneEvent & { field_index?: number });
     }
   }
 
@@ -142,9 +149,28 @@ export function parseStoryTurnEnvelope(raw: string, options: StoryTurnEnvelopeOp
   } else {
     phoneEvents = configuredPrompts.map((prompt, index) => {
       const label = promptLabel(prompt, boundedText(options.characterName, 80) || "角色", playerName);
-      const candidate = parsedPhoneEvents[index] ?? undefined;
-      if (!candidate || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
-        return { event_type: "notification", title: label, body: fallbackBodyForLabel(label) };
+      // Explicit field_index takes priority over array order. Legacy outputs still use their original position.
+      const indexedCandidate = parsedPhoneEvents.find((event) =>
+        event && typeof (event as StoryPhoneEvent & { field_index?: number }).field_index === "number"
+        && (event as StoryPhoneEvent & { field_index?: number }).field_index === index
+      );
+      const positionalCandidate = parsedPhoneEvents[index];
+      const candidate = indexedCandidate ?? (positionalCandidate && typeof (positionalCandidate as StoryPhoneEvent & { field_index?: number }).field_index !== "number"
+        ? positionalCandidate
+        : undefined);
+      const indexedCandidateHasWrongTitle = indexedCandidate
+        && indexedCandidate.title.trim() !== label.trim();
+      if (!candidate || indexedCandidateHasWrongTitle || (!explicitSend && isLikelyPlayerOriginMessage(candidate, playerName))) {
+        // Keep the last snapshot only when the configured field identity still matches;
+        // a renamed/re-purposed author field must not inherit unrelated old content.
+        const priorState = (options.currentPhoneStates ?? []).find((state) =>
+          state.field_index === index && state.title.trim() === label.trim() && boundedText(state.body, 600)
+        );
+        return {
+          event_type: "notification",
+          title: label,
+          body: priorState ? boundedText(priorState.body, 600) : fallbackBodyForLabel(label),
+        };
       }
       const candidateBody = candidate.body || fallbackBodyForLabel(label);
       return {

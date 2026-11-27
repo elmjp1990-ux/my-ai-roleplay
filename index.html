@@ -3692,6 +3692,9 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
+      // Restore the persisted toggle before rendering the suggestion panel; otherwise
+      // a stale local default can hide valid per-message suggestions after reload.
+      s.suggestions=savedData.suggestions!==false;
       s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
@@ -10290,42 +10293,25 @@ document.addEventListener('click',async event=>{
     try{
       edited=JSON.parse(editor.value);
       if(!Array.isArray(edited))throw new Error('JSON 必須是陣列');
-      if(edited.some(row=>!row||typeof row!=='object'||!row.id))throw new Error('每筆行程都必須保留原本的 id');
-      const ids=edited.map(row=>String(row.id));
-      if(new Set(ids).size!==ids.length)throw new Error('行程 id 不可重複');
+      if(!edited.length)throw new Error('至少保留一筆行程，避免誤刪整份行程表');
+      if(edited.length>500)throw new Error('單份行程最多 500 筆');
+      if(edited.some(row=>!row||typeof row!=='object'||Array.isArray(row)))throw new Error('每筆行程都必須是物件');
     }catch(error){
       if(status)status.textContent='JSON 格式或資料錯誤：'+(error?.message||'請檢查內容');
       return;
     }
     saveSchedulesButton.disabled=true;
-    if(status)status.textContent='正在驗證並儲存修改…';
+    if(status)status.textContent='正在驗證並安全儲存行程（包含新增、修改與移除）…';
     try{
-      const client=window.mySupabase;
-      const {data:currentRows,error:readError}=await client.from('character_schedules')
-        .select('id,character_id,weekday,day_type,start_time,end_time,location_key,location_description,activity,scene_description,priority,is_active,source_type,variant_key,variant_weight,special_event_key,encounter_greeting,is_outdoor,rain_fallback_location_key,rain_fallback_activity,rain_fallback_greeting')
-        .eq('character_id',characterId).eq('is_active',true);
-      if(readError)throw readError;
-      const current=Array.isArray(currentRows)?currentRows:[];
-      const currentIds=new Set(current.map(row=>String(row.id)));
-      if(edited.length!==current.length||edited.some(row=>!currentIds.has(String(row.id)))){
-        throw new Error('為避免資料不完整，目前請保留所有既有行程 id 與筆數；新增／刪除需另外安全處理。');
-      }
-      const allowed=['weekday','day_type','start_time','end_time','location_key','location_description','activity','scene_description','priority','is_active','variant_key','variant_weight','special_event_key','encounter_greeting','is_outdoor','rain_fallback_location_key','rain_fallback_activity','rain_fallback_greeting'];
-      const originalById=new Map(current.map(row=>[String(row.id),row]));
-      for(const row of edited){
-        const original=originalById.get(String(row.id));
-        const patch={};
-        for(const key of allowed){
-          if(Object.prototype.hasOwnProperty.call(row,key)&&JSON.stringify(row[key]??null)!==JSON.stringify(original[key]??null))patch[key]=row[key];
-        }
-        if(!Object.keys(patch).length)continue;
-        patch.source_type='manual';
-        const {error:updateError}=await client.from('character_schedules').update(patch).eq('id',row.id).eq('character_id',characterId);
-        if(updateError)throw updateError;
-      }
-      if(status)status.textContent='行程修改已儲存。正在重新讀取確認…';
+      const {data,error}=await window.mySupabase.rpc('replace_character_schedules_from_editor',{
+        p_character_id:characterId,
+        p_rows:edited
+      });
+      if(error)throw error;
+      const result=data&&typeof data==='object'?data:{};
+      if(status)status.textContent='儲存完成：更新 '+Number(result.updated||0)+' 筆、新增 '+Number(result.inserted||0)+' 筆、移除 '+Number(result.deleted||0)+' 筆。正在重新讀取確認…';
       await loadEncounterScheduleTestTools();
-      if(status)status.textContent='行程修改已儲存並重新讀取確認；純查看不會呼叫 AI。';
+      if(status)status.textContent='行程已儲存並重新讀取確認；既有行程 ID 已保留，新增行程由資料庫建立 ID，移除的行程已實際刪除。';
     }catch(error){
       if(status)status.textContent='儲存失敗：'+(error?.message||'請稍後重試');
     }finally{
