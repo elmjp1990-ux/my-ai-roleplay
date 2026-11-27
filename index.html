@@ -3692,6 +3692,9 @@ async function saveChatSessionToCloud(s, options = {}) {
       const savedData=currentRow.data.session_data&&typeof currentRow.data.session_data==='object'?currentRow.data.session_data:{};
       s.memories=Array.isArray(savedData.memories)?savedData.memories:[];
       s.album=Array.isArray(savedData.album)?savedData.album:[];
+      // Restore the persisted toggle before rendering the suggestion panel; otherwise
+      // a stale local default can hide valid per-message suggestions after reload.
+      s.suggestions=savedData.suggestions!==false;
       s.suggestedReplies=Array.isArray(savedData.suggestedReplies)?savedData.suggestedReplies.slice(0,3).map(value=>String(value||'').trim()).filter(value=>Array.from(value).length>=30&&Array.from(value).length<=90):[];
       s.cloudRoleplayMeta=savedData.roleplayMeta&&typeof savedData.roleplayMeta==='object'?savedData.roleplayMeta:{};
       s.pendingTurn=savedData.pendingTurn&&isUuid(savedData.pendingTurn.turnId)&&isUuid(savedData.pendingTurn.userMessageId)&&isUuid(savedData.pendingTurn.assistantMessageId)
