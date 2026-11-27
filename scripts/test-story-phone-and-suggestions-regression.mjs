@@ -58,6 +58,8 @@ assert.match(html, /const noticeContentHTML=\[configuredNoticeHTML,storyStateHTM
 assert.match(html, /const configuredFieldIndexes=new Set\(configuredPhonePrompts\.slice\(0,8\)/);
 
 // Per-message persisted suggestions override stale session metadata on reload.
+assert.match(html, /s\.suggestions=savedData\.suggestions!==false/,
+  'the persisted suggestion visibility toggle must be restored before rendering the composer');
 assert.match(html, /Object\.assign\(normalized,metadata\);[\s\S]{0,260}if\(persistedSuggestions\.length===3\)normalized\.suggestedReplies=persistedSuggestions/);
 
 // Refresh Story relationship state once through renderConversation after settlement.
