@@ -265,3 +265,25 @@
 .store-crystal-package .store-package-first-badge-hidden{
   visibility:hidden;
 }
+
+
+/* POYOZZ member cards: six restrained, distinct material finishes. */
+.store-member-level-card{isolation:isolate;border-color:var(--member-edge,rgba(255,255,255,.2));background:var(--member-surface,linear-gradient(125deg,#292b35,#171923 62%,#252532));color:var(--member-text,#f4f2f8);box-shadow:inset 0 1px rgba(255,255,255,.2),inset 0 -18px 38px var(--member-shade,rgba(0,0,0,.12)),0 14px 32px rgba(8,5,15,.2)}
+.store-member-level-card:before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(ellipse at 88% 8%,var(--member-glow,rgba(255,255,255,.12)),transparent 48%),linear-gradient(115deg,rgba(255,255,255,.12),transparent 38%,rgba(255,255,255,.035));}
+.store-member-level-card .store-member-top small,.store-member-level-card .store-member-total span{color:var(--member-muted,rgba(255,255,255,.72));opacity:1}
+.store-member-level-card .store-member-top h2{color:var(--member-text,#f4f2f8);text-shadow:0 2px 12px var(--member-text-shadow,rgba(0,0,0,.18))}
+.store-member-level-card .store-member-level-number{color:var(--member-accent,#eee8fa);text-shadow:0 1px 12px var(--member-glow,rgba(255,255,255,.2))}
+.store-member-level-card .store-member-progress-track{background:var(--member-track,rgba(0,0,0,.2));box-shadow:inset 0 1px 3px rgba(0,0,0,.22)}
+.store-member-level-card .store-member-progress-fill{background:var(--member-fill,linear-gradient(90deg,#aaa0bd,#f1eaff));box-shadow:0 0 13px var(--member-glow,rgba(255,255,255,.24))}
+.store-member-level-card .store-member-progress-caption{color:var(--member-muted,rgba(255,255,255,.78))}
+.store-member-level-card .store-member-total{border-top-color:var(--member-divider,rgba(255,255,255,.18))}
+.store-member-level-card .store-member-total strong{color:var(--member-text,#f4f2f8)}
+.store-member-level-card .store-member-history{color:var(--member-muted,rgba(255,255,255,.78))}
+.store-member-level-lv0{--member-surface:linear-gradient(128deg,#454650 0%,#292b34 48%,#171920 100%);--member-edge:rgba(190,194,207,.3);--member-text:#f0f0f4;--member-muted:#c4c5ce;--member-accent:#d6d7df;--member-fill:linear-gradient(90deg,#777b89,#d4d6df);--member-glow:rgba(205,211,230,.18);--member-shade:rgba(0,0,0,.25);--member-track:rgba(0,0,0,.28)}
+.store-member-level-lv1{--member-surface:linear-gradient(128deg,#f0f1f3 0%,#cfd3da 48%,#aeb4bf 100%);--member-edge:rgba(255,255,255,.8);--member-text:#343943;--member-muted:#555d69;--member-accent:#59616d;--member-fill:linear-gradient(90deg,#858e9c,#f8f9fb);--member-glow:rgba(255,255,255,.62);--member-shade:rgba(67,75,89,.1);--member-track:rgba(58,65,77,.17);--member-divider:rgba(67,75,89,.2);--member-text-shadow:rgba(255,255,255,.65)}
+.store-member-level-lv2{--member-surface:linear-gradient(128deg,#e7d5a7 0%,#c9ae70 48%,#9e824b 100%);--member-edge:rgba(255,239,195,.78);--member-text:#42351f;--member-muted:#665536;--member-accent:#705b32;--member-fill:linear-gradient(90deg,#9c7a3e,#f7e7b9);--member-glow:rgba(255,237,190,.48);--member-shade:rgba(85,61,23,.12);--member-track:rgba(76,56,25,.17);--member-divider:rgba(91,68,31,.2);--member-text-shadow:rgba(255,245,216,.42)}
+.store-member-level-lv3{--member-surface:linear-gradient(128deg,#f4f5f6 0%,#d9dde2 48%,#b8bec7 100%);--member-edge:rgba(255,255,255,.9);--member-text:#353b45;--member-muted:#5c6470;--member-accent:#58616e;--member-fill:linear-gradient(90deg,#929ba8,#fff);--member-glow:rgba(255,255,255,.7);--member-shade:rgba(70,78,89,.1);--member-track:rgba(56,65,78,.16);--member-divider:rgba(67,75,89,.2);--member-text-shadow:rgba(255,255,255,.72)}
+.store-member-level-lv4{--member-surface:linear-gradient(128deg,#e8e3f8 0%,#b9c9df 38%,#8b9ebd 72%,#77728f 100%);--member-edge:rgba(238,229,255,.88);--member-text:#292d42;--member-muted:#4c526b;--member-accent:#494d70;--member-fill:linear-gradient(90deg,#8d8cc5,#f4eaff 52%,#b8e6ef);--member-glow:rgba(224,215,255,.68);--member-shade:rgba(48,43,78,.13);--member-track:rgba(45,47,76,.18);--member-divider:rgba(64,61,94,.22);--member-text-shadow:rgba(255,255,255,.65)}
+.store-member-level-lv5{--member-surface:linear-gradient(122deg,#29283e 0%,#171a2c 42%,#34304c 72%,#111725 100%);--member-edge:rgba(207,190,255,.82);--member-text:#f7f2ff;--member-muted:#d4cce8;--member-accent:#f0e4ff;--member-fill:linear-gradient(90deg,#7468a9,#d9c8ff 48%,#a7dce9);--member-glow:rgba(185,155,255,.4);--member-shade:rgba(0,0,0,.32);--member-track:rgba(0,0,0,.3);--member-divider:rgba(218,200,255,.24);--member-text-shadow:rgba(13,10,30,.55);border-width:1.5px;box-shadow:inset 0 1px rgba(255,255,255,.28),inset 0 -24px 48px rgba(0,0,0,.25),0 16px 38px rgba(7,5,20,.3),0 0 24px rgba(174,143,255,.12)}
+.store-member-level-lv5:after{content:"";position:absolute;inset:1px;z-index:-1;pointer-events:none;border-radius:20px;background:linear-gradient(112deg,transparent 12%,rgba(255,255,255,.1) 34%,transparent 53%,rgba(183,220,255,.08) 72%,transparent 88%)}
+@media(max-width:600px){.store-member-level-lv5{box-shadow:inset 0 1px rgba(255,255,255,.24),inset 0 -18px 36px rgba(0,0,0,.24),0 10px 24px rgba(7,5,20,.26)}}
